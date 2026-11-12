@@ -1484,6 +1484,22 @@
         "AI-RM-014"
       ],
       "topic": "Photographer & Camera Identity Registry (Learning, Registry, Exchange)"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-064",
+      "relatedBugs": [],
+      "relatedDecisions": [
+        "DEC-027"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Event Quick Import & Dump Sorting"
     }
   ]
 }

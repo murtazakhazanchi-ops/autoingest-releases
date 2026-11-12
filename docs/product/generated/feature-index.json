@@ -2748,7 +2748,9 @@
       "dependencies": [
         "AI-FEAT-029"
       ],
-      "dependents": [],
+      "dependents": [
+        "AI-FEAT-064"
+      ],
       "documentation_completeness": {
         "evidence_gap_count": 7,
         "narrative": "Partial — 3 unresolved evidence gaps in this file (see fields/sections marked \"Evidence pending\" above)"
@@ -3742,7 +3744,8 @@
         "AI-FEAT-058"
       ],
       "dependents": [
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ],
       "documentation_completeness": {
         "evidence_gap_count": 5,
@@ -3760,6 +3763,10 @@
       ],
       "related_bugs": [],
       "related_changelog_entries": [
+        {
+          "date": "2026-11-12",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-064 (new), AI-FEAT-061, AI-FEAT-063 (paused stages only)"
+        },
         {
           "date": "2026-10-28",
           "excerpt": "**What changed**: Added DEC-029 recording six owner-approved decisions, split into final architectural decisions (1 single photographer list, option b; 2 rename keeps alias with pre-save collision che"
@@ -3928,7 +3935,9 @@
         "AI-FEAT-036",
         "AI-FEAT-061"
       ],
-      "dependents": [],
+      "dependents": [
+        "AI-FEAT-064"
+      ],
       "documentation_completeness": {
         "evidence_gap_count": 3,
         "narrative": "Requirements, approved decisions (DEC-029), Q3 multi-identifier amendment and implemented Q4a–Q4d behaviour recorded; Q5–Q7 not started; technical docs under `docs/` not yet updated (feature unmerged) *(Prior value, superseded 2026-11-05: Requirements, proposed model and the approved design decisions (DEC-029) recorded; technical investigations (per-manufacturer tags) still pending)*"
@@ -3945,6 +3954,10 @@
       ],
       "related_bugs": [],
       "related_changelog_entries": [
+        {
+          "date": "2026-11-12",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-064 (new), AI-FEAT-061, AI-FEAT-063 (paused stages only)"
+        },
         {
           "date": "2026-11-05",
           "excerpt": "## 2026-11-05 — AI-FEAT-063 Q4a–Q4d recorded; Q3 multi-identifier amendment applied"
@@ -4023,6 +4036,76 @@
       "subfeatures": [],
       "summary": "One shared backend capability that remembers which photographers use which cameras, so AutoIngest can **suggest** (never decide) the photographer for an import. Camera details are captured automatically from the media, confirmed once by the operator, and reused everywhere photographer identification is needed: the menu-bar Quick Ingest companion, the existing Confirm Event Import modal, and a new Photographer Registry tab in Metadata Management. Registries are portable between AutoIngest computers through a versioned export file whose import **merges, never replaces**.",
       "timeline_path": "generated/feature-timelines/AI-FEAT-063_TIMELINE.md"
+    },
+    {
+      "aliases": [],
+      "canonical_document": "features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md",
+      "category": "Metadata",
+      "dependencies": [
+        "AI-FEAT-047",
+        "AI-FEAT-061",
+        "AI-FEAT-063"
+      ],
+      "dependents": [],
+      "documentation_completeness": {
+        "evidence_gap_count": 0,
+        "narrative": "Rules, stage plan and EQI-1 behaviour recorded; technical docs under `docs/` not updated while unmerged"
+      },
+      "evidence_status": "EQI-1 implemented on `feature/event-quick-import-dump` (EQI-1 commit: `ede3fcd`) — local, unmerged, unreleased. macOS verified (unit, isolated live, isolated packaged arm64); Windows NOT verified. Stable unchanged.",
+      "feature_id": "AI-FEAT-064",
+      "introduced_version": "Evidence pending",
+      "last_modified_version": "2026-11-12 — milestone created; EQI-1 implemented",
+      "maturity": "Experimental",
+      "name": "Event Quick Import & Dump Sorting",
+      "parent_feature": [
+        "AI-FEAT-061"
+      ],
+      "related_architecture_sections": [
+        "None yet"
+      ],
+      "related_bugs": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-11-12",
+          "excerpt": "## 2026-11-12 — AI-RM-016 Event Quick Import & Dump Sorting created (AI-FEAT-064); AI-RM-014 Q5e paused"
+        },
+        {
+          "date": "2026-11-12",
+          "excerpt": "**What changed**: New milestone AI-RM-016 (PRIORITY 1) and feature AI-FEAT-064 with the owner-approved UI, data-integrity and folder-sequencing rules, the EQI-0…EQI-5 stage plan, and EQI-1's implement"
+        },
+        {
+          "date": "2026-11-12",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-064 (new), AI-FEAT-061, AI-FEAT-063 (paused stages only)"
+        }
+      ],
+      "related_code_paths": [],
+      "related_decisions": [
+        "DEC-027"
+      ],
+      "related_features": [
+        "AI-FEAT-047",
+        "AI-FEAT-061",
+        "AI-FEAT-063"
+      ],
+      "related_postmortems": [],
+      "related_technical_docs": [],
+      "related_tests": [
+        "test/eventDumpQuickImportEQI1.test.js",
+        "test/eventDumpQuickImportLive.test.js"
+      ],
+      "roadmap_ids": [],
+      "search_keywords": [
+        "dump",
+        "event",
+        "import",
+        "metadata",
+        "quick",
+        "sorting"
+      ],
+      "status": "In active development",
+      "subfeatures": [],
+      "summary": "Evidence pending — not yet documented as fact.",
+      "timeline_path": "generated/feature-timelines/AI-FEAT-064_TIMELINE.md"
     }
   ],
   "schema_version": "1.3.0"

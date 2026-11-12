@@ -2,7 +2,7 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `aa61627752c88cfcf614ce28eaf0533d1d42bcd8`.
+Generated against source commit `1f791bf1a4b77b2b5e6cf85eccf180a6e297050b`.
 
 ## Summary
 
@@ -47,7 +47,7 @@ None.
 
 | Rule | Message | File | Note |
 |---|---|---|---|
-| architecture-coverage | 42/63 features placed in the architectural-evolution relationship map | 11_ARCHITECTURAL_EVOLUTION.md | Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048, AI-FEAT-059, AI-FEAT-060, AI-FEAT-061, AI-FEAT-062, AI-FEAT-063 |
+| architecture-coverage | 42/64 features placed in the architectural-evolution relationship map | 11_ARCHITECTURAL_EVOLUTION.md | Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048, AI-FEAT-059, AI-FEAT-060, AI-FEAT-061, AI-FEAT-062, AI-FEAT-063, AI-FEAT-064 |
 | overlapping-active-decisions | 2 Accepted decisions (DEC-006, DEC-007) all govern the exact same feature/milestone set (AI-FEAT-029) — worth a human check that they don't contradict each other | DEC-006 | — |
 | overlapping-active-decisions | 2 Accepted decisions (DEC-020, DEC-021) all govern the exact same feature/milestone set (AI-FEAT-059) — worth a human check that they don't contradict each other | DEC-020 | — |
 | shared-code-path | main/main.js is explicitly owned by 7 features (shared, not exclusive) | main/main.js | AI-FEAT-001, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-036, AI-FEAT-057, AI-FEAT-058 |

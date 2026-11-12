@@ -15,10 +15,10 @@
   "feature_status_counts_overall": {
     "Implemented": 45,
     "Implemented — evolving": 7,
-    "In active development": 2,
+    "In active development": 3,
     "Planned": 9
   },
-  "following_milestone_id": "AI-RM-015",
+  "following_milestone_id": "AI-RM-016",
   "milestones": [
     {
       "current_risks": "None blocking — see AI-FEAT-033's Known Bugs section for the one documented, non-blocking limitation (preview-session identifier does not survive the Preview→Confirm round trip)",
@@ -335,6 +335,28 @@
       "status": "**Active — PRIORITY 1.** Q0 done (2026-10-27). Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f` (Status Ladder rung 1; macOS only; local, unmerged, unreleased), awaiting owner review. Phases re-planned 2026-10-28 as Q0–Q9 (DEC-028); six design decisions approved 2026-10-28 (DEC-029). Q2 not started. *(Prior value, superseded 2026-10-28: **Active — PRIORITY 1.** Q0 done (2026-10-27). Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f` (Status Ladder rung 1; macOS only; local, unmerged, unreleased), awaiting owner review. Phases re-planned 2026-10-28 as Q0–Q9 (DEC-028). Q2 not started. *(Prior value, superseded 2026-10-28: **Active — PRIORITY 1.** Q0 complete (2026-10-27). **Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f`** (2026-10-28), not merged and not released, awaiting owner review. Q2 not started. *(Prior value, superseded 2026-10-28: **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval.)*)*)*"
     },
     {
+      "current_risks": "Live-event use before EQI-3 (Dump stays unsorted until then — by design); the AI-RM-014 Keychain/main-thread risk (a Keychain prompt can stall the app) is unchanged by EQI-1; Windows unverified.",
+      "dependencies": [
+        "AI-RM-014"
+      ],
+      "existing_features_extended": [
+        "AI-FEAT-047",
+        "AI-FEAT-061"
+      ],
+      "feature_status_counts": {
+        "In active development": 1
+      },
+      "id": "AI-RM-016",
+      "included_features": [
+        "AI-FEAT-064"
+      ],
+      "name": "Event Quick Import & Dump Sorting",
+      "next_action": "Owner review at the EQI-1 release gate (report + Preview checklist). Then EQI-2.",
+      "objective": "Menu-bar Event Dump Quick Import into the selected event (`Event/Dump/<Photographer>/`, never PC-sequenced), optional division between events, sorting the Dump through the existing Import Workspace, and safe source-card cleanup — reusing existing services, UI and transactions.",
+      "planned_estimate": "Evidence pending — not yet documented as fact",
+      "status": "**Active — PRIORITY 1 (from 2026-11-12).** EQI-0 done. EQI-1 implemented and verified on `feature/event-quick-import-dump` (local, unmerged, unreleased; macOS only), awaiting owner review. EQI-2 to EQI-5 not started."
+    },
+    {
       "current_risks": "Hosts the remaining scope of AI-RM-006 (Integrity Verification — Archive-Wide) since 2026-10-27, including its AI-FEAT-025 disambiguation risk. Migration from the existing capped, per-computer name+size import index has to be designed so that history is not lost and confidence is not overstated.",
       "dependencies": [
         "AI-RM-014"
@@ -360,9 +382,9 @@
   "next_milestone_id": "AI-RM-014",
   "next_planned_action": "Owner review of the Q1 report; then explicit approval of the next implementation phase (Q2). Pending investigations from DEC-029: per-manufacturer camera tags (before Q3 approval) and the Q8 import-pipeline dependency audit (before any Q8 design review). *(Prior value, superseded 2026-10-28: Owner review of the Q1 report and of the expanded AI-RM-014 plan (AI-FEAT-061 § Expanded phase plan, AI-FEAT-063, DEC-028); then explicit approval of the next implementation phase (Q2) *(Prior value, superseded 2026-10-28: Owner review of AI-FEAT-061 (architecture, phase plan, test matrix); on approval, start AI-RM-014 Q1 in a dedicated worktree cut from the verified `origin/stable/0.9` HEAD *(Prior value, superseded 2026-10-27: Discovery and specification for AI-RM-002 (Archive Maintenance) — no scope exists yet)*)*)*",
   "pending_decisions": "(1) Q1 review on `feature/menu-bar-companion-q1`. (2) Default-on companion and launch-at-login before Stable. (3) Q8 detailed design — separate review after the dependency audit (DEC-029 decision 5). (4) Carried forward: `archiveRepairService.js` naming collision (AI-RM-002) and AI-RM-006 vs AI-FEAT-025 disambiguation (AI-RM-015). Resolved 2026-10-28 by DEC-029: one photographer vocabulary, rename semantics, multi-photographer cards, shoot-day boundary. *(Prior value, superseded 2026-10-28: (1) Q1 review on `feature/menu-bar-companion-q1`. (2) Default-on companion and launch-at-login before Stable. (3) AI-FEAT-063 open design questions: one photographer vocabulary (registry vs `listManager`), rename semantics, multi-photographer cards. (4) Shoot-day boundary for shoots crossing midnight (AI-FEAT-061 Q2). (5) Carried forward: `archiveRepairService.js` naming collision (AI-RM-002) and AI-RM-006 vs AI-FEAT-025 disambiguation (AI-RM-015). *(Prior value, superseded 2026-10-28: (1) Q1 review on `feature/menu-bar-companion-q1`. (2) Default-on companion and launch-at-login before Stable (launch-at-login excluded from Q1). (3) Carried forward: the `archiveRepairService.js` naming collision (now inside AI-RM-002) and AI-RM-006 vs AI-FEAT-025 disambiguation (now inside AI-RM-015). The AI-RM-005…009 placement was resolved 2026-10-27 (02_MASTER_ROADMAP.md § Workstreams). *(Prior value, superseded 2026-10-27 after owner Q1 approval: (1) AI-FEAT-061 Q1 approval, including single-instance lock and the Q4 handoff listener as the only main-window code touch. (2) AI-RM-006 vs AI-RM-015 overlap. (3) AI-RM-007 vs AI-RM-002 overlap. (4) Placement of AI-RM-005…009 in the Priority Order. (5) Carried forward: AI-RM-007 naming collision; AI-RM-006 vs AI-FEAT-025.  (Prior value, superseded 2026-10-27: Naming collision for AI-RM-007's service (see Current risks); scope disambiguation for AI-RM-006 vs. AI-FEAT-025))*)*)*",
-  "progress_percent": 33.3,
+  "progress_percent": 31.3,
   "recently_completed_documentation_work": "2026-10-28 — six AI-RM-014 design decisions approved and recorded (DEC-029) — documentation only. 2026-10-28 — AI-RM-014 expanded to Q0–Q9 with the shared Photographer & Camera Identity Registry (AI-FEAT-063, DEC-028). 2026-10-27/28 — Q1 foundation on its feature branch. *(Prior value, superseded 2026-10-28: 2026-10-28 — AI-RM-014 expanded to Q0–Q9 with the shared Photographer & Camera Identity Registry (AI-FEAT-063, DEC-028) — documentation only. 2026-10-27/28 — Q1 foundation on its feature branch. *(Prior value, superseded 2026-10-28: 2026-10-27 — roadmap reprioritization and AI-RM-014 Q0 specification (documentation only, no application code). Releases since the prior dashboard update: v0.9.13 (Multi-Event Import), v0.9.14 (MX Creative Console), v0.9.16 (current Stable). *(Prior value, superseded 2026-10-27: UI polish to the Metadata Management Modal / Audit & Repair tab (commits `4446a30` → `c5d200f`, 2026-08-02 through 2026-08-04) — cosmetic/layout only, no behavior change, all part of the already-complete AI-RM-001)*)*)*",
   "schema_version": "1.3.0",
-  "total_features": 63,
-  "total_milestones": 15
+  "total_features": 64,
+  "total_milestones": 16
 }

@@ -4,12 +4,12 @@
     "bugs": 20,
     "decisions": 26,
     "engineering_conversations": 4,
-    "features": 63,
-    "knowledge_records": 63,
+    "features": 64,
+    "knowledge_records": 64,
     "memory_capsules": 5,
     "postmortems": 2,
-    "roadmap_milestones": 15,
-    "search_index_records": 446,
+    "roadmap_milestones": 16,
+    "search_index_records": 451,
     "subsystems": 18,
     "workflow_records": 8
   },
@@ -92,6 +92,7 @@
     "feature-timelines/AI-FEAT-061_TIMELINE.md",
     "feature-timelines/AI-FEAT-062_TIMELINE.md",
     "feature-timelines/AI-FEAT-063_TIMELINE.md",
+    "feature-timelines/AI-FEAT-064_TIMELINE.md",
     "knowledge-index.json",
     "memory-index.json",
     "memory-index.jsonl",
@@ -107,10 +108,10 @@
   "generation_command": "node scripts/product-docs/cli.js build",
   "generator_version": "1.3.0",
   "relationship_counts": {
-    "dependency_graph_edges": 673,
-    "dependency_graph_nodes": 146
+    "dependency_graph_edges": 685,
+    "dependency_graph_nodes": 148
   },
   "schema_version": "1.3.0",
-  "source_commit": "aa61627752c88cfcf614ce28eaf0533d1d42bcd8",
-  "source_file_count": 160
+  "source_commit": "1f791bf1a4b77b2b5e6cf85eccf180a6e297050b",
+  "source_file_count": 161
 }

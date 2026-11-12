@@ -2,10 +2,10 @@
 
 > Generated artifact — cross-checked against 01_FEATURE_REGISTRY.md, 02_MASTER_ROADMAP.md, 03_IMPLEMENTATION_TIMELINE.md, and 04_PROJECT_DASHBOARD.md at generation time; generation fails with a diagnostic instead of silently picking a side if those sources disagree. Regenerate with `node scripts/product-docs/cli.js build`.
 
-**Progress**: 5/15 milestones complete (33.3%)
+**Progress**: 5/16 milestones complete (31.3%)
 **Current milestone**: AI-RM-014
-**Following milestone**: AI-RM-015
-**Total features**: 63
+**Following milestone**: AI-RM-016
+**Total features**: 64
 
 ## Feature status counts (overall)
 
@@ -13,7 +13,7 @@
 |---|---|
 | Implemented — evolving | 7 |
 | Implemented | 45 |
-| In active development | 2 |
+| In active development | 3 |
 | Planned | 9 |
 
 ## Milestones
@@ -34,6 +34,7 @@
 | AI-RM-012 | AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2) | **Completed — Stage 1 + Stage 2 merged to `main`** (merge commit `765e9b8`, 2026-08-14). Stage 1 (prototype) and Stage 2 Phases 4–27 (concept/intent retrieval layer, Workflow record type, roadmap routing, Online Registry/teamwork coverage, 119-question eval corpus, hallucination/grounding + adversarial suites, 9-tab portal UX + directory/onboarding mode, mandatory final-report sections, and a pre-merge acceptance pass) all complete and verified from the actual merged `main` state. Stage 3 has not begun and requires separate approval. | AI-FEAT-059 | AI-RM-001, AI-RM-010 | Stage 1: single implementation session (2026-08-13). Stage 2: single extended implementation session spanning 2026-08-13 to 2026-08-14 (Phases 1-27 plus a user-directed pre-merge acceptance pass and merge). | None for this milestone — complete and merged. Deferred future-work items (true rendered-browser verification, remaining Workflow-record coverage, a production-integration decision, a semantic/AI-assisted-retrieval necessity review, a separate live-Registry-integration architecture decision, UX polish from real operator use, and an automatic-discoverability maintenance process) are recorded, not scheduled — see AI-FEAT-059's Future Enhancements. Any Stage 3 work requires separate review and authorization. |
 | AI-RM-013 | MX Creative Console Hardware Integration (Unified Contextual Keypad) | **Completed** — released in AutoIngest v0.9.14 Stable (commit `093c721`, tag `v0.9.14`, 2026-10-16) | AI-FEAT-060 | AI-RM-001, AI-RM-010 | Evidence pending for phases predating this session (Phase 1A/3A-D/4A/4B — see AI-FEAT-060's Original Plan / Intent). This session's own Unified Contextual Keypad migration (native multistate spike → contextual keypad spike → production migration → three physical bug fixes) ran in a single extended session (2026-10-15). | None for this milestone — complete and released. Optional follow-up: remove the retired `PluginDynamicFolder` source now that it is superseded and shipped. |
 | AI-RM-014 | Quick Ingest & Desktop Experience | **Active — PRIORITY 1.** Q0 done (2026-10-27). Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f` (Status Ladder rung 1; macOS only; local, unmerged, unreleased), awaiting owner review. Phases re-planned 2026-10-28 as Q0–Q9 (DEC-028); six design decisions approved 2026-10-28 (DEC-029). Q2 not started. *(Prior value, superseded 2026-10-28: **Active — PRIORITY 1.** Q0 done (2026-10-27). Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f` (Status Ladder rung 1; macOS only; local, unmerged, unreleased), awaiting owner review. Phases re-planned 2026-10-28 as Q0–Q9 (DEC-028). Q2 not started. *(Prior value, superseded 2026-10-28: **Active — PRIORITY 1.** Q0 complete (2026-10-27). **Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f`** (2026-10-28), not merged and not released, awaiting owner review. Q2 not started. *(Prior value, superseded 2026-10-28: **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval.)*)*)* | AI-FEAT-061, AI-FEAT-063 | AI-RM-015 | Evidence pending — not yet documented as fact (no owner estimate given) | Owner review of the Q1 report. Before Q2: Windows hardware tray run and the companion-default decision. Before Q3 approval: per-manufacturer camera-tag measurement on real files. Before Q8 design: import-pipeline dependency audit and a separate design review. No Q2 implementation, Preview RC or Stable merge without explicit approval. *(Prior value, superseded 2026-10-28: Owner review of the Q1 report and of this expanded plan (AI-FEAT-061 § Expanded phase plan, AI-FEAT-063, DEC-028). Before Q2: Windows hardware tray run and the companion-default decision. No Q2 implementation, Preview RC or Stable merge without explicit approval. *(Prior value, superseded 2026-10-28: Owner review of the Q1 report on `feature/menu-bar-companion-q1`. Before Q2: a Windows hardware tray run, and the owner decision on the companion default (on in Q1). No Preview RC, Stable merge or Q2 without approval. *(Prior value, superseded 2026-10-28: Owner review/approval of the AI-FEAT-061 plan (including R1 refactor, R3 single-instance, and the Q4 handoff listener as the only main-window code touch); then cut `feature/quick-ingest-companion-q1` worktree from the verified `origin/stable/0.9` HEAD.)*)*)* |
+| AI-RM-016 | Event Quick Import & Dump Sorting | **Active — PRIORITY 1 (from 2026-11-12).** EQI-0 done. EQI-1 implemented and verified on `feature/event-quick-import-dump` (local, unmerged, unreleased; macOS only), awaiting owner review. EQI-2 to EQI-5 not started. | AI-FEAT-064 | AI-RM-014 | Evidence pending — not yet documented as fact | Owner review at the EQI-1 release gate (report + Preview checklist). Then EQI-2. |
 | AI-RM-015 | Backup Intelligence Foundation | Planned — not started. Priority Order #5. | AI-FEAT-062 | AI-RM-014 | Evidence pending — not yet documented as fact | Not started — follows AI-RM-014 (Ask AutoIngest continues in parallel on its own branch) |
 
 ## Blockers and risks

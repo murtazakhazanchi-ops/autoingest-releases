@@ -2,11 +2,11 @@
 
 > Generated artifact — locator only. Regenerate with `node scripts/product-docs/cli.js build`. Full machine-readable graph: `dependency-graph.json`. Views below are deliberately bounded (one subsystem or milestone chain per diagram) rather than one unreadable graph of every node.
 
-Total: 146 nodes, 673 edges.
+Total: 148 nodes, 685 edges.
 
 ### Roadmap milestone relationships
 
-15 node(s), 16 edge(s) in this view.
+16 node(s), 17 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -25,6 +25,7 @@ flowchart LR
   AI_RM_012(("AI-RM-012: AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)"))
   AI_RM_013(("AI-RM-013: MX Creative Console Hardware Integration (Unified Contextual Keypad)"))
   AI_RM_014(("AI-RM-014: Quick Ingest & Desktop Experience"))
+  AI_RM_016(("AI-RM-016: Event Quick Import & Dump Sorting"))
   AI_RM_015(("AI-RM-015: Backup Intelligence Foundation"))
   AI_RM_002 -->|depends_on| AI_RM_001
   AI_RM_002 -->|depends_on| AI_RM_015
@@ -42,11 +43,12 @@ flowchart LR
   AI_RM_013 -->|depends_on| AI_RM_010
   AI_RM_014 -->|depends_on| AI_RM_015
   AI_RM_015 -->|depends_on| AI_RM_014
+  AI_RM_016 -->|depends_on| AI_RM_014
 ```
 
 ### Feature dependency overview (features with a depends_on/extended_by edge)
 
-59 node(s), 188 edge(s) in this view.
+60 node(s), 195 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -110,6 +112,7 @@ flowchart LR
   AI_FEAT_061["AI-FEAT-061: Quick Ingest & Desktop Companion (Menu Bar / System Tray)"]
   AI_FEAT_062["AI-FEAT-062: Backup Intelligence Foundation"]
   AI_FEAT_063["AI-FEAT-063: Photographer & Camera Identity Registry (Learning, Registry, Exchange)"]
+  AI_FEAT_064["AI-FEAT-064: Event Quick Import & Dump Sorting"]
   AI_FEAT_001 -->|related_to| AI_FEAT_003
   AI_FEAT_002 -->|depends_on| AI_FEAT_005
   AI_FEAT_002 -->|related_to| AI_FEAT_022
@@ -284,6 +287,7 @@ flowchart LR
   AI_FEAT_061 -->|depends_on| AI_FEAT_058
   AI_FEAT_061 -->|related_to| AI_FEAT_062
   AI_FEAT_061 -->|related_to| AI_FEAT_063
+  AI_FEAT_061 -->|extended_by| AI_FEAT_064
   AI_FEAT_062 -->|depends_on| AI_FEAT_019
   AI_FEAT_062 -->|depends_on| AI_FEAT_020
   AI_FEAT_062 -->|depends_on| AI_FEAT_025
@@ -298,11 +302,17 @@ flowchart LR
   AI_FEAT_063 -->|depends_on| AI_FEAT_061
   AI_FEAT_063 -->|related_to| AI_FEAT_061
   AI_FEAT_063 -->|related_to| AI_FEAT_062
+  AI_FEAT_064 -->|depends_on| AI_FEAT_047
+  AI_FEAT_064 -->|related_to| AI_FEAT_047
+  AI_FEAT_064 -->|depends_on| AI_FEAT_061
+  AI_FEAT_064 -->|related_to| AI_FEAT_061
+  AI_FEAT_064 -->|depends_on| AI_FEAT_063
+  AI_FEAT_064 -->|related_to| AI_FEAT_063
 ```
 
 ### Metadata subsystem
 
-10 node(s), 33 edge(s) in this view.
+11 node(s), 35 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -317,6 +327,7 @@ flowchart LR
   AI_FEAT_036["AI-FEAT-036: Keyword Registry"]
   AI_FEAT_037["AI-FEAT-037: Metadata Reapply / Sync"]
   AI_FEAT_063["AI-FEAT-063: Photographer & Camera Identity Registry (Learning, Registry, Exchange)"]
+  AI_FEAT_064["AI-FEAT-064: Event Quick Import & Dump Sorting"]
   AI_FEAT_029 -->|extended_by| AI_FEAT_030
   AI_FEAT_029 -->|extended_by| AI_FEAT_030
   AI_FEAT_029 -->|extended_by| AI_FEAT_031
@@ -350,6 +361,8 @@ flowchart LR
   AI_FEAT_063 -->|depends_on| AI_FEAT_029
   AI_FEAT_063 -->|depends_on| AI_FEAT_034
   AI_FEAT_063 -->|depends_on| AI_FEAT_036
+  AI_FEAT_064 -->|depends_on| AI_FEAT_063
+  AI_FEAT_064 -->|related_to| AI_FEAT_063
 ```
 
 ### Import and Archive Writing subsystem
@@ -446,7 +459,7 @@ flowchart LR
 
 ### Planned archive-management direction
 
-22 node(s), 33 edge(s) in this view.
+23 node(s), 34 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -473,6 +486,7 @@ flowchart LR
   AI_RM_013(("AI-RM-013: MX Creative Console Hardware Integration (Unified Contextual Keypad)"))
   AI_RM_014(("AI-RM-014: Quick Ingest & Desktop Experience"))
   AI_RM_015(("AI-RM-015: Backup Intelligence Foundation"))
+  AI_RM_016(("AI-RM-016: Event Quick Import & Dump Sorting"))
   AI_FEAT_049 -->|extended_by| AI_RM_002
   AI_FEAT_049 -->|planned_in| AI_RM_002
   AI_FEAT_050 -->|planned_in| AI_RM_003
@@ -506,5 +520,6 @@ flowchart LR
   AI_RM_013 -->|depends_on| AI_RM_010
   AI_RM_014 -->|depends_on| AI_RM_015
   AI_RM_015 -->|depends_on| AI_RM_014
+  AI_RM_016 -->|depends_on| AI_RM_014
 ```
 

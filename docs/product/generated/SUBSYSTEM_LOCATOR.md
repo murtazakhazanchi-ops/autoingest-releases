@@ -183,7 +183,7 @@
 ## Metadata (`SUBSYS-metadata`)
 
 **Aliases**: metadata writing, exif, iptc, xmp, xmp sidecars, raw metadata, metadata queue, metadata audit, metadata repair, metadata audit repair, keyword registry, metadata reapply, metadata sync, metadata verification
-**Primary features**: AI-FEAT-029, AI-FEAT-030, AI-FEAT-031, AI-FEAT-032, AI-FEAT-033, AI-FEAT-034, AI-FEAT-035, AI-FEAT-036, AI-FEAT-037, AI-FEAT-063
+**Primary features**: AI-FEAT-029, AI-FEAT-030, AI-FEAT-031, AI-FEAT-032, AI-FEAT-033, AI-FEAT-034, AI-FEAT-035, AI-FEAT-036, AI-FEAT-037, AI-FEAT-063, AI-FEAT-064
 **Canonical technical docs**: because nothing is implemented, docs/data-model.md — none yet describe this feature, docs/features.md #15, docs/ingestion-flow.md, docs/metadata-system.md, docs/metadata-system.md § Durable Queue Storage and Recovery Behavior, docs/metadata-system.md § Event-Level Metadata State, docs/metadata-system.md § Import Path Coverage, docs/metadata-system.md § Metadata Audit, § Repair
 **Related bugs**: None recorded
 **Related decisions**: None recorded

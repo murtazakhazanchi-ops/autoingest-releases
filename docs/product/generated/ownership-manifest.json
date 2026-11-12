@@ -26,7 +26,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "docs/multi-event-import.md": {
@@ -228,7 +229,8 @@
         "AI-FEAT-057",
         "AI-FEAT-058",
         "AI-FEAT-061",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "main/exifService.js": {
@@ -243,7 +245,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "main/fileBrowser.js": {
@@ -305,7 +308,8 @@
         "AI-FEAT-057",
         "AI-FEAT-058",
         "AI-FEAT-061",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "main/metadataQueueRecovery.js": {
@@ -320,7 +324,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "main/metadataQueueStore.js": {
@@ -335,7 +340,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "main/metadataRepairService.js": {
@@ -350,7 +356,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "main/metadataStateService.js": {
@@ -365,7 +372,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "main/metadataSyncService.js": {
@@ -380,7 +388,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "main/metadataVerificationService.js": {
@@ -395,7 +404,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "main/preload.js": {
@@ -544,7 +554,8 @@
         "AI-FEAT-041",
         "AI-FEAT-057",
         "AI-FEAT-061",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "renderer/renderer.js": {
@@ -586,7 +597,8 @@
         "AI-FEAT-057",
         "AI-FEAT-058",
         "AI-FEAT-061",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "renderer/splash.html": {
@@ -911,7 +923,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "services/metadataAuditService.js": {
@@ -926,7 +939,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "services/metadataExpectationService.js": {
@@ -941,7 +955,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "services/nasEventCache.js": {
@@ -1079,7 +1094,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "test/importSession.test.js": {
@@ -1110,7 +1126,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "test/qmzLiveE2E.test.js": {
@@ -1404,7 +1421,8 @@
     ],
     "AI-FEAT-061": [],
     "AI-FEAT-062": [],
-    "AI-FEAT-063": []
+    "AI-FEAT-063": [],
+    "AI-FEAT-064": []
   },
   "feature_to_tests": {
     "AI-FEAT-001": [],
@@ -1533,6 +1551,10 @@
       "test/photographerLearningQ4cLive.test.js",
       "test/photographerLearningQ4d.test.js",
       "test/photographerLearningQ4dLive.test.js"
+    ],
+    "AI-FEAT-064": [
+      "test/eventDumpQuickImportEQI1.test.js",
+      "test/eventDumpQuickImportLive.test.js"
     ]
   },
   "ipc_to_features": {
@@ -1587,7 +1609,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "SUBSYS-source-acquisition": {
@@ -1674,7 +1697,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-063"
+        "AI-FEAT-063",
+        "AI-FEAT-064"
       ]
     },
     "SUBSYS-transfer-and-backup": {
@@ -1756,7 +1780,8 @@
       "AI-FEAT-035",
       "AI-FEAT-036",
       "AI-FEAT-037",
-      "AI-FEAT-063"
+      "AI-FEAT-063",
+      "AI-FEAT-064"
     ],
     "SUBSYS-planned-archive-management": [
       "AI-FEAT-049",
@@ -1801,6 +1826,12 @@
     "test/dashboardMetadataHealthCard.test.js": [
       "AI-FEAT-034",
       "AI-FEAT-035"
+    ],
+    "test/eventDumpQuickImportEQI1.test.js": [
+      "AI-FEAT-064"
+    ],
+    "test/eventDumpQuickImportLive.test.js": [
+      "AI-FEAT-064"
     ],
     "test/eventJsonStore.test.js": [
       "AI-FEAT-004",

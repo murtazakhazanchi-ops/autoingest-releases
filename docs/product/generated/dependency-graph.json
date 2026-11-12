@@ -3051,6 +3051,14 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-016:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-047",
+      "target": "AI-RM-016"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md#lifecycle-metadata:Related-architectural-evolution-sections",
       "relationship": "documented_by",
@@ -3875,11 +3883,27 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-061",
+      "target": "AI-FEAT-064"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#header-table:Related-roadmap-milestone",
       "relationship": "planned_in",
       "source": "AI-FEAT-061",
       "target": "AI-RM-014"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-016:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-061",
+      "target": "AI-RM-016"
     },
     {
       "evidence_status": "explicit",
@@ -4120,6 +4144,62 @@
       "relationship": "governed_by",
       "source": "AI-FEAT-063",
       "target": "DEC-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-064",
+      "target": "AI-FEAT-047"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-064",
+      "target": "AI-FEAT-047"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-064",
+      "target": "AI-FEAT-061"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-064",
+      "target": "AI-FEAT-061"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-064",
+      "target": "AI-FEAT-063"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-064",
+      "target": "AI-FEAT-063"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-064",
+      "target": "DEC-027"
     },
     {
       "evidence_status": "explicit",
@@ -4616,6 +4696,22 @@
       "relationship": "governed_by",
       "source": "AI-RM-015",
       "target": "DEC-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-016:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-016",
+      "target": "AI-FEAT-064"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-016:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-016",
+      "target": "AI-RM-014"
     },
     {
       "evidence_status": "explicit",
@@ -5766,6 +5862,12 @@
       "type": "feature"
     },
     {
+      "doc_path": "features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md",
+      "id": "AI-FEAT-064",
+      "label": "Event Quick Import & Dump Sorting",
+      "type": "feature"
+    },
+    {
       "doc_path": "memory/AI-MEM-0001_METADATA_MANAGEMENT_MODAL_AUDIT_REPAIR_EVOLUTION.md",
       "id": "AI-MEM-0001",
       "label": "Metadata Management Modal Consolidation and Audit & Repair Tab Evolution",
@@ -5883,6 +5985,12 @@
       "doc_path": "02_MASTER_ROADMAP.md",
       "id": "AI-RM-015",
       "label": "Backup Intelligence Foundation",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-016",
+      "label": "Event Quick Import & Dump Sorting",
       "type": "milestone"
     },
     {

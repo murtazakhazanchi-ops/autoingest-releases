@@ -7,6 +7,15 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-11-12 — AI-RM-016 Event Quick Import & Dump Sorting created (AI-FEAT-064); AI-RM-014 Q5e paused
+
+- **Task type**: roadmap milestone + feature record (documentation only, on `docs/roadmap-quick-ingest-priority`; code on `feature/event-quick-import-dump`)
+- **What changed**: New milestone AI-RM-016 (PRIORITY 1) and feature AI-FEAT-064 with the owner-approved UI, data-integrity and folder-sequencing rules, the EQI-0…EQI-5 stage plan, and EQI-1's implemented behaviour kept separate from planned stages. New current-position statement (previous kept). AI-RM-014's unfinished Q5e work (META, S3, COMP, S2–S8, live renaming) recorded as paused — not cancelled, not complete.
+- **Affected feature(s)**: AI-FEAT-064 (new), AI-FEAT-061, AI-FEAT-063 (paused stages only)
+- **Affected roadmap milestone(s)**: AI-RM-016 (new), AI-RM-014
+- **Unresolved gaps**: dashboard (04) not regenerated; Windows not verified; technical docs under `docs/` not updated while the feature is unmerged
+- **Evidence confidence**: EQI-1 commits and their unit/live/packaged test runs on `feature/event-quick-import-dump`
+
 ## 2026-11-05 — AI-FEAT-063 Q4a–Q4d recorded; Q3 multi-identifier amendment applied
 
 - **Task type**: feature journal (documentation only, on `docs/roadmap-quick-ingest-priority`; the application code lives on `feature/photographer-camera-learning-q4` — Q4a `ccd97e7`, Q4b `200c814`, Q4c `4cfafba`, fix `2a7a593`, Q4d `6d3cc45` — local and unmerged, reviewed separately)

@@ -91,6 +91,7 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 | AI-FEAT-036 | Keyword Registry | Implemented | Stable | — | — | [features/AI-FEAT-036_KEYWORD_REGISTRY.md](features/AI-FEAT-036_KEYWORD_REGISTRY.md) |
 | AI-FEAT-037 | Metadata Reapply / Sync | Implemented | Evolving | AI-FEAT-029 | — | [features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md](features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md) |
 | AI-FEAT-063 | Photographer & Camera Identity Registry (Learning, Registry, Exchange) | In active development | Experimental | — | AI-RM-014 | [features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md](features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md) |
+| AI-FEAT-064 | Event Quick Import & Dump Sorting | In active development (EQI-1) | Experimental | AI-FEAT-061 | AI-RM-016 | [AI-FEAT-064](features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md) |
 
 ## Transfer and Backup
 
