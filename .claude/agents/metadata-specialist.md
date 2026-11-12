@@ -1010,6 +1010,22 @@ Validation:
 - Confirm RAW files use sidecar path only (`isRaw` branch in `_writeMetadata`).
 - Confirm any architectural change to the write approach is explicitly approved before implementation.
 
+## Learned Rule — Event Dump attribution (EQI-1)
+
+Context:
+- Audit, Repair, resume, Reapply or verification of media under `Event/Dump/<Photographer>/…`.
+
+Rule:
+- The photographer is the Dump folder one level below `Dump` (`resolvePhotographerFromPath`) — never "Dump", never the last import's photographer; a file directly inside `Dump/` is unresolved, not guessed.
+- In multi-component events a Dump file reconstructs as the explicit no-component group the Dump import wrote (`subEventId: null`, `metadataTags: []`), never as ambiguous; single-component Dump files use the normal root group.
+- Same-size-skipped files are verified/reconciled asynchronously after the copy batch — check them after that pass, not at batch_complete.
+
+Avoid:
+- Treating `Dump` like a component folder or a photographer name in any metadata path.
+
+Validation:
+- Audit of Dump files reports complete in single- and multi-component events; Creator/Artist/By-line and RAW sidecars read back as the Dump photographer.
+
 ## Validation Checklist
 
 Before making changes, read:

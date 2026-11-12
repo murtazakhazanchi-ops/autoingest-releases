@@ -2464,6 +2464,39 @@ Status:
 
 ---
 
+### 2026-11-12 — EQI-1 Event Dump Quick Import: validation, local build, RC Preview
+
+Task type:
+- Ingestion / Event System / UI (companion) / Release
+
+What happened:
+- Menu-bar Event Dump import into `Event/Dump/<Photographer>/` (AI-FEAT-064, feature/event-quick-import-dump @ ede3fcd, fixes @ 4e4fd81), validated in isolated dev and packaged builds, released as the normal RC v0.9.18-rc.1.
+
+Reusable lesson:
+- Reuse, don't rebuild: the companion requests; the main window's existing import machinery runs it; Create New Event opens the existing Event Creator through the existing picker.
+- Dump folders are never PC-sequenced; guards live in the sequencing service and the commit transaction.
+- File-level "already imported" is a rolling name+size index: after eviction, tagged JPEGs (size changed) become `_1` duplicates unless the destination is checked by image-data hash.
+- A picker opened from the menu bar can open and close between periodic renderer reports; treat the completed request as the "opened" signal, and click only freshly re-rendered controls.
+- RC Preview procedure: push `release/vX.Y.Z-rc.N` at the validated commit, then `workflow_dispatch` release.yml with build_type=rc, rc_version, allow_unsigned_mac=true (D3). NEVER push a `v*` tag yourself — that triggers the Stable release path.
+- Packaged verification: build from `git archive` + a real (copied) node_modules, check bundled ExifTool `-ver` and `exiftool-config.pl`, zero symlinks, no `test/` in the asar; run destructive tests on a test-identity build of the same source, never the real identity.
+- Local real-identity build: do not launch it in automation when a physical external drive is attached (no drive stub) — leave that launch to the operator.
+
+Common failure mode:
+- Synthetic card photos under 50 KB are ignored by discovery; event.json components need id + folderName; addToList title-cases names; Playwright auto-dismisses confirm dialogs (accept them as an operator would).
+
+Preferred pattern:
+- One isolated live test per workflow that drives the REAL popup and REAL form, with crash injection at a precise point (wrap a main-process hook, SIGKILL) and restart on the same profile.
+
+Promote to agents:
+- ingestion-routing-specialist.md (Event Dump rules, re-import guard, engine reuse)
+- metadata-specialist.md (Dump attribution, async same-size-skip verification)
+- Not ui-system-specialist.md (no new visual rule; reuse of the existing Event Creator is a workflow rule recorded here)
+
+Status:
+- Promoted (EQI-2/EQI-3/EQI-4 not implemented)
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

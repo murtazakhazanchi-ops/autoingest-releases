@@ -481,6 +481,23 @@ Validation:
 - Confirm execution copies exactly the reviewed worklist, not a fresh unrestricted re-walk.
 - Confirm a mismatch aborts the entire operation with nothing touched — no silent fallback mode.
 
+## Learned Rule — Event Dump (EQI-1): unsequenced, routed through the existing transaction
+
+Context:
+- Any import into `Event/Dump/<Photographer>/` (menu-bar Event Dump Quick Import, later Divide Between Events / Sort Dump).
+
+Rule:
+- Dump is never a component, photographer, QMZ container or PC-sequenced scope: `photographerSequenceService.isEventDumpName` / `isDumpScopeKey` guard scanning, plan/applyRenames, scope resolution and `writeSequencesToEventJson`.
+- Dump destinations come only from `ImportRouter.buildDumpFileJobs` (eventPath-based, plain photographer name, VIDEO/ for video) and are re-checked in `import:commitTransaction` (`destination: 'dump'` → `eventDumpPaths.dumpJobsRefusal`).
+- Run Dump imports through the existing machinery (ImportSessionRunner one-event plan → `_sessPrepareEvent` → commitImportTransaction → Local First sync registration), never a second copy loop.
+- The rolling filename+size import index can forget files; tagged JPEGs change size, so the same-size skip misses them. Hold a Dump job back only when its destination exists AND ExifTool ImageDataHash of source and destination is equal (`partitionAlreadyInDump`); otherwise import (different photo, same name → existing rename rule).
+
+Avoid:
+- Consulting `photographerSequences` for Dump; reserving PC numbers; filename-only "already imported" decisions; letting a crash-left photographer lock strand a retry (use the existing busy-archive dialog).
+
+Validation:
+- Isolated live import into Dump (single + multi component, Direct + Local First), re-import after index eviction (no `_1` duplicates), crash during copy (retry, one import record) and during metadata (queue resumes), sequencing refuses Dump.
+
 ## Validation Checklist
 
 Before making changes, read:
