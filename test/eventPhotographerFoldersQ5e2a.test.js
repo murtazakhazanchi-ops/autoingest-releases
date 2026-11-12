@@ -328,7 +328,15 @@ const add = (ev, additions, extra = {}) => {
       // external-Quit guard and the live tests wired to it. No app code.
       'test/support/liveTestPreload.js', 'test/support/liveTestQuitGuard.js', 'test/support/liveTestHarness.js', 'test/liveTestQuitGuardLive.test.js',
       'test/metadataIntentDurabilityLive.test.js', 'test/multiEventImportLive.test.js', 'test/photographerRegistryQ5aLive.test.js',
-      'test/photographerRegistryQ5cLive.test.js', 'test/photographerRegistryQ5dLive.test.js', 'test/photographerRegistryQ5e1Live.test.js']);
+      'test/photographerRegistryQ5cLive.test.js', 'test/photographerRegistryQ5dLive.test.js', 'test/photographerRegistryQ5e1Live.test.js',
+      // EQI-1 (AI-FEAT-064 / AI-RM-016, owner-approved milestone, not Q5e-2a): Event Dump Quick Import.
+      // Dump is never sequenced (photographerSequenceService), attributed by its own folder
+      // (eventEvidenceReconstruction), and imported through the existing import transaction.
+      'main/preload.js', 'main/companionPreload.js', 'renderer/index.html', 'renderer/renderer.js', 'renderer/eventDumpImport.js',
+      'renderer/importRouter.js', 'renderer/importSessionUI.js', 'renderer/companion/companion.html', 'renderer/companion/companion.js',
+      'renderer/companion/companion.css', 'services/eventDumpCompanion.js', 'services/eventDumpPaths.js', 'services/companionService.js', 'services/workspaceHandoff.js',
+      'services/eventEvidenceReconstruction.js', 'test/companionQ1UiFreeze.test.js', 'test/photographerRegistryQ5c.test.js',
+      'test/eventDumpQuickImportEQI1.test.js', 'test/eventDumpQuickImportLive.test.js', 'test/companionQ1Live.test.js']);
     assert.deepEqual(changed.filter(f => !allowed.has(f)), []);
   });
 

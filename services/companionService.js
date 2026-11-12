@@ -13,8 +13,11 @@
  *     "Review" handoffs into the existing workspace (workspaceHandoff),
  *   - Q3: the camera summary of each card (which cameras, how many files, whether each
  *     body is identified). It never assigns a photographer and stores nothing.
+ *   - AI-FEAT-064 EQI-1: Event Dump Quick Import (eventDumpCompanion.js) — the operator's
+ *     explicit choice of photographer, the card's NEW photos, the main window's active event;
+ *     the import itself is run by the main window's existing import machinery.
  *
- * It never copies or writes anything, and never starts an import. Card data comes
+ * It never copies or writes anything itself; a Dump import is a request to the workspace. Card data comes
  * from the single shared poller (sourceMonitorService) as a 'companion' consumer; the
  * popup receives only the path-free snapshot from companionModel.buildSnapshot().
  *
@@ -38,6 +41,8 @@ const { createCardAssessor } = require('./cardAssessmentService');
 const { summarize, filesForSelection, normalizeSelection } = require('./dateAssessmentModel');
 const { summarizeCameras } = require('./cameraAssessmentModel');
 const { createWorkspaceHandoff } = require('./workspaceHandoff');
+const { createEventDumpController } = require('./eventDumpCompanion');
+const { classify } = require('./dateAssessmentModel');
 
 const MONITOR_CONSUMER = 'companion';
 const TOOLTIP = 'AutoIngest';
@@ -59,6 +64,7 @@ const SOURCE_ID_RE = /^src-\d+$/;
 const IPC_HANDLE_CHANNELS = [
   'companion:getSnapshot', 'companion:openAutoIngest', 'companion:quit', 'companion:hide',
   'companion:selectDate', 'companion:reviewSelected', 'companion:reviewEarlier',
+  'companion:setDumpOptions', 'companion:dumpImport', 'companion:openEventPicker',
 ];
 
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
@@ -80,6 +86,7 @@ let _autoOpenCount = 0;
 let _autoOpenSuppressedCount = 0;
 let _assessor = null;
 let _handoff = null;
+let _dump = null;                // EQI-1 Event Dump controller (eventDumpCompanion.js)
 /**
  * Camera keys in the popup are HMACs under a secret that lives only for this process:
  * they let the popup tell cameras apart, reveal nothing about serials, and are useless
@@ -143,11 +150,13 @@ function _assessmentView(sourceId) {
       view.cameras = job.cameraSummary; // names, counts, opaque keys — never identifiers
     }
   }
+  view.dump = _dump ? _dump.cardView(sourceId, job) : null;   // EQI-1: names and counts only
   return view;
 }
 
 function _snapshot() {
-  return buildSnapshot(_monitor ? _monitor.getLatest() : null, new Date(), _assessmentView);
+  const snap = buildSnapshot(_monitor ? _monitor.getLatest() : null, new Date(), _assessmentView);
+  return { ...snap, dump: _dump ? _dump.globalView() : null };
 }
 
 function _pushSnapshot() {
@@ -184,6 +193,20 @@ function _registerIpc() {
     if (!_isFromPopup(event)) return { ok: false };
     return _review(payload, 'card');
   });
+  // EQI-1 Event Dump Quick Import.
+  ipcMain.handle('companion:setDumpOptions', (event, payload) => {
+    if (!_isFromPopup(event) || !_dump) return { ok: false };
+    return _dump.setOptions(payload);
+  });
+  ipcMain.handle('companion:dumpImport', (event, payload) => {
+    if (!_isFromPopup(event) || !_dump) return { state: 'refused', reason: 'invalid' };
+    return _dump.startImport(payload);
+  });
+  ipcMain.handle('companion:openEventPicker', (event, payload) => {
+    if (!_isFromPopup(event) || !_dump) return { state: 'refused', reason: 'invalid' };
+    return _dump.openPicker(payload);
+  });
+  ipcMain.on('companion:workspaceEvent', _onWorkspaceEvent);
   ipcMain.handle('companion:quit', (event) => {
     if (!_isFromPopup(event)) return { ok: false };
     hidePopup();
@@ -193,9 +216,17 @@ function _registerIpc() {
   });
 }
 
+/** The main window's active-event report — accepted only from the main window itself. */
+function _onWorkspaceEvent(event, info) {
+  const main = windowRegistry.getMainWindow();
+  if (!_dump || !main || main.isDestroyed() || event.sender !== main.webContents) return;
+  _dump.onWorkspaceEvent(info);
+}
+
 function _unregisterIpc() {
   if (!_ipcRegistered) return;
   for (const ch of IPC_HANDLE_CHANNELS) ipcMain.removeHandler(ch);
+  ipcMain.removeListener('companion:workspaceEvent', _onWorkspaceEvent);
   _ipcRegistered = false;
 }
 
@@ -412,6 +443,7 @@ function _onPoll(latest) {
     if (_handoff) _handoff.cancelForSource(id, 'source-detached');
     _selections.delete(id);
     _ops.delete(id);
+    if (_dump) _dump.forget(id);
   }
   if (_assessor) _assessor.sync(latest && latest.cards);
   _pushSnapshot();
@@ -478,7 +510,7 @@ function _contextMenu() {
  * @param {() => void} opts.openApp  focus/restore the main window or reopen it via splash
  * @param {(msg: string) => void} [opts.log]
  */
-function init({ monitor, openApp, log }) {
+function init({ monitor, openApp, log, isImported = () => false, listPhotographers = () => [] }) {
   if (_tray) return;
   _monitor = monitor;
   _openApp = openApp;
@@ -514,6 +546,20 @@ function init({ monitor, openApp, log }) {
     log: _log,
   });
   _handoff.register();
+  _dump = createEventDumpController({
+    handoff: _handoff,
+    getCard: _attachedCard,
+    verifyJob: (sourceId) => (_assessor ? _assessor.verify(sourceId) : null),
+    classify: (evidence, selection) => classify(evidence, selection),
+    selectionFor: (sourceId) => normalizeSelection(_selections.get(sourceId), localDateString(new Date())),
+    isImported,
+    listPhotographers,
+    isBusy: () => operatorActivity.isBusy(),
+    pushSnapshot: _pushSnapshot,
+    showPopup: (opts) => { if (_tray) showPopup(opts); },
+    hidePopup: () => hidePopup(),
+    log: _log,
+  });
   _unsubscribe = _monitor.subscribe(_onPoll);
   _monitor.acquire(MONITOR_CONSUMER);
   _log('[companion] tray started');
@@ -548,6 +594,7 @@ function shutdown() {
   _autoOpen = null;
   if (_assessor) { _assessor.shutdown(); _assessor = null; }
   if (_handoff) { _handoff.unregister(); _handoff = null; }
+  _dump = null;
   _selections.clear();
   _ops.clear();
   _reviewStarting = false;
@@ -579,4 +626,9 @@ function getDiagnostics() {
   };
 }
 
-module.exports = { init, shutdown, showPopup, hidePopup, togglePopup, getDiagnostics, findAssessedRecords };
+/** EQI-1: copy progress of the import running for a Dump request (main.js copy-progress tap). */
+function notifyImportProgress(progress) { if (_dump) _dump.onImportProgress(progress); }
+/** EQI-1: metadata batch outcome (main.js batch_complete tap). */
+function notifyMetadataBatch(p) { if (_dump) _dump.onMetadataBatch(p); }
+
+module.exports = { init, shutdown, showPopup, hidePopup, togglePopup, getDiagnostics, findAssessedRecords, notifyImportProgress, notifyMetadataBatch };

@@ -753,7 +753,6 @@ async function _runSessionImportInner() {
 
   const txPathByKey = new Map();   // eventKey → path event.json lives at (staging path in Local First)
   const subEventNamesFor = (item) => (fresh.get(item.eventKey)?.subEventIds || []).map(id => ({ id, name: id }));
-  const normSlash = (p) => (p || '').replace(/\\/g, '/').replace(/\/$/, '');
   let result;
 
   try {
@@ -769,26 +768,7 @@ async function _runSessionImportInner() {
       },
       isSourceAlive: async () => (importCleanupRoot ? !!(await window.api.dirExists(importCleanupRoot)) : true),
 
-      prepareEvent: async (item) => {
-        if (choice.importMode !== 'local-first') {
-          return { ok: true, prepared: { txEventPath: item.eventPath, txFileJobs: item.fileJobs } };
-        }
-        const normColl = normSlash(item.collectionPath);
-        const normStaging = normSlash(archSt.localStagingRoot);
-        const collectionName = normColl.split('/').filter(Boolean).pop() || '';
-        const mirror = await window.api.ensureLocalMirror({
-          collectionName,
-          eventName: item.routingEventData.event?.name || '',
-          eventPath: item.eventPath,
-          eventJsonPath: normSlash(item.eventPath) + '/event.json',
-        });
-        if (!mirror?.ok) return { ok: false, error: `Local staging setup failed: ${mirror?.reason || 'unknown error'}` };
-        const txFileJobs = item.fileJobs.map(job => {
-          const nd = job.dest.replace(/\\/g, '/');
-          return nd.startsWith(normColl + '/') ? { ...job, dest: normStaging + '/' + collectionName + nd.slice(normColl.length) } : job;
-        });
-        return { ok: true, prepared: { txEventPath: mirror.localEventPath, txFileJobs } };
-      },
+      prepareEvent: (item) => _sessPrepareEvent(item, choice.importMode, archSt),
 
       markInProgress: async (item, prepared) => {
         txPathByKey.set(item.eventKey, prepared.txEventPath);
@@ -875,6 +855,37 @@ async function _runSessionImportInner() {
   _sessShowRunSummary(result, plan, importCleanupRoot, txPathByKey);
   importRunning = false;
   _refreshEventWorkspaceUI();
+}
+
+/**
+ * Per-event, non-interactive import setup (ImportSessionRunner deps.prepareEvent). Direct Archive:
+ * the event as it is. Local First: ensure the event's local mirror and remap every destination
+ * from the collection path into Local Staging. Shared by the multi-event import and the Event Dump
+ * import (eventDumpImport.js), so both route exactly the same way.
+ * @param {{ eventPath: string, collectionPath: string, routingEventData: object, fileJobs: object[] }} item
+ * @param {'local-first'|'direct-nas'} importMode
+ * @param {{ localStagingRoot?: string }} archSt  getArchiveOperationsStatus()
+ */
+async function _sessPrepareEvent(item, importMode, archSt) {
+  const normSlash = (p) => (p || '').replace(/\\/g, '/').replace(/\/$/, '');
+  if (importMode !== 'local-first') {
+    return { ok: true, prepared: { txEventPath: item.eventPath, txFileJobs: item.fileJobs } };
+  }
+  const normColl = normSlash(item.collectionPath);
+  const normStaging = normSlash(archSt.localStagingRoot);
+  const collectionName = normColl.split('/').filter(Boolean).pop() || '';
+  const mirror = await window.api.ensureLocalMirror({
+    collectionName,
+    eventName: item.routingEventData.event?.name || '',
+    eventPath: item.eventPath,
+    eventJsonPath: normSlash(item.eventPath) + '/event.json',
+  });
+  if (!mirror?.ok) return { ok: false, error: `Local staging setup failed: ${mirror?.reason || 'unknown error'}` };
+  const txFileJobs = item.fileJobs.map(job => {
+    const nd = job.dest.replace(/\\/g, '/');
+    return nd.startsWith(normColl + '/') ? { ...job, dest: normStaging + '/' + collectionName + nd.slice(normColl.length) } : job;
+  });
+  return { ok: true, prepared: { txEventPath: mirror.localEventPath, txFileJobs } };
 }
 
 /** Local First: one pending sync manifest per event, keyed by its own metadata batch. */

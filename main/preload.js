@@ -470,5 +470,11 @@ contextBridge.exposeInMainWorld('api', {
   onCompanionOpenSource:      (cb)                 => _register('companion:openSource', (_e, req) => cb(req)),
   companionOpenSourceProgress: (requestId)         => ipcRenderer.send('companion:openSourceProgress', { requestId }),
   companionOpenSourceResult:  (requestId, result)  => ipcRenderer.send('companion:openSourceResult', { requestId, result }),
+  // AI-FEAT-064 EQI-1: Event Dump import / event picker requests from the companion (same
+  // acknowledge → heartbeat → result protocol as companion:openSource), and the active-event
+  // report the companion shows (names only are forwarded to the popup).
+  onCompanionDumpImport:      (cb)                 => _register('companion:dumpImport', (_e, req) => cb(req)),
+  onCompanionOpenEventPicker: (cb)                 => _register('companion:openEventPicker', (_e, req) => cb(req)),
+  companionWorkspaceEvent:    (info)               => ipcRenderer.send('companion:workspaceEvent', info),
 
 });

@@ -50,6 +50,12 @@ function resolvePhotographerFromPath(filePath, baseDir, fallback) {
   }
 
   let seg = parts[0];
+  // Event Dump (EQI-1): Event/Dump/<Photographer>/… — the photographer is the plain folder one
+  // level deeper (never PC-sequenced). A file directly inside Dump has no reliable photographer.
+  if (photographerSeqService.isEventDumpName(seg)) {
+    if (parts.length < 3) return { photographer: '', unresolved: true };
+    return { photographer: photographerSeqService.canonicalName(parts[1]), unresolved: false };
+  }
   // The first folder below the event/component root is a QMZ sequence container (or
   // _Unsequenced/Enroute) — never a photographer. The real photographer, if any, is one
   // level deeper. See photographerSequenceService.isQmzContainerName for the full set of
@@ -80,7 +86,12 @@ function _locate(eventFolderPath, eventJson, filePath) {
 
   let component = null;
   let resolved;
-  if (!isMulti) {
+  // Event Dump media sits at the event root and belongs to no component until Sort Dump (EQI-3);
+  // its photographer is its Dump folder — never the last import's photographer.
+  const isDump = photographerSeqService.isEventDumpName(path.relative(eventFolderPath, filePath).split(path.sep)[0]);
+  if (isDump) {
+    resolved = resolvePhotographerFromPath(filePath, eventFolderPath, '');
+  } else if (!isMulti) {
     resolved = resolvePhotographerFromPath(filePath, eventFolderPath, fallbackPhotographer);
   } else {
     component = components.find(c => c.folderName
@@ -90,7 +101,7 @@ function _locate(eventFolderPath, eventJson, filePath) {
       : { photographer: fallbackPhotographer, unresolved: false };
   }
   return {
-    components, isMulti, component,
+    components, isMulti, component, isDump,
     photographer: resolved.photographer,
     photographerUnresolved: resolved.unresolved,
     fallbackPhotographer,
@@ -135,15 +146,18 @@ function _intentFor(intent, eventFolderPath, destPath, srcForLookup, diskCompone
  * @returns {object} metadataExpectationService evidence (standard/diskComponents shape).
  */
 function buildFileEvidence(eventFolderPath, eventJson, filePath) {
-  const { components, isMulti, component, photographer, photographerUnresolved } = _locate(eventFolderPath, eventJson, filePath);
+  const { components, isMulti, component, isDump, photographer, photographerUnresolved } = _locate(eventFolderPath, eventJson, filePath);
 
   // Multi-component with no resolvable component: no group entry at all (not a
   // 'root'-shaped fallback) — the resolver's tier-3 evidence match requires a group
   // whose subEventId names a real component folder; an empty groups array correctly
   // yields status:'ambiguous' (component-unresolved-multi-event) instead of silently
   // treating an unattributable multi-component file as if it belonged to a single root.
+  // Event Dump in a multi-component event: the explicit "no component keyword" group the Dump
+  // import itself wrote (subEventId null, metadataTags []) — never ambiguous, never a guess.
   const group = isMulti
-    ? (component ? { id: component.folderName, subEventId: component.folderName, files: [filePath] } : null)
+    ? (isDump ? { id: 'dump', subEventId: null, files: [filePath], metadataTags: [] }
+      : component ? { id: component.folderName, subEventId: component.folderName, files: [filePath] } : null)
     : { id: 'root', subEventId: null, files: [filePath] };
 
   const evidence = {
@@ -158,6 +172,7 @@ function buildFileEvidence(eventFolderPath, eventJson, filePath) {
     const intent = intentModule.getIntent(eventJson);             // built once per event document
     const { fields, diagnostics: intentDiagnostics } = _intentFor(intent, eventFolderPath, filePath, filePath, isMulti ? component : components[0]);
     Object.assign(group, fields);
+    if (isMulti && isDump && group.metadataTags === undefined) group.metadataTags = [];
     diagnostics.push(...intentDiagnostics);
   }
   if (diagnostics.length) evidence.intentDiagnostics = diagnostics;
@@ -187,11 +202,13 @@ function buildEventEvidenceContext(eventFolderPath, eventJson, files) {
     const loc = _locate(eventFolderPath, eventJson, f.dest);
     outFiles.push({ ...f, photographer: loc.photographer, photographerUnresolved: loc.photographerUnresolved });
 
-    if (loc.isMulti && !loc.component) continue;                    // unresolvable: no group ⇒ resolver returns ambiguous
+    if (loc.isMulti && !loc.component && !loc.isDump) continue;     // unresolvable: no group ⇒ resolver returns ambiguous
     const matchPath = f.src || f.dest;
     const { fields } = _intentFor(intent, eventFolderPath, f.dest, matchPath, loc.isMulti ? loc.component : loc.components[0]);
+    // Multi-component Dump: the explicit no-component group the Dump import wrote (see buildFileEvidence).
+    if (loc.isMulti && loc.isDump && fields.metadataTags === undefined) fields.metadataTags = [];
 
-    const subEventId = loc.isMulti ? loc.component.folderName : null;
+    const subEventId = loc.isMulti && loc.component ? loc.component.folderName : null;
     const tagsKey = fields.metadataTags === undefined ? 'none' : JSON.stringify(fields.metadataTags);
     const gk = `${subEventId ?? ''}\u0000${tagsKey}\u0000${fields.intentIntegrityError ?? ''}`;
     let g = groupsByKey.get(gk);

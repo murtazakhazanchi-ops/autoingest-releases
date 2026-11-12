@@ -302,9 +302,41 @@ const ImportRouter = (() => {
     return { fileJobs, skippedSrcs };
   }
 
+  // ── buildDumpFileJobs (AI-FEAT-064 EQI-1 Event Dump) ───────────────────────
+  //
+  //   eventPath / Dump / Photographer / [VIDEO /] filename
+  //
+  // eventPath is EventCreator.getActiveEventData().eventPath (the effective collection path, the
+  // same single source of truth the event.json write uses) — never coll._masterPath alone.
+  //
+  // Dump is unsorted quick-import media: it belongs to no component and is NEVER PC-sequenced, so
+  // photographerSequences is deliberately not consulted — the folder is the photographer's own
+  // plain name, and a later Dump import by the same photographer reuses it. main.js re-checks
+  // every job (_eventDumpJobsRefusal) before anything is copied.
+
+  const DUMP_DIR = 'Dump';
+
+  /**
+   * @param {{ eventData: object, photographer: string, files: string[] }} params
+   * @returns {{ fileJobs: Array<{src:string,dest:string}>, skippedSrcs: string[] }}
+   */
+  function buildDumpFileJobs({ eventData, photographer, files }) {
+    const name = typeof photographer === 'string' ? photographer.trim() : '';
+    const eventPath = eventData && typeof eventData.eventPath === 'string' ? eventData.eventPath.replace(/\/+$/, '') : '';
+    if (!eventPath || !name || !Array.isArray(files)) {
+      return { fileJobs: [], skippedSrcs: Array.isArray(files) ? [...files] : [] };
+    }
+    const baseDir = `${eventPath}/${DUMP_DIR}/${name}`;
+    const fileJobs = files.map((src) => {
+      const filename = basename(src);
+      return { src, dest: VIDEO_EXTENSIONS.has(extOf(filename)) ? `${baseDir}/VIDEO/${filename}` : `${baseDir}/${filename}` };
+    });
+    return { fileJobs, skippedSrcs: [] };
+  }
+
   // ── Expose ─────────────────────────────────────────────────────────────────
 
-  return { buildFileJobs, simulateImport, validateGroups };
+  return { buildFileJobs, buildDumpFileJobs, simulateImport, validateGroups, DUMP_DIR };
 
 })();
 

@@ -21,6 +21,10 @@ contextBridge.exposeInMainWorld('companion', {
   selectDate:     (sourceId, date, untilTime = null) => ipcRenderer.invoke('companion:selectDate', { sourceId, date, untilTime }),
   reviewSelected: (sourceId) => ipcRenderer.invoke('companion:reviewSelected', { sourceId }),
   reviewEarlier:  (sourceId) => ipcRenderer.invoke('companion:reviewEarlier', { sourceId }),
+  // AI-FEAT-064 EQI-1 — Event Dump Quick Import (names only; main resolves everything else)
+  setDumpOptions:  (sourceId, options) => ipcRenderer.invoke('companion:setDumpOptions', { sourceId, ...options }),
+  dumpImport:      (sourceId) => ipcRenderer.invoke('companion:dumpImport', { sourceId }),
+  openEventPicker: (mode) => ipcRenderer.invoke('companion:openEventPicker', { mode }),
   /** @param {(snapshot: object) => void} cb @returns {() => void} unsubscribe */
   onSnapshot: (cb) => {
     const listener = (_e, snapshot) => cb(snapshot);

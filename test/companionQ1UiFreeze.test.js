@@ -17,6 +17,13 @@
 // Q5e-1 adds, still inside that panel only, the profile module (photographerRegistryProfile.js:
 // aliases, retire/reactivate, first registration, PREVIEW-ONLY rename), its script tag and scoped
 // styles, and one read-only channel (renamePreview). No rename can be applied from the UI.
+// EQI-1 exception (AI-FEAT-064 / AI-RM-016, owner-approved): Event Dump Quick Import from the
+// companion, run by the main window's EXISTING import machinery and drawing NOTHING in the main
+// window — a new non-visual module (eventDumpImport.js) and its script tag, additive
+// ImportRouter.buildDumpFileJobs, a behaviour-preserving extraction of the multi-event import's
+// per-event prepare step (importSessionUI.js _sessPrepareEvent, so both imports route alike), the
+// module's init in the companion block of renderer.js, and three companion channels. The picker /
+// Event Creator it opens is the existing UI, unchanged.
 //
 // Run: node test/companionQ1UiFreeze.test.js [baseRef]   (default origin/stable/0.9)
 
@@ -53,11 +60,21 @@ const Q5C_TAB_LINE_OLD = "  ['msTabMetadata', 'msTabAudit', 'msTabRegistry'].for
 const Q5C_TAB_LINE_NEW = "  ['msTabMetadata', 'msTabAudit', 'msTabRegistry', 'msTabPhotographers'].forEach(id => {";
 const Q5C_PRELOAD_CHANNELS = ['photographerRegistry:load', 'photographerRegistry:search', 'photographerRegistry:photographer', 'photographerRegistry:camera'];
 const Q5D_PRELOAD_CHANNELS = ['photographerRegistry:prepare', 'photographerRegistry:commit', 'photographerRegistry:cancel', 'photographerRegistry:renamePreview'];
+const EQI1_MODULE = 'renderer/eventDumpImport.js';
+const EQI1_ROUTER = 'renderer/importRouter.js';
+const EQI1_SESSION_UI = 'renderer/importSessionUI.js';
+const EQI1_SCRIPT = '<script src="eventDumpImport.js"></script>';
+const EQI1_PRELOAD_CHANNELS = ['companion:dumpImport', 'companion:openEventPicker', 'companion:workspaceEvent'];
+const EQI1_RENDERER_LINES = [
+  '+  // AI-FEAT-064 EQI-1: Event Dump imports / event picker requests from the companion, and the',
+  '+  // active-event report it shows.',
+  "+  if (typeof EventDumpImport !== 'undefined') EventDumpImport.init();",
+];
 const diffLines = (file) => git('diff', '-U0', mergeBase, '--', file).split('\n')
   .filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
 
 t('no existing renderer file changed except the approved handoff listener (main window, splash, shared modules)', () => {
-  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE, Q5E_MODULE].includes(f));
+  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE, Q5E_MODULE, EQI1_MODULE, EQI1_ROUTER, EQI1_SESSION_UI].includes(f));
   assert.deepEqual(offending, []);
 });
 
@@ -65,7 +82,7 @@ t('renderer.js: handoff listener is additions only and draws nothing', () => {
   const all = diffLines(APPROVED_RENDERER_TOUCH);
   // Q5c: the only changed existing line is the Metadata Management tab list gaining its fourth id.
   assert.deepEqual(all.filter(l => l.startsWith('-')), all.some(l => l === `+${Q5C_TAB_LINE_NEW}`) ? [`-${Q5C_TAB_LINE_OLD}`] : [], 'no existing line removed or changed');
-  const lines = all.filter(l => l !== `+${Q5C_TAB_LINE_NEW}` && l !== `-${Q5C_TAB_LINE_OLD}`);
+  const lines = all.filter(l => l !== `+${Q5C_TAB_LINE_NEW}` && l !== `-${Q5C_TAB_LINE_OLD}` && !EQI1_RENDERER_LINES.includes(l));
   const drawing = lines.filter(l => /innerHTML|outerHTML|createElement|insertAdjacent|appendChild|replaceChildren|\.style\.|classList\.(add|remove|toggle)|<[a-z]+[ >]/i.test(l));
   assert.deepEqual(drawing, [], 'no DOM, markup or style created');
   if (lines.length) assert.ok(lines.some(l => l.includes('COMPANION HANDOFF')), 'confined to the documented handoff block');
@@ -74,7 +91,7 @@ t('renderer.js: handoff listener is additions only and draws nothing', () => {
 t('main-window preload: only the companion handoff channels were added', () => {
   const lines = diffLines('main/preload.js');
   assert.deepEqual(lines.filter(l => l.startsWith('-')), [], 'no existing API removed or changed');
-  const allowed = new Set(['companion:openSource', 'companion:openSourceProgress', 'companion:openSourceResult', 'companion:workspaceReady', ...Q5C_PRELOAD_CHANNELS, ...Q5D_PRELOAD_CHANNELS]);
+  const allowed = new Set(['companion:openSource', 'companion:openSourceProgress', 'companion:openSourceResult', 'companion:workspaceReady', ...Q5C_PRELOAD_CHANNELS, ...Q5D_PRELOAD_CHANNELS, ...EQI1_PRELOAD_CHANNELS]);
   const channels = [...lines.join('\n').matchAll(/'([a-z-]+:[A-Za-z]+)'/g)].map(m => m[1]);
   assert.deepEqual(channels.filter(c => !allowed.has(c)), [], 'no other channel exposed to the main window');
 });
@@ -102,12 +119,49 @@ t('index.html (Q5c): additions only, confined to the Photographer Registry tab, 
   const scoped = (sel) => /^@media \(max-width: 860px\)/.test(sel) || sel.split('{')[0].split(',').every(part => /^\s*(\.pr-|#msTabPhotographers\b|#metadataSyncModal \.ms-tabs?\b)/.test(part));
   assert.deepEqual(selectors.filter(sel => !scoped(sel)), [], 'every new rule is scoped to the Q5c panel or the modal tab row');
   const scripts = added.filter(l => /<script\b/.test(l));
-  assert.deepEqual(scripts.map(l => l.trim()), ['<script src="photographerRegistryUI.js" defer></script>', '<script src="photographerRegistryActions.js" defer></script>', '<script src="photographerRegistryProfile.js" defer></script>'], 'only the dedicated modules are loaded');
+  assert.deepEqual(scripts.map(l => l.trim()).sort(), ['<script src="photographerRegistryUI.js" defer></script>', '<script src="photographerRegistryActions.js" defer></script>', '<script src="photographerRegistryProfile.js" defer></script>', EQI1_SCRIPT].sort(), 'only the dedicated modules are loaded');
   const tabButtons = added.filter(l => /class="ms-tab"/.test(l));
   assert.equal(tabButtons.length, 1, 'exactly one new Metadata Management tab button');
   assert.ok(/data-ms-tab="msTabPhotographers">Photographer Registry<\/button>/.test(tabButtons[0]));
   const actions = added.filter(l => /<button\b/.test(l) && !/class="ms-tab"|data-pr-view=/.test(l));
   assert.deepEqual(actions, [], 'no action button (rename, alias, confirm, retire, resolve) in the markup');
+});
+
+t('renderer.js (EQI-1): only the Event Dump module init in the companion block', () => {
+  const eqi = diffLines(APPROVED_RENDERER_TOUCH).filter(l => /EventDumpImport|EQI-1|active-event report/.test(l));
+  if (!eqi.length) return;
+  assert.deepEqual(eqi, EQI1_RENDERER_LINES);
+});
+
+t('eventDumpImport.js (EQI-1): non-visual — draws nothing, only clicks the existing "+ Create New Event" button', () => {
+  const src = require('fs').readFileSync(path.join(ROOT, EQI1_MODULE), 'utf8');
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert.ok(!/innerHTML|outerHTML|insertAdjacent|createElement|appendChild|replaceChildren|\.style\.|classList\.(add|remove|toggle)|document\.write/.test(code), 'no DOM, markup or style created');
+  assert.ok(!/ipcRenderer|require\(/.test(code), 'no direct IPC or module access');
+  const ids = [...code.matchAll(/getElementById\('([^']+)'\)/g)].map(m => m[1]);
+  assert.deepEqual([...new Set(ids)].sort(), ['ecNewEventFromList', 'workspace'], 'reads the workspace state; clicks only the existing New Event button');
+  assert.ok(/destination: 'dump'/.test(code) && /ImportRouter\.buildDumpFileJobs/.test(code) && /ImportSessionRunner\.run/.test(code) && /_sessPrepareEvent/.test(code), 'runs the existing import machinery');
+});
+
+t('importRouter.js (EQI-1): additions only — buildDumpFileJobs, never consults photographerSequences', () => {
+  const lines = diffLines(EQI1_ROUTER);
+  const removed = lines.filter(l => l.startsWith('-'));
+  assert.deepEqual(removed, ['-  return { buildFileJobs, simulateImport, validateGroups };'], 'only the export line changed');
+  const added = lines.filter(l => l.startsWith('+')).join('\n');
+  assert.ok(/function buildDumpFileJobs/.test(added) && !/photographerSequences\[|\.photographerSequences/.test(added.replace(/\/\/.*$/gm, '')), 'Dump routing never reads PC sequences');
+});
+
+t('importSessionUI.js (EQI-1): only the per-event prepare step moved into _sessPrepareEvent, unchanged', () => {
+  const lines = diffLines(EQI1_SESSION_UI);
+  const norm = (l) => l.slice(1).trim();
+  const added = new Set(lines.filter(l => l.startsWith('+')).map(norm));
+  const removed = lines.filter(l => l.startsWith('-')).map(norm).filter(Boolean);
+  // The helper takes the import mode as a parameter instead of reading the session's `choice`.
+  const notMoved = removed.filter(l => !added.has(l) && !['prepareEvent: async (item) => {', '},', "if (choice.importMode !== 'local-first') {", "const normSlash = (p) => (p || '').replace(/\\\\/g, '/').replace(/\\/$/, '');"].includes(l));
+  assert.deepEqual(notMoved, [], 'every removed line reappears in the extracted helper');
+  assert.ok(added.has('prepareEvent: (item) => _sessPrepareEvent(item, choice.importMode, archSt),'), 'the multi-event import calls the shared helper');
+  const drawing = lines.filter(l => l.startsWith('+') && /innerHTML|createElement|\.style\.|classList\.(add|remove|toggle)/.test(l));
+  assert.deepEqual(drawing, [], 'no DOM, markup or style created');
 });
 
 t('photographerRegistryActions.js (Q5d): decisions only through prepare/commit/cancel (+ search for the picker), no HTML injection', () => {

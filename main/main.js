@@ -78,6 +78,7 @@ const eventMetadataIntent = require('../services/eventMetadataIntent');
 const realtimeOps              = require('../services/realtimeOperationsService');
 const offlineCollectionRegistry    = require('../services/offlineCollectionRegistryService');
 const photographerSeqService       = require('../services/photographerSequenceService');
+const eventDumpPaths               = require('../services/eventDumpPaths');
 const photographerLearning         = require('../services/photographerLearningRuntime');
 const qmzService                   = require('./qmzService');
 const { parseProgramPdf }          = require('./qmzProgramPdfParser');
@@ -360,7 +361,14 @@ function _handleTracked(channel, kind, handler) {
 function _startCompanion() {
   if (process.env.AUTOINGEST_DISABLE_COMPANION === '1' || !settings.getCompanionEnabled()) return;
   try {
-    companionService.init({ monitor: sourceMonitor, openApp: _openAutoIngest, log });
+    companionService.init({
+      monitor: sourceMonitor, openApp: _openAutoIngest, log,
+      // EQI-1 Event Dump: file-level "already imported" (the same global index the workspace uses)
+      // and the photographer list the operator chooses from.
+      isImported: (name, size) => typeof name === 'string' && Number.isFinite(size)
+        && !!importIndex[name.toLowerCase() + '_' + size],
+      listPhotographers: () => require('./listManager').getList('photographers'),
+    });
   } catch (err) {
     log(`[main] companion failed to start: ${err.message}`);
   }
@@ -799,6 +807,7 @@ async function importFileJobs(event, fileJobs, onTeamProgress = null) {
       if (!event.sender.isDestroyed()) {
         event.sender.send('import:progress', progress);
       }
+      companionService.notifyImportProgress(progress);   // EQI-1: only shown while a Dump import runs
       if (progress.status === 'done' || progress.status === 'renamed') {
         bytesCopiedSoFar += progress.fileSize || 0;
         fileIndex++;
@@ -890,6 +899,10 @@ function buildAuditImportEntries(auditContext = {}) {
     : null;
   const config = require('../config/app.config');
   const VIDEO_EXT_SET = new Set(config.VIDEO_EXTENSIONS);
+  // Event Dump (EQI-1): the media went to Event/Dump/<photographer>, not into any component.
+  // componentIndex stays a number (isValidImportEntry) and older builds keep the entry; the
+  // additive `destination` marks it for Sort Dump and recovery, `componentName` for the log.
+  const isDump = auditContext.destination === 'dump';
   const logs = [];
 
   groups.forEach((group, index) => {
@@ -898,8 +911,8 @@ function buildAuditImportEntries(auditContext = {}) {
       const matchIdx = subEventNames.findIndex(se => se.name === group.subEventId);
       if (matchIdx >= 0) componentIndex = matchIdx;
     }
-    const comp = liveComps[componentIndex];
-    const componentName = comp ? comp.eventTypes.map(t => t.label).join(', ') : '';
+    const comp = isDump ? null : liveComps[componentIndex];
+    const componentName = isDump ? 'Dump' : (comp ? comp.eventTypes.map(t => t.label).join(', ') : '');
     let photos = 0, videos = 0;
     for (const filePath of (group.files || [])) {
       const ext = '.' + (filePath.split('.').pop() || '').toLowerCase();
@@ -918,6 +931,7 @@ function buildAuditImportEntries(auditContext = {}) {
       counts:         { photos, videos },
       source,
       importedBy,
+      ...(isDump ? { destination: 'dump' } : {}),
     });
   });
 
@@ -1120,8 +1134,14 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
                               // progress is attributed to THIS batch's event, not whichever event is current
   importSessionId = null,     // shared by every event transaction of ONE multi-event source import: Deep Verify
                               // then covers the whole session instead of only the last event's files
+  destination = null,         // 'dump' (EQI-1 Event Dump import) | null — every job then targets Event/Dump/<photographer>/
 }) => {
   let originalEventJson = null;
+  if (destination !== null && destination !== 'dump') throw new Error(`Unknown import destination: ${destination}`);
+  if (destination === 'dump') {
+    const refusal = eventDumpPaths.dumpJobsRefusal(fileJobs, eventJsonPath, photographer);
+    if (refusal) throw new Error(`Event Dump import refused: ${refusal}`);
+  }
 
   const restoreCreatedStatus = async () => {
     if (!eventJsonPath) return;
@@ -1274,6 +1294,7 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
       collName,
       source,
       importedBy,
+      destination,
     };
     let logs;
     try {
@@ -1415,6 +1436,7 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
             if (_willWriteNasMetadata && p.event === 'batch_complete') {
               _releaseDirectNasLocks(_directNasLocks);
             }
+            if (p.event === 'batch_complete') companionService.notifyMetadataBatch(p);   // EQI-1 Dump outcome
             if (p.event === 'batch_complete' && eventJsonPath) {
               try {
                 await _writeLastMetadataRun(path.join(eventJsonPath, 'event.json'), p, metaContext.groups);
@@ -1480,7 +1502,8 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
           files:        (result.copiedFiles || []).map(f => ({ src: f.src, size: f.size, dest: f.dest })),
           copied:       result.copied || 0,
           eventDir:     eventJsonPath,
-          workflow:     (typeof importSessionId === 'string' && importSessionId) ? 'multi-event-import' : 'event-import',
+          workflow:     destination === 'dump' ? 'event-dump-import'
+            : (typeof importSessionId === 'string' && importSessionId) ? 'multi-event-import' : 'event-import',
           operatorId:   importedBy && typeof importedBy.id === 'string' ? importedBy.id : null,
         });
       }

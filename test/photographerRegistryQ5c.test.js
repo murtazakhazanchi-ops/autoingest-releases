@@ -356,6 +356,13 @@ function assertClean(payload, fx, label) {
     assert.ok(!/appendEvents|createIdentityRegistryStore|\.open\(|writeFile|buildRenameEvent|createProfileCommandService|planCurrentEventFolderRename/.test(block), 'no direct store write, naming or folder path in main.js');
   });
 
+  const EQI1_MAIN_CHANGED = [
+    '-    companionService.init({ monitor: sourceMonitor, openApp: _openAutoIngest, log });',
+    '-    const comp = liveComps[componentIndex];',
+    "-    const componentName = comp ? comp.eventTypes.map(t => t.label).join(', ') : '';",
+    "-          workflow:     (typeof importSessionId === 'string' && importSessionId) ? 'multi-event-import' : 'event-import',",
+  ];
+  const EQI1_PRELOAD_MEMBERS = ['onCompanionDumpImport', 'onCompanionOpenEventPicker', 'companionWorkspaceEvent'];
   await t('main.js / preload.js change since Q5b is additions only, confined to the Q5c block', async () => {
     let base;
     try { base = execFileSync('git', ['rev-parse', '--verify', 'aa58eb1^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { console.log('    (Q5b commit not available — skipped)'); return; }
@@ -363,11 +370,14 @@ function assertClean(payload, fx, label) {
       const lines = q5OwnDiffLines(base, f);
       // Q5e-2b (authorized S5 groundwork): the sequencing handler's closing "});" became "}" when its
       // original steps moved, unchanged, into the guarded _applySequenceUnlocked. Nothing else may go.
-      const allowedRemoved = f === 'main/main.js' ? ['-});'] : [];
-      assert.deepEqual(lines.filter(l => l.startsWith('-')), allowedRemoved, `${f}: nothing removed`);
+      // EQI-1 (AI-FEAT-064 / AI-RM-016, owner-approved milestone, not Q5): the companion gets the
+      // import-index / photographer-list dependencies, Dump import entries are marked, and Dump
+      // imports get their own learning workflow label — exactly these lines change.
+      const allowedRemoved = f === 'main/main.js' ? ['-});', ...EQI1_MAIN_CHANGED] : [];
+      assert.deepEqual(lines.filter(l => l.startsWith('-')).sort(), [...allowedRemoved].sort(), `${f}: nothing removed`);
     }
     const pre = execFileSync('git', ['diff', '-U0', base, '--', 'main/preload.js'], { cwd: ROOT, encoding: 'utf8' });
-    const exposed = [...pre.matchAll(/^\+\s+(\w+):/gm)].map(m => m[1]);
+    const exposed = [...pre.matchAll(/^\+\s+(\w+):/gm)].map(m => m[1]).filter(m => !EQI1_PRELOAD_MEMBERS.includes(m));
     assert.deepEqual(exposed.sort(), ['photographerRegistryCamera', 'photographerRegistryCancel', 'photographerRegistryCommit', 'photographerRegistryLoad', 'photographerRegistryPhotographer', 'photographerRegistryPrepare', 'photographerRegistryRenamePreview', 'photographerRegistrySearch']);
   });
 
@@ -398,6 +408,13 @@ function assertClean(payload, fx, label) {
       // guard and the live tests wired to it.
       'test/support/liveTestPreload.js', 'test/support/liveTestQuitGuard.js', 'test/support/liveTestHarness.js', 'test/liveTestQuitGuardLive.test.js',
       'test/metadataIntentDurabilityLive.test.js', 'test/multiEventImportLive.test.js', 'test/photographerRegistryQ5aLive.test.js',
+      // EQI-1 (AI-FEAT-064, owner-approved milestone, not Q5): Event Dump Quick Import — companion
+      // controller and UI, the generalized workspace handoff, Dump attribution, the non-visual
+      // workspace module, Dump routing and the shared per-event prepare step, and their tests.
+      'services/eventDumpCompanion.js', 'services/eventDumpPaths.js', 'services/companionService.js', 'services/workspaceHandoff.js', 'services/eventEvidenceReconstruction.js',
+      'main/companionPreload.js', 'renderer/eventDumpImport.js', 'renderer/importRouter.js', 'renderer/importSessionUI.js',
+      'renderer/companion/companion.html', 'renderer/companion/companion.js', 'renderer/companion/companion.css',
+      'test/eventDumpQuickImportEQI1.test.js', 'test/eventDumpQuickImportLive.test.js', 'test/companionQ1Live.test.js', 'test/eventPhotographerFoldersQ5e2a.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });

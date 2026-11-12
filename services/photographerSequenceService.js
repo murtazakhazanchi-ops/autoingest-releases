@@ -69,6 +69,26 @@ function isQmzContainerName(name) {
   return bare === UNSEQUENCED || bare === ENROUTE_DIR || SEQ_RE.test(bare);
 }
 
+// Event Dump (AI-FEAT-064 EQI-1): Event/Dump/<Photographer>/… holds unsorted quick-import media.
+// The Dump folder is never a photographer, component or QMZ container, and nothing inside it is
+// ever PC-sequenced: Dump photographer folders keep their plain names until Sort Dump moves the
+// media into the event's final, sequenced folders.
+const DUMP_DIR = 'Dump';
+
+/**
+ * True when `name` is the event-level Dump folder (case-insensitive; a PC prefix wrongly added by
+ * an older build is ignored, so a damaged "PC01-Dump" is still recognised and never re-sequenced).
+ * @param {string} name
+ */
+function isEventDumpName(name) {
+  return typeof name === 'string' && canonicalName(name).toLowerCase() === DUMP_DIR.toLowerCase();
+}
+
+/** True when an event-relative scope key ("Dump", "Dump/Ali", "Comp/Dump") lies inside a Dump folder. */
+function isDumpScopeKey(scopeKey) {
+  return typeof scopeKey === 'string' && scopeKey.split(/[\\/]/).some(isEventDumpName);
+}
+
 // Folder names that should never be treated as photographer or component folders.
 // _Selected/__MACOSX: mirror _NAS_SKIP_DIRS in main.js.
 // VIDEO: excluded at every archive-walk level; never a photographer folder.
@@ -167,10 +187,11 @@ async function scanPhotographerFolders(localEventPath, components) {
 
     for (const name of names) {
       if (excludeNames && excludeNames.has(name)) continue; // stale component folder from a prior state
+      if (isEventDumpName(name)) continue; // Event Dump: never a photographer, never a sequenceable scope
       if (isQmzContainerName(name)) {
         const containerNames = await readSubdirNames(path.join(baseDir, name));
         const containerPhotographers = containerNames
-          .filter(cname => !isQmzContainerName(cname)) // a container nested inside another container is never a photographer either
+          .filter(cname => !isQmzContainerName(cname) && !isEventDumpName(cname)) // a container nested inside another container is never a photographer either
           .map(cname => ({ folderName: cname, canonical: canonicalName(cname) }));
         nestedScopes.push({
           scopeKey:      baseScopeKey ? `${baseScopeKey}/${name}` : name,
@@ -233,6 +254,9 @@ function resolveScopeBaseDir(realEvent, scopeKey) {
   if (segs.length === 0 || badSeg !== undefined) {
     return { ok: false, reason: `scope key "${scopeKey}" is invalid.` };
   }
+  if (isDumpScopeKey(scopeKey)) {
+    return { ok: false, reason: `scope key "${scopeKey}" is inside the event Dump; Dump photographer folders are never PC-sequenced.` };
+  }
 
   const baseDir = path.resolve(path.join(realEvent, ...segs));
   if (!PathUtils.isPathUnderRoot(baseDir, realEvent)) {
@@ -263,6 +287,8 @@ function resolveScopeBaseDir(realEvent, scopeKey) {
  */
 async function planRenames(localEventPath, scopedOrdered) {
   const renames = [];
+  const dump = _dumpScopeRefusal(scopedOrdered);
+  if (dump) return { ok: false, renames, error: dump };
   for (const scope of scopedOrdered) {
     const baseDir = scope.scopeKey === EVENT_ROOT_KEY ? localEventPath : path.join(localEventPath, scope.scopeKey);
     let dirs;
@@ -271,7 +297,7 @@ async function planRenames(localEventPath, scopedOrdered) {
     const claimed = new Set();
     for (const entry of scope.ordered) {
       // Same skip rule as _applyRenamesInDir (v0.9.17: QMZ structural containers are never renamed).
-      if (_skipDir(entry.canonical) || isQmzContainerName(entry.canonical)) continue;
+      if (_skipDir(entry.canonical) || isQmzContainerName(entry.canonical) || isEventDumpName(entry.canonical)) continue;
       let current = null;
       for (const d of dirs) {
         if (!claimed.has(d.name) && canonicalName(d.name) === entry.canonical && await _directoryHardened(baseDir, d)) { current = d.name; break; }
@@ -284,8 +310,16 @@ async function planRenames(localEventPath, scopedOrdered) {
   return { ok: true, renames };
 }
 
+/** Refusal reason when any requested scope lies inside an Event Dump folder (null = none does). */
+function _dumpScopeRefusal(scopedOrdered) {
+  const bad = (scopedOrdered || []).find(s => s && isDumpScopeKey(s.scopeKey));
+  return bad ? `dump-not-sequenceable: "${bad.scopeKey}" is inside the event Dump; Dump photographer folders are never PC-sequenced` : null;
+}
+
 async function applyRenames(localEventPath, scopedOrdered) {
   const allRenames = [];
+  const dump = _dumpScopeRefusal(scopedOrdered);
+  if (dump) return { ok: false, error: dump, renames: allRenames };
 
   for (const scope of scopedOrdered) {
     const baseDir = scope.scopeKey === EVENT_ROOT_KEY
@@ -317,7 +351,7 @@ async function _applyRenamesInDir(baseDir, ordered) {
     // (a sequence code, _Unsequenced, or Enroute) even if one ever reached this far —
     // scanPhotographerFolders already excludes these from `photographers`, so this is a
     // backstop, not the primary defense.
-    if (_skipDir(entry.canonical) || isQmzContainerName(entry.canonical)) continue;
+    if (_skipDir(entry.canonical) || isQmzContainerName(entry.canonical) || isEventDumpName(entry.canonical)) continue;
     const target = path.join(baseDir, entry.folderName);
 
     // Locate whichever folder currently holds this canonical name
@@ -473,6 +507,8 @@ async function updateManifestAfterRename(localEventPath, scopedRenameMap) {
  */
 async function writeSequencesToEventJson(localEventPath, scopedSequences) {
   const jsonPath = path.join(localEventPath, 'event.json');
+  const dumpKey = Object.keys(scopedSequences || {}).find(isDumpScopeKey);
+  if (dumpKey) return { ok: false, error: `dump-not-sequenceable: "${dumpKey}" is inside the event Dump; no PC sequence is ever recorded for it` };
   // Q5e-2b (audit item F11): through the event.json write chain, so a concurrent import, metadata
   // or registry update to the same event.json is never overwritten by a stale copy, and the two
   // writers never share the temp file. Only photographerSequences and updatedAt change; every
@@ -500,6 +536,9 @@ module.exports = {
   EVENT_ROOT_KEY,
   canonicalName,
   isQmzContainerName,
+  DUMP_DIR,
+  isEventDumpName,
+  isDumpScopeKey,
   resolveScopeBaseDir,
   seqPrefix,
   scanPhotographerFolders,

@@ -69,6 +69,12 @@
         <p class="assess-error" role="alert" hidden></p>
 
         <div class="assess-result" hidden>
+          <!-- EQI-1: Review in AutoIngest (Q2) or Event Dump Quick Import into the active event. -->
+          <div class="mode-switch" role="radiogroup" aria-label="What to do with this card">
+            <button type="button" class="mode-btn" data-mode="review" role="radio">Review in AutoIngest</button>
+            <button type="button" class="mode-btn" data-mode="dump" role="radio">Event Dump</button>
+          </div>
+
           <label class="field">
             <span class="field-label">Shoot date</span>
             <select class="date-select"></select>
@@ -86,6 +92,35 @@
           <div class="card-actions">
             <button type="button" class="btn btn-primary review-selected">Review Selected Date</button>
             <button type="button" class="btn btn-secondary review-earlier">Review Earlier Files</button>
+          </div>
+
+          <!-- EQI-1 Event Dump: everything NEW from the shoot date → the active event's Dump/<photographer>. -->
+          <div class="dump" hidden>
+            <div class="dump-event">
+              <span class="field-label">Event</span>
+              <span class="dump-event-name"></span>
+              <span class="dump-event-actions">
+                <button type="button" class="link-btn dump-choose-event">Change event</button>
+                <span aria-hidden="true">·</span>
+                <button type="button" class="link-btn dump-new-event">Create New Event</button>
+              </span>
+            </div>
+            <label class="field">
+              <span class="field-label">Photographer</span>
+              <select class="dump-photographer"></select>
+            </label>
+            <p class="dump-suggest" hidden>Last used: <button type="button" class="link-btn dump-use-last"></button></p>
+            <p class="dump-counts"></p>
+            <label class="dump-earlier-row" hidden>
+              <input type="checkbox" class="dump-earlier">
+              <span class="dump-earlier-text"></span>
+            </label>
+            <button type="button" class="btn btn-primary dump-import">Import to Dump</button>
+            <div class="dump-progress" role="status" hidden>
+              <span class="dump-progress-text"></span>
+              <div class="progress-track" aria-hidden="true"><div class="progress-bar dump-bar"></div></div>
+            </div>
+            <p class="dump-result" role="status" aria-live="polite" hidden></p>
           </div>
 
           <p class="suggestion" hidden><span class="suggestion-text"></span> <button type="button" class="link-btn use-suggestion"></button></p>

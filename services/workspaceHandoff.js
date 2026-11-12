@@ -65,7 +65,19 @@ function createWorkspaceHandoff({
   }
 
   function _publicView(op) {
-    return { id: op.id, sourceId: op.sourceId, state: op.state, phase: op.phase, reason: op.reason, selected: op.selected, startedAt: op.startedAt, endedAt: op.endedAt };
+    return { id: op.id, kind: op.kind, sourceId: op.sourceId, state: op.state, phase: op.phase, reason: op.reason, selected: op.selected, result: op.result, startedAt: op.startedAt, endedAt: op.endedAt };
+  }
+
+  /** The workspace's own result fields, reduced to plain numbers / short strings / booleans. */
+  function _cleanResult(r) {
+    const out = {};
+    for (const [k, v] of Object.entries(r || {})) {
+      if (typeof v === 'number' && Number.isFinite(v)) out[k] = v;
+      else if (typeof v === 'boolean') out[k] = v;
+      else if (typeof v === 'string') out[k] = v.slice(0, 200);
+      else if (v === null) out[k] = null;
+    }
+    return out;
   }
 
   function _finish(op, state, reason = null, selected = 0) {
@@ -124,10 +136,11 @@ function createWorkspaceHandoff({
     const op = _ownActive(event, msg);
     if (!op) return; // unknown, superseded or already-ended operation: ignored
     const r = msg.result && typeof msg.result === 'object' ? msg.result : {};
+    op.result = _cleanResult(r);
     const reason = typeof r.reason === 'string' ? r.reason : null;
     if (typeof r.detail === 'string') log(`[handoff] #${op.id} workspace detail: ${r.detail.slice(0, 120)}`);
     if (r.ok === true) _finish(op, 'completed', null, Number.isInteger(r.selected) ? r.selected : 0);
-    else if (reason === 'open-failed' || reason === 'error') _finish(op, 'failed', reason);
+    else if (reason === 'open-failed' || reason === 'error' || reason === 'import-failed') _finish(op, 'failed', reason);
     else _finish(op, 'refused', reason || 'refused');
   }
 
@@ -165,11 +178,26 @@ function createWorkspaceHandoff({
    * @returns {{ started: boolean, operation: object, done: Promise<object> }}
    */
   function openSource({ sourceId, mountpoint, label, selectPaths = null }) {
+    return _start('open-source', sourceId, 'companion:openSource',
+      (id) => ({ requestId: id, type: 'memory-card', path: mountpoint, label, selectPaths }));
+  }
+
+  /**
+   * AI-FEAT-064 EQI-1: the same operation lifecycle (ready workspace → acknowledge → heartbeat →
+   * one terminal result) for an Event Dump import the workspace runs, or for opening its event
+   * picker / Event Creator. `payload(id)` builds the message; its result fields are kept (cleaned).
+   * @param {'dump-import'|'event-picker'} kind
+   */
+  function request(kind, { sourceId = null, channel, payload }) {
+    return _start(kind, sourceId, channel, payload);
+  }
+
+  function _start(kind, sourceId, channel, payload) {
     if (_active) return { started: false, operation: _publicView(_active), done: Promise.resolve(_publicView(_active)) };
     let resolve;
     const done = new Promise(r => { resolve = r; });
     const op = {
-      id: ++_seq, sourceId, state: 'pending', phase: 'waiting-for-workspace', reason: null, selected: 0,
+      id: ++_seq, kind, sourceId, state: 'pending', phase: 'waiting-for-workspace', reason: null, selected: 0, result: null,
       startedAt: Date.now(), endedAt: null, wcId: null, acked: false, timer: null, resolve,
     };
     if (isBusy()) {
@@ -188,7 +216,7 @@ function createWorkspaceHandoff({
       op.wcId = wc.id;
       op.phase = 'sent';
       _arm(op, ackTimeoutMs);
-      wc.send('companion:openSource', { requestId: op.id, type: 'memory-card', path: mountpoint, label, selectPaths });
+      wc.send(channel, payload(op.id));
     })().catch((err) => _finish(op, 'failed', `error: ${err && err.message}`));
 
     return { started: true, operation: _publicView(op), done };
@@ -207,7 +235,7 @@ function createWorkspaceHandoff({
     return { inFlight: !!_active, active: getActive(), workspaceReady: !!wc && _ready.has(wc.id), operationsStarted: _seq };
   }
 
-  return { register, unregister, openSource, cancelForSource, getActive, getDiagnostics };
+  return { register, unregister, openSource, request, cancelForSource, getActive, getDiagnostics };
 }
 
 module.exports = { createWorkspaceHandoff, READY_TIMEOUT_MS, ACK_TIMEOUT_MS, HEARTBEAT_TIMEOUT_MS };

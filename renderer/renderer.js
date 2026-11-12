@@ -6040,6 +6040,9 @@ function _registerCompanionHandoff() {
     }
     window.api.companionOpenSourceResult(requestId, result);
   });
+  // AI-FEAT-064 EQI-1: Event Dump imports / event picker requests from the companion, and the
+  // active-event report it shows.
+  if (typeof EventDumpImport !== 'undefined') EventDumpImport.init();
   window.api.companionWorkspaceReady();
 }
 

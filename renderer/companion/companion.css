@@ -245,3 +245,31 @@ select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* ── AI-FEAT-064 EQI-1: Review / Event Dump mode switch and the Event Dump section ── */
+.mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-btn); }
+.mode-btn {
+  padding: 5px var(--space-1); border: none; border-radius: calc(var(--radius-btn) - 2px);
+  background: transparent; color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+.mode-btn:hover { background: var(--surface-hover); }
+.mode-btn.is-on { background: var(--accent-strong); color: #fff; }
+.mode-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+.dump { display: flex; flex-direction: column; gap: var(--space-2); }
+.dump p { margin: 0; }
+.dump-event { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px var(--space-2); }
+.dump-event .field-label { grid-column: 1 / -1; }
+.dump-event-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dump-event-name[data-empty="yes"] { color: var(--warning); font-weight: 500; }
+.dump-event-actions { display: flex; gap: 4px; align-items: baseline; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.dump-photographer { width: 100%; }
+.dump-counts, .dump-suggest { font-size: 12px; color: var(--text-secondary); }
+.dump-earlier-row { display: flex; gap: var(--space-1); align-items: center; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+.dump-import { width: 100%; padding: 8px var(--space-2); }
+.dump-progress { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+.dump-result { font-size: 12px; line-height: 1.45; color: var(--text-secondary); }
+.dump-result[data-state="completed"] { color: var(--success); }
+.dump-result[data-state="completed-with-errors"] { color: var(--warning); }
+.dump-result[data-state="refused"], .dump-result[data-state="failed"], .dump-result[data-state="cancelled"] { color: var(--danger); }

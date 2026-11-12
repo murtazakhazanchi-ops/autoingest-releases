@@ -197,7 +197,7 @@ function spawnSecondInstance(userDataDir, marker) {
     check(st.heading === '1 card connected' && st.labels[0] === 'AI_Q1_TEST', `popup shows the card: ${JSON.stringify(st)}`);
     check(!st.emptyVisible && st.listVisible, 'card state: empty-state is NOT rendered, list is');
     check(!st.hasMainApi, 'popup has NO access to the main window API (window.api undefined)');
-    check(JSON.stringify(st.companionKeys) === JSON.stringify(['getSnapshot', 'hide', 'onSnapshot', 'openAutoIngest', 'quit', 'reviewEarlier', 'reviewSelected', 'selectDate']), `popup API is exactly the companion surface (Q1 + Q2 date assessment): ${st.companionKeys}`);
+    check(JSON.stringify(st.companionKeys) === JSON.stringify(['dumpImport', 'getSnapshot', 'hide', 'onSnapshot', 'openAutoIngest', 'openEventPicker', 'quit', 'reviewEarlier', 'reviewSelected', 'selectDate', 'setDumpOptions']), `popup API is exactly the companion surface (Q1 + Q2 date assessment + EQI-1 Event Dump: setDumpOptions/dumpImport/openEventPicker): ${st.companionKeys}`);
     check(!JSON.stringify(st).includes(cardRoot), 'no filesystem path reached the popup');
     await popup.screenshot({ path: path.join(shotDir, 'popup-one-card.png') });
 
