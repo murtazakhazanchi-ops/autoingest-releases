@@ -36,6 +36,7 @@ const operatorActivity = require('./operatorActivity');
 const {
   buildSnapshot, computePopupPosition, computePopupSize, resolveTrayAnchor, createAutoOpenTracker, handoffStatusText, localDateString,
 } = require('./companionModel');
+const { suggestForCard } = require('./companionPhotographerSuggestion');
 const { createCardAssessor } = require('./cardAssessmentService');
 const { summarize, filesForSelection, normalizeSelection } = require('./dateAssessmentModel');
 const { summarizeCameras } = require('./cameraAssessmentModel');
@@ -76,6 +77,9 @@ let _popup = null;
 let _monitor = null;
 let _unsubscribe = null;
 let _openApp = null;
+/** EQI-1.2: the photographer list and the already-open identity registry (never opened here). */
+let _listPhotographers = () => [];
+let _registryForSuggestions = null;
 let _log = () => {};
 let _lastBlurCloseAt = 0;
 let _ipcRegistered = false;
@@ -156,7 +160,30 @@ function _assessmentView(sourceId) {
     }
   }
   view.dump = _dump ? _dump.cardView(sourceId, job) : null;   // EQI-1: names and counts only
+  if (view.dump) view.dump.suggestion = _photographerSuggestion(job);   // EQI-1.2: names only
   return view;
+}
+
+/**
+ * EQI-1.2: camera-based photographer suggestion for one card (companionPhotographerSuggestion.js
+ * over the card's own Q3 assessment). The registry is used only if this process already has it
+ * open — the menu bar never opens it (Keychain). Recomputed when the registry or the photographer
+ * list changes; a new card is a new job, so nothing carries over between cards. Never throws.
+ */
+function _photographerSuggestion(job) {
+  if (job.state !== 'complete' || !job.cameras) return { status: 'unknown', reason: 'assessing', candidates: [] };
+  let registry;
+  try { registry = _registryForSuggestions ? _registryForSuggestions() : { ok: false, reason: 'registry-not-open' }; }
+  catch { registry = { ok: false, reason: 'registry-unavailable' }; }
+  let listNames = [];
+  try { listNames = _listPhotographers() || []; } catch { /* none */ }
+  const key = `${registry.ok ? registry.revision : registry.reason}|${listNames.length}`;
+  if (job.photographerSuggestion && job.photographerSuggestion.key === key) return job.photographerSuggestion.value;
+  let value;
+  try { value = suggestForCard({ records: job.records, assessed: job.cameras, registry, listNames }); }
+  catch { value = { status: 'unknown', reason: 'suggestion-failed', candidates: [] }; }
+  job.photographerSuggestion = { key, value };
+  return value;
 }
 
 function _snapshot() {
@@ -578,9 +605,11 @@ function _contextMenu() {
  * @param {() => void} opts.openApp  focus/restore the main window or reopen it via splash
  * @param {(msg: string) => void} [opts.log]
  */
-function init({ monitor, openApp, log, isImported = () => false, listPhotographers = () => [], scanEvents = null }) {
+function init({ monitor, openApp, log, isImported = () => false, listPhotographers = () => [], scanEvents = null, registryForSuggestions = null }) {
   if (_tray) return;
   _monitor = monitor;
+  _listPhotographers = listPhotographers;
+  _registryForSuggestions = registryForSuggestions;
   _openApp = openApp;
   if (log) _log = log;
 

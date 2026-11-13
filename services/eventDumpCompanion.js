@@ -121,6 +121,7 @@ function createEventDumpController(deps) {
       event: _event ? {
         eventName: _event.eventName, collectionName: _event.collectionName,
         componentCount: _event.componentCount, pendingSync: _event.pendingSync,
+        types: _event.types, places: _event.places,
       } : null,
       photographers: _photographers(),
       lastPhotographer: _lastPhotographer,
@@ -129,6 +130,9 @@ function createEventDumpController(deps) {
   }
 
   /** The main window's active-event report (untrusted shape; only from the main window). */
+  /** EQI-1.2: display labels (event types, location/city) — bounded plain strings only. */
+  const _labels = (v) => (Array.isArray(v) ? v.filter(x => typeof x === 'string' && x.trim()).slice(0, 12).map(x => x.trim().slice(0, 80)) : []);
+
   function onWorkspaceEvent(info) {
     let next = null;
     if (info && typeof info === 'object' && typeof info.eventPath === 'string' && info.eventPath) {
@@ -138,6 +142,8 @@ function createEventDumpController(deps) {
         collectionName: typeof info.collectionName === 'string' ? info.collectionName.slice(0, 200) : '',
         componentCount: Number.isInteger(info.componentCount) ? info.componentCount : 0,
         pendingSync: info.pendingSync === true,
+        types: _labels(info.types),
+        places: _labels(info.places),
       };
     }
     const pickerOpen = !!(info && typeof info === 'object' && info.pickerOpen === true);

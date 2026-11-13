@@ -21,6 +21,16 @@ const EventDumpImport = (() => {
   let _running = false;
   let _lastReport = '';
 
+  function _eventLabels(components) {
+    const types = [], places = [];
+    const add = (arr, v) => { if (typeof v === 'string' && v.trim() && !arr.includes(v.trim())) arr.push(v.trim()); };
+    for (const c of Array.isArray(components) ? components : []) {
+      for (const t of (c && c.eventTypes) || []) add(types, t && t.label);
+      add(places, [c && c.location && c.location.label, c && c.city && c.city.label].filter(Boolean).join(', '));
+    }
+    return { types, places };
+  }
+
   function _activeEventInfo() {
     const ed = (typeof EventCreator !== 'undefined') ? EventCreator.getActiveEventData() : null;
     if (!ed || !ed.eventPath || !ed.event) return null;
@@ -30,6 +40,9 @@ const EventDumpImport = (() => {
       collectionName: (ed.coll && ed.coll.name) || '',
       componentCount: Array.isArray(ed.event.components) ? ed.event.components.length : 0,
       pendingSync: EventCreator.isPendingSync(),
+      // EQI-1.2: labels only, so the companion can set the event's types and place apart from
+      // its name (the canonical name itself is shown unchanged).
+      ..._eventLabels(ed.event.components),
     };
   }
 

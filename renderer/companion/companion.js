@@ -6,6 +6,9 @@
  * from main. This file only formats them and sends the operator's choices back by opaque
  * sourceId / name. Text is set with textContent only.
  *
+ * EQI-1.2: one focal point per block (the new-file count, the selected event, the photographer)
+ * and camera-based photographer suggestions from main — shown as choices, never selected.
+ *
  * EQI-1.1: one popup, two presentations (main sizes the window and keeps the state):
  *   compact  — card overview: what is on each card and what to do with it
  *   expanded — Event Dump for one card: event, photographer, destination, import, progress
@@ -128,14 +131,46 @@
     return notes.join(' ');
   }
 
-  /** "3 new · 89 already imported" for the chosen date (file-level history from main). */
+  /** "89 already imported · 3 new from earlier dates" (file-level history from main). The new
+   *  count itself is the card's large number, so it is not repeated here. */
   function importStatusText(d) {
     if (!d) return '';
     const c = d.counts;
-    const parts = [`${plural(c.selectedNew, 'new file')}`];
+    const parts = [];
     if (c.selectedImported) parts.push(`${c.selectedImported.toLocaleString()} already imported`);
     if (c.earlierNew) parts.push(`${c.earlierNew.toLocaleString()} new from earlier dates`);
     return parts.join(' · ');
+  }
+
+  /** The large NEW count (falls back to the date's count before import history is known). */
+  function renderHero(el, n) {
+    el.querySelector('strong').textContent = n.toLocaleString();
+    el.dataset.zero = n === 0 ? 'yes' : '';
+  }
+
+  // EQI-1.2: camera → photographer recognition, from main (existing registry evidence only).
+  const RECOG_UNKNOWN = {
+    'registry-not-open': 'Camera recognition starts after the first import this session',
+    'learning-off': 'Photographer learning is switched off — no camera-based suggestions',
+    'body-matching-unavailable': 'Camera bodies cannot be matched on this computer',
+    'registry-unavailable': 'Photographer registry unavailable',
+    'model-only': 'Camera body not identified — no photographer suggestion',
+    'camera-conflict': 'Conflicting camera information — no photographer suggestion',
+    'camera-not-recognised': 'Camera not recognised yet',
+    'no-history-for-camera': 'No photographer history for this camera',
+    'photographer-not-in-list': 'Suggested photographer is not in the photographer list',
+    'no-camera-evidence': 'No camera information on this card',
+  };
+  /** One short line for the card overview; the expanded view explains in full. */
+  function recognitionText(sug) {
+    if (!sug || sug.reason === 'assessing') return '';
+    const names = sug.candidates.map(c => c.name);
+    switch (sug.status) {
+      case 'confirmed': return `Camera confirmed: ${names[0]}`;
+      case 'observed': return `Camera seen with ${names[0]} · unconfirmed`;
+      case 'multiple': return `Camera shared by ${names.length} photographers`;
+      default: return 'Photographer not recognised from camera';
+    }
   }
 
   function dumpResultText(op) {
@@ -174,11 +209,20 @@
     row.querySelector('.selected-caption').textContent = `${s.counts.selected === 1 ? 'file' : 'files'} captured ${day}${extra}`;
     row.querySelector('.selected-breakdown').textContent = breakdownText(s.selectedBreakdown);
     row.querySelector('.import-status').textContent = importStatusText(d);
+    renderHero(row.querySelector(".hero-count"), d ? d.counts.selectedNew : s.counts.selected);
+    const recog = row.querySelector('.recog');
+    const rt = recognitionText(d && d.suggestion);
+    recog.hidden = !rt;
+    recog.querySelector('.recog-text').textContent = rt;
+    recog.dataset.status = d && d.suggestion ? d.suggestion.status : '';
 
     row.querySelector('.earlier-count').textContent = s.counts.earlier.toLocaleString();
     row.querySelector('.later-count').textContent = s.counts.later.toLocaleString();
     row.querySelector('.later-bucket').hidden = s.counts.later === 0;
     row.querySelector('.uncertain-count').textContent = s.counts.uncertain.toLocaleString();
+    row.querySelector('.earlier-count').parentElement.hidden = s.counts.earlier === 0;
+    row.querySelector('.uncertain-count').parentElement.hidden = s.counts.uncertain === 0;
+    row.querySelector('.buckets').hidden = s.counts.earlier + s.counts.later + s.counts.uncertain === 0;
 
     const note = row.querySelector('.assess-note');
     note.textContent = notesText(s);
@@ -483,6 +527,79 @@
   $('xp-change-event').addEventListener('click', openEventPicker);
   $('xp-new-event').addEventListener('click', () => { api.openEventPicker('new'); });
 
+  const txt = (t) => document.createTextNode(t);
+  const strong = (t) => { const b = document.createElement('strong'); b.textContent = t; return b; };
+  const span = (cls, t) => { const e = document.createElement('span'); e.className = cls; e.textContent = t; return e; };
+
+  /** The canonical name as-is; "<date> _NN-" styled apart. textContent stays the exact name. */
+  function renderEventName(el, ev) {
+    if (!ev) { el.replaceChildren(txt('No event selected')); el.dataset.empty = 'yes'; return; }
+    el.dataset.empty = '';
+    const m = /^(\d{4}-\d{2}-\d{2})( _)(\d+)(-)([\s\S]*)$/.exec(ev.eventName);
+    if (!m) { el.replaceChildren(txt(ev.eventName)); return; }
+    el.replaceChildren(span('ev-date', m[1]), txt(m[2]), span('ev-seq', m[3]), txt(m[4]), span('ev-rest', m[5]));
+  }
+
+  function renderEventTags(el, ev) {
+    const tags = [];
+    if (ev) {
+      const m = /^(\d{4}-\d{2}-\d{2}) _(\d+)-/.exec(ev.eventName);
+      if (m) tags.push(['date', m[1]], ['seq', `Event ${m[2]}`]);
+      for (const t of ev.types || []) tags.push(['type', t]);
+      for (const p of ev.places || []) tags.push(['place', p]);
+      if (ev.componentCount > 1) tags.push(['meta', `${ev.componentCount} components`]);
+      if (ev.pendingSync) tags.push(['meta', 'Local copy · sync pending']);
+    }
+    el.replaceChildren(...tags.map(([kind, label]) => { const li = document.createElement('li'); li.dataset.kind = kind; li.textContent = label; return li; }));
+    el.hidden = !tags.length;
+  }
+
+  /** Camera-based suggestion: offered as buttons — never selected without the operator. */
+  function renderCameraSuggestion(sug, chosen, lock) {
+    const box = $('xp-ph-camera');
+    const choices = $('xp-ph-camera-choices');
+    const show = !!sug && sug.reason !== 'assessing';
+    box.hidden = !show;
+    if (!show) { choices.replaceChildren(); return; }
+    box.dataset.status = sug.status;
+    const names = sug.candidates.map(c => c.name);
+    const text = sug.status === 'confirmed' ? `Camera confirmed for ${names[0]}. Confirm the photographer before importing.`
+      : sug.status === 'observed' ? `This camera was used by ${names[0]} before (not confirmed). Check before choosing.`
+      : sug.status === 'multiple' ? 'This camera is used by several photographers — choose the right one.'
+      : `${RECOG_UNKNOWN[sug.reason] || 'Photographer not recognised from the camera'}. Search the list below.`;
+    $('xp-ph-camera-text').textContent = text;
+    choices.replaceChildren(...sug.candidates.map(c => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `btn ${c.name === chosen ? 'btn-secondary' : sug.status === 'confirmed' ? 'btn-primary' : 'btn-secondary'} ph-choice`;
+      b.textContent = c.name === chosen ? `✓ ${c.name}` : `Use ${c.name}`;
+      b.setAttribute('aria-pressed', c.name === chosen ? 'true' : 'false');
+      b.disabled = lock;
+      b.onclick = () => choosePhotographer(c.name);
+      return b;
+    }));
+  }
+
+  /** "1448-05-14 _02 · Ziyafat" — the event as a short reference (the full name is shown above). */
+  function shortEvent(ev) {
+    const m = /^(\d{4}-\d{2}-\d{2} _\d+)-/.exec(ev.eventName);
+    if (!m) return ev.eventName;
+    const first = (ev.types && ev.types[0]) || ev.eventName.slice(m[0].length).split('-')[0];
+    return `${m[1]} · ${first}${ev.types && ev.types.length > 1 ? ' …' : ''}`;
+  }
+
+  /** Event / Dump / Photographer, readable; the full canonical path under "Full path". */
+  function renderDestination(ev, chosen) {
+    const dest = $('xp-dest');
+    if (!ev) { dest.replaceChildren(txt('Choose an event to see where the files will go.')); $('xp-dest-full').textContent = ''; return; }
+    const sep = () => span('seg-sep', '/');
+    const ph = span('seg-ph', chosen || '<photographer>');
+    ph.dataset.empty = chosen ? '' : 'yes';
+    dest.replaceChildren(span('seg-event', shortEvent(ev)), txt(' '), sep(), txt(' '), span('seg-dump', 'Dump'), txt(' '), sep(), txt(' '), ph);
+    dest.title = `${ev.eventName} / Dump / ${chosen || '<photographer>'}`;
+    $('xp-dest-full').textContent = `${ev.collectionName} / ${ev.eventName} / Dump / ${chosen || '<photographer>'}`;
+  }
+
   function renderExpanded(src) {
     const a = src.assessment || {};
     const s = a.summary;
@@ -498,7 +615,9 @@
       syncSelect(dateSel, s.options.map(o => [o.date, optionLabel(o)]), s.selection.date);
       dateSel.onchange = () => { api.selectDate(src.sourceId, dateSel.value, s.selection.untilTime); };
       const day = s.selection.date === s.today ? 'today' : `on ${formatDate(s.selection.date)}`;
-      $('xp-counts').textContent = d ? `${plural(d.counts.selectedNew, 'new file')} captured ${day}` : '';
+      // The new count is the large number beside the card; this line says what it counts.
+      $('xp-counts').textContent = `${plural(s.counts.selected, 'file')} captured ${day}${breakdownText(s.selectedBreakdown) ? ` · ${breakdownText(s.selectedBreakdown)}` : ''}`;
+      renderHero($("xp-new-num").parentElement, d ? d.counts.selectedNew : s.counts.selected);
       const sub = [];
       if (d && d.counts.selectedImported) sub.push(`${d.counts.selectedImported.toLocaleString()} already imported`);
       if (s.counts.uncertain) sub.push(`${s.counts.uncertain.toLocaleString()} without a reliable date stay on the card`);
@@ -514,33 +633,35 @@
       $('xp-earlier-text').textContent = `Also import ${plural(d.counts.earlierNew, 'new file')} from earlier dates`;
     }
 
-    // Selected event — the complete canonical name, wrapping; never truncated.
-    const evName = $('xp-event-name');
-    evName.textContent = g.event ? g.event.eventName : 'No event selected';
-    evName.dataset.empty = g.event ? '' : 'yes';
+    // Selected event — the complete canonical name, unchanged and wrapping (never truncated);
+    // only its date and sequence are styled apart. Types and place come from the event's data.
+    renderEventName($('xp-event-name'), g.event);
+    renderEventTags($('xp-event-tags'), g.event);
     $('xp-event-coll').textContent = g.event ? `Collection ${g.event.collectionName}` : '';
     $('xp-change-event').textContent = g.event ? 'Change Event' : 'Choose Event';
     $('xp-change-event').disabled = lock;
     $('xp-new-event').disabled = lock;
 
     // Photographer — the confirmed choice lives in main; typing never replaces it.
-    if (document.activeElement !== xp.phInput && xp.phList.hidden) xp.phInput.value = (d && d.photographer) || '';
+    const chosen = (d && d.photographer) || null;
+    if (document.activeElement !== xp.phInput && xp.phList.hidden) xp.phInput.value = chosen || '';
     xp.phInput.disabled = lock;
+    $('xp-combo').closest('.xp-ph').dataset.chosen = chosen ? 'yes' : '';
     const phState = $('xp-ph-state');
-    phState.textContent = d && d.photographer ? `Selected: ${d.photographer}` : 'No photographer selected — choose one from the list.';
-    phState.dataset.empty = d && d.photographer ? '' : 'yes';
-    const sug = $('xp-ph-suggest');
-    sug.hidden = !g.lastPhotographer || (d && d.photographer === g.lastPhotographer) || !g.photographers.includes(g.lastPhotographer);
-    if (!sug.hidden) {
+    phState.textContent = chosen ? `✓ ${chosen}` : 'Not chosen yet';
+    phState.dataset.empty = chosen ? '' : 'yes';
+    renderCameraSuggestion(d && d.suggestion, chosen, lock);
+    const last = $('xp-ph-last');
+    last.hidden = !g.lastPhotographer || chosen === g.lastPhotographer || !g.photographers.includes(g.lastPhotographer)
+      || !!(d && d.suggestion && d.suggestion.candidates.some(c => c.name === g.lastPhotographer));
+    if (!last.hidden) {
       const use = $('xp-ph-use-last');
       use.textContent = g.lastPhotographer;
       use.disabled = lock;
       use.onclick = () => choosePhotographer(g.lastPhotographer);
     }
 
-    $('xp-dest').textContent = g.event
-      ? `${g.event.collectionName} / ${g.event.eventName} / Dump / ${(d && d.photographer) || '<photographer>'}`
-      : 'Choose an event to see where the files will go.';
+    renderDestination(g.event, chosen);
 
     // Pinned action.
     const btn = $('xp-import');
@@ -549,8 +670,14 @@
     btn.textContent = d && d.counts.toImport > 0 ? `Import ${plural(d.counts.toImport, 'file')} to Dump` : 'Import to Dump';
     btn.title = !g.event ? DUMP_REASONS['no-event'] : !(d && d.photographer) ? DUMP_REASONS['no-photographer'] : '';
     btn.onclick = () => { api.dumpImport(src.sourceId); };
+    const readyLine = $('xp-ready');
+    readyLine.dataset.ready = ready ? 'yes' : '';
+    readyLine.replaceChildren(...(ready
+      ? [txt('Ready: '), strong(plural(d.counts.toImport, 'file')), txt(' as '), strong(d.photographer), txt(` → event ${shortEvent(g.event)}`)]
+      : [txt(!g.event ? 'Choose the event to import into.' : !(d && d.photographer) ? 'Choose and confirm the photographer.' : 'No new files to import for this date.')]));
     const op = d && d.op;
     const pending = !!(op && op.state === 'pending');
+    readyLine.hidden = pending || (!ready && !!op && op.state === 'completed');
     $('xp-progress').hidden = !pending;
     if (pending) {
       const p = op.progress || { done: 0, total: 0 };

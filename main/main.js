@@ -373,6 +373,9 @@ function _startCompanion() {
         const r = await _scanEventsCore(collectionPath, `companion-${Date.now().toString(36)}`);
         return r && r.ok && Array.isArray(r.events) ? r.events : [];
       },
+      // EQI-1.2 camera-based photographer suggestions: the identity registry only if this process
+      // already opened it — never opened from the menu bar (Keychain).
+      registryForSuggestions: () => require('../services/photographerLearningRuntime').peekOpenRegistry(),
     });
   } catch (err) {
     log(`[main] companion failed to start: ${err.message}`);

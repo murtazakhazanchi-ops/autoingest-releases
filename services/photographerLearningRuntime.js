@@ -342,6 +342,43 @@ async function openRegistryForManagement() {
   }
 }
 
+let _peekCache = null;
+
+/**
+ * EQI-1.2 — the registry for the companion's camera-based photographer suggestions, ONLY when
+ * this process has already opened it (learning after an import, or a Photographer Registry
+ * decision). Never opens, initialises, locks or decrypts anything and never touches secure
+ * storage: opening the key needs the macOS Keychain, which can stall the main process behind a
+ * prompt, so the menu bar never triggers it. The derived state is cached per registry revision.
+ * Never throws.
+ * @returns {{ ok: true, keyring: object|null, state: object, retired: Set<string>, shipped: object, revision: string }
+ *         | { ok: false, reason: 'registry-not-open'|'learning-off'|'registry-unavailable' }}
+ */
+function peekOpenRegistry() {
+  try {
+    if (_closedForQuit || !_store || _store.getStatus().state !== 'ready') {
+      // With learning switched off nothing opens the registry in this process (only a registry
+      // decision would), so say so rather than promising recognition after an import.
+      let learningOn = true;
+      try { learningOn = _deps().settings.getPhotographerLearningEnabled(); } catch { /* assume on */ }
+      return { ok: false, reason: learningOn ? 'registry-not-open' : 'learning-off' };
+    }
+    const events = _store.getEvents();
+    const keyring = _store.getKeyring();
+    const revision = `${events.length}:${events.length ? events[events.length - 1].eventId : ''}:${keyring ? 'k' : '-'}`;
+    if (_peekCache && _peekCache.revision === revision) return _peekCache;
+    const shippedNames = _readJsonOr(path.join(__dirname, '..', 'data', 'photographers.json'), []);
+    const state = _store.deriveState({ shippedNames });
+    if (!state) return { ok: false, reason: 'registry-unavailable' };
+    const { retiredIds } = require('./photographerNameModel');
+    const P = require('./photographerIdentity');
+    _peekCache = { ok: true, keyring, state, retired: retiredIds(events, { state }), shipped: P.bootstrapShippedIds(shippedNames), revision };
+    return _peekCache;
+  } catch {
+    return { ok: false, reason: 'registry-unavailable' };
+  }
+}
+
 /** will-quit: cancel learning work and release the registry lock. Synchronous, idempotent. */
 function shutdown() {
   _closedForQuit = true;
@@ -351,6 +388,6 @@ function shutdown() {
 }
 
 module.exports = {
-  onImportCommitted, scheduleRecoveryAfterLaunch, shutdown, inspectRegistry, openRegistryForManagement, registryNames,
+  onImportCommitted, scheduleRecoveryAfterLaunch, shutdown, inspectRegistry, openRegistryForManagement, registryNames, peekOpenRegistry,
   _forTests: { get: () => _service, store: () => _store, useStore: (s) => { _store = s; }, recoverNow: (opts) => _get().recoverPending(opts), whenIdle: () => _get().whenIdle() },
 };

@@ -37,10 +37,11 @@
     </section>
 
     <!-- ── Expanded: Event Dump for one card ─────────────────────────────────── -->
+    <!-- EQI-1.2 order: source → event → photographer → destination → import. -->
     <section class="xp view-expanded" id="xp" hidden aria-label="Event Dump">
       <div class="xp-body scroll-area">
-        <section class="xp-section xp-card" aria-label="Card">
-          <div class="xp-card-head">
+        <section class="xp-source" aria-label="Card">
+          <div class="xp-source-top">
             <svg class="card-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M7 3h7.5L19 7.5V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>
               <path d="M10 3v4M13 3v4"/>
@@ -49,12 +50,10 @@
               <span class="xp-card-label" id="xp-card-label"></span>
               <span class="xp-card-meta" id="xp-card-meta"></span>
             </div>
+            <p class="hero-count" aria-live="polite"><strong id="xp-new-num">0</strong><span id="xp-new-caption">new</span></p>
           </div>
-          <div class="xp-grid">
-            <label class="field">
-              <span class="field-label">Shoot date</span>
-              <select id="xp-date"></select>
-            </label>
+          <div class="xp-source-row">
+            <select id="xp-date" aria-label="Shoot date"></select>
             <div class="xp-counts">
               <p class="xp-counts-main" id="xp-counts"></p>
               <p class="xp-counts-sub" id="xp-counts-sub"></p>
@@ -66,10 +65,14 @@
           </label>
         </section>
 
-        <section class="xp-section" aria-labelledby="xp-event-title">
-          <h3 class="xp-title" id="xp-event-title">Selected Event</h3>
-          <p class="xp-event-coll" id="xp-event-coll"></p>
+        <section class="xp-panel xp-event" aria-labelledby="xp-event-title">
+          <div class="xp-panel-head">
+            <h3 class="xp-title" id="xp-event-title">Importing into</h3>
+            <span class="xp-event-coll" id="xp-event-coll"></span>
+          </div>
+          <!-- The complete canonical name, unchanged; date and sequence are only styled apart. -->
           <p class="xp-event-name" id="xp-event-name"></p>
+          <ul class="xp-tags" id="xp-event-tags" aria-label="Event details"></ul>
           <div class="xp-event-actions">
             <button type="button" class="btn btn-secondary" id="xp-change-event">Change Event</button>
             <button type="button" class="btn btn-secondary" id="xp-new-event">Create New Event</button>
@@ -86,25 +89,34 @@
           </div>
         </section>
 
-        <section class="xp-section" aria-labelledby="xp-ph-title">
-          <h3 class="xp-title" id="xp-ph-title">Photographer</h3>
+        <section class="xp-panel xp-ph" aria-labelledby="xp-ph-title">
+          <div class="xp-panel-head">
+            <h3 class="xp-title" id="xp-ph-title">Photographer</h3>
+            <span class="xp-ph-state" id="xp-ph-state"></span>
+          </div>
+          <!-- Camera-based suggestion (existing registry evidence) — never a selection by itself. -->
+          <div class="ph-camera" id="xp-ph-camera" hidden>
+            <p class="ph-camera-text" id="xp-ph-camera-text"></p>
+            <div class="ph-camera-choices" id="xp-ph-camera-choices"></div>
+          </div>
           <div class="combo" id="xp-combo">
             <input type="text" id="xp-ph-input" class="text-input" role="combobox" aria-expanded="false" aria-controls="xp-ph-list"
-                   aria-autocomplete="list" placeholder="Type to search photographers" autocomplete="off" spellcheck="false">
+                   aria-autocomplete="list" aria-labelledby="xp-ph-title" placeholder="Type to search photographers" autocomplete="off" spellcheck="false">
             <ul class="combo-list scroll-area" id="xp-ph-list" role="listbox" hidden></ul>
           </div>
-          <p class="xp-ph-state" id="xp-ph-state"></p>
-          <p class="dump-suggest" id="xp-ph-suggest" hidden>Last used: <button type="button" class="link-btn" id="xp-ph-use-last"></button></p>
+          <p class="ph-last" id="xp-ph-last" hidden><span class="ph-last-label">Last used this session:</span> <button type="button" class="link-btn" id="xp-ph-use-last"></button></p>
         </section>
 
-        <section class="xp-section" aria-labelledby="xp-dest-title">
+        <section class="xp-dest-row" aria-labelledby="xp-dest-title">
           <h3 class="xp-title" id="xp-dest-title">Destination</h3>
           <p class="xp-dest" id="xp-dest"></p>
+          <details class="xp-dest-full"><summary>Full path</summary><p id="xp-dest-full"></p></details>
         </section>
       </div>
 
-      <!-- Pinned: the import action and its progress stay reachable while the content scrolls. -->
+      <!-- Pinned: readiness, the import action and its progress stay reachable while content scrolls. -->
       <div class="xp-action">
+        <p class="xp-ready" id="xp-ready"></p>
         <div class="dump-progress" id="xp-progress" role="status" hidden>
           <span id="xp-progress-text"></span>
           <div class="progress-track" aria-hidden="true"><div class="progress-bar" id="xp-bar"></div></div>
@@ -140,6 +152,8 @@
         <ul class="camera-list"></ul>
         <button type="button" class="link-btn cameras-more" hidden></button>
       </div>
+      <!-- EQI-1.2: camera → photographer recognition (existing registry evidence only). -->
+      <p class="recog" hidden><span class="recog-dot" aria-hidden="true"></span><span class="recog-text"></span></p>
 
       <!-- Q2: capture-date assessment. Every value below comes from main's snapshot. -->
       <div class="assessment">
@@ -152,15 +166,12 @@
         <p class="assess-error" role="alert" hidden></p>
 
         <div class="assess-result" hidden>
-          <label class="field">
-            <span class="field-label">Shoot date</span>
-            <select class="date-select"></select>
-          </label>
-
-          <p class="selected-line"><strong class="selected-num"></strong> <span class="selected-caption"></span></p>
+          <div class="hero">
+            <p class="hero-count"><strong class="new-num">0</strong><span class="new-caption">new</span></p>
+            <select class="date-select" aria-label="Shoot date"></select>
+          </div>
+          <p class="selected-line"><strong class="selected-num"></strong> <span class="selected-caption"></span><span class="import-status"></span></p>
           <p class="selected-breakdown"></p>
-          <!-- EQI-1.1: import status at a glance (file-level history). -->
-          <p class="import-status"></p>
 
           <dl class="buckets">
             <div class="bucket"><dt>Earlier</dt><dd class="earlier-count"></dd></div>
@@ -168,20 +179,22 @@
             <div class="bucket"><dt>Date uncertain</dt><dd class="uncertain-count"></dd></div>
           </dl>
 
-          <div class="card-actions">
-            <button type="button" class="btn btn-secondary review-selected">Review Selected Date</button>
-            <button type="button" class="btn btn-secondary review-earlier">Review Earlier Files</button>
-          </div>
-          <button type="button" class="btn btn-primary event-dump-btn">Event Dump</button>
-          <p class="dump-last" hidden></p>
-
           <p class="suggestion" hidden><span class="suggestion-text"></span> <button type="button" class="link-btn use-suggestion"></button></p>
           <p class="assess-note" hidden></p>
 
-          <label class="field field-inline">
-            <span class="field-label">Continues after midnight</span>
-            <select class="midnight-select"></select>
-          </label>
+          <div class="card-actions">
+            <button type="button" class="btn btn-secondary review-selected" title="Open the selected date's new files in AutoIngest's Import workspace">Quick Import</button>
+            <button type="button" class="btn btn-primary event-dump-btn" title="Import the selected date's new files into an event's Dump folder">Event Dump</button>
+          </div>
+          <p class="dump-last" hidden></p>
+
+          <div class="card-minor">
+            <button type="button" class="link-btn review-earlier">Review earlier files</button>
+            <label class="field field-inline">
+              <span class="field-label" title="Include files taken after midnight as part of this day">After midnight</span>
+              <select class="midnight-select"></select>
+            </label>
+          </div>
         </div>
       </div>
     </li>
