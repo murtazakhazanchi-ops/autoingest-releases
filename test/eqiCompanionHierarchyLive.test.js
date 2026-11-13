@@ -241,17 +241,17 @@ const removeOpenRegistry = (app) => mainRequire(app, '../services/photographerLe
       await shoot(page, shots, '5-expanded-unknown');
     });
 
-    // ═══ 5. Registry not open (the normal state before learning this session) ═══
+    // ═══ 5. No registry on this computer yet (CAM-001: startup found none and created nothing) ═══
     await removeOpenRegistry(app);
-    const c2 = await waitFor(async () => { const v = await dumpView(app); return v.card?.suggestion?.reason === 'registry-not-open' ? v.card : null; }, 10000);
-    check(!!c2 && c2.suggestion.status === 'unknown', 'registry not open: honest "unknown" with its reason, nothing asserted');
-    check(!H.keychainHas(iso.keychainItem), 'no Keychain item was created by any suggestion phase (the menu bar never opens the registry)');
+    const c2 = await waitFor(async () => { const v = await dumpView(app); return v.card?.suggestion?.reason === 'no-registry' ? v.card : null; }, 10000);
+    check(!!c2 && c2.suggestion.status === 'unknown', 'no registry: honest "unknown" with its reason, nothing asserted');
+    check(!H.keychainHas(iso.keychainItem), 'no Keychain item was created by any suggestion phase (no registry → no key access)');
     await withPopup(app, async (page) => {
       await enterDump(page);
       // The open popup refreshes on the next snapshot push (card poll), not instantly.
-      await page.waitForFunction(() => /after the first import/i.test(document.getElementById('xp-ph-camera-text').textContent), null, { timeout: 15000 }).catch(() => {});
+      await page.waitForFunction(() => /No camera history yet/i.test(document.getElementById('xp-ph-camera-text').textContent), null, { timeout: 15000 }).catch(() => {});
       const txt = await page.textContent('#xp-ph-camera-text');
-      check(/after the first import/i.test(txt), `registry-not-open explained ("${txt}")`);
+      check(/No camera history yet/i.test(txt), `no-registry explained ("${txt}")`);
       await shoot(page, shots, '6-expanded-registry-not-open');
     });
 

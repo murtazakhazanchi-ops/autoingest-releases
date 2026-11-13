@@ -421,6 +421,8 @@ function assertClean(payload, fx, label) {
       'services/companionModel.js', 'renderer/companion/photographerMatch.js', 'test/eqiCompanionAdaptiveEQI11.test.js', 'test/eqiCompanionAdaptiveLive.test.js', 'test/fixtures/eqi11-realworld-dump-event.json', 'test/eventPhotographerFoldersQ5e2a.test.js',
       // EQI-1.2: companion visual hierarchy + camera-based photographer suggestions (read-only peek).
       'services/companionPhotographerSuggestion.js', 'test/eqiCompanionHierarchyEQI12.test.js', 'test/eqiCompanionHierarchyLive.test.js',
+      // CAM-001: registry opened at launch, macOS Keychain work in a helper process.
+      'services/secureStorageHelper.js', 'services/secureStorageHelperProcess.js', 'test/cam001RegistryStartup.test.js', 'test/cam001StartupRecognitionLive.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });

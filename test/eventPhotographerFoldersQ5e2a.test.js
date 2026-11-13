@@ -341,7 +341,11 @@ const add = (ev, additions, extra = {}) => {
       'services/companionModel.js', 'renderer/companion/photographerMatch.js', 'test/eqiCompanionAdaptiveEQI11.test.js', 'test/eqiCompanionAdaptiveLive.test.js', 'test/fixtures/eqi11-realworld-dump-event.json',
       // EQI-1.2: companion visual hierarchy + camera-based photographer suggestions (read-only peek).
       // The runtime gains only peekOpenRegistry(): reads an ALREADY-open store, never opens one.
-      'services/photographerLearningRuntime.js', 'services/companionPhotographerSuggestion.js', 'test/eqiCompanionHierarchyEQI12.test.js', 'test/eqiCompanionHierarchyLive.test.js']);
+      'services/photographerLearningRuntime.js', 'services/companionPhotographerSuggestion.js', 'test/eqiCompanionHierarchyEQI12.test.js', 'test/eqiCompanionHierarchyLive.test.js',
+      // CAM-001: immediate photographer recognition — the registry opened at launch with the macOS
+      // Keychain work in a helper process (key store awaits an async adapter; no key or format change).
+      'services/secureStorageHelper.js', 'services/secureStorageHelperProcess.js', 'services/identityKeyStore.js', 'services/identityRegistryStore.js',
+      'test/cam001RegistryStartup.test.js', 'test/cam001StartupRecognitionLive.test.js', 'test/photographerRegistryQ5d.test.js']);
     assert.deepEqual(changed.filter(f => !allowed.has(f)), []);
   });
 

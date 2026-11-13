@@ -419,30 +419,44 @@ const layout = (main) => main.evaluate(() => {
       log('settings keys changed:', Object.keys({ ...settingsBefore2, ...sa }).filter(k => JSON.stringify(settingsBefore2[k]) !== JSON.stringify(sa[k])).join(', '));
     }
     check(diff2.length === 0, `browsing changed no registry, key, settings, list or alias file${diff2.length ? ` (changed: ${diff2.join(', ')})` : ''}`);
-    check(!keychainHas(KEYCHAIN_ITEM), 'no Keychain item created while browsing');
+    // CAM-001: startup recognition reads the registry key through the key helper, so the test
+    // identity's own "Safe Storage" item may now exist (safeStorage creates it when missing). The
+    // seeded key file is never replaced — the file check above covers that.
 
-    // ── Error states while running: locked, corrupt (file left exactly as found) ────
+    // ── Error states: locked, corrupt (file left exactly as found) ────
+    // CAM-001 opens the registry at startup and the browser then shows the open store, so each
+    // error state is set up before a launch, where startup recognition meets it first.
+    await app.close(); app = null;
     fs.writeFileSync(path.join(dir, 'registry.lock'), JSON.stringify({ pid: process.pid, token: 'q5c-live', at: new Date().toISOString() }));
+    ({ app, main } = await launch(work, ud, drivesFile));
+    shot.app = app;
+    await settleStartup(ud);
     await openTab(main);
     const locked = await main.evaluate(() => document.getElementById('prStatus').textContent);
     check(/Another AutoIngest process is updating the registry/.test(locked), 'registry locked by another live process → read-only notice, data still shown');
     await shot(main, '10-locked-dark');
     await closeModal(main);
+    await app.close(); app = null;
     fs.unlinkSync(path.join(dir, 'registry.lock'));
     const good = fs.readFileSync(path.join(dir, 'registry.json'));
     fs.writeFileSync(path.join(dir, 'registry.json'), '{ damaged');
     const before3 = ownFiles(ud);
+    ({ app, main } = await launch(work, ud, drivesFile));
+    shot.app = app;
+    await settleStartup(ud);
     await openTab(main);
     const corrupt = await main.evaluate(() => ({ text: document.getElementById('prStatus').textContent, cls: document.querySelector('#prStatus .pr-notice')?.className }));
     check(/could not be read as a valid registry/.test(corrupt.text) && /attention/.test(corrupt.cls), 'corrupt registry → attention notice without any reset control');
     await shot(main, '11-corrupt-light-check');
     await closeModal(main);
-    check(JSON.stringify(ownFiles(ud)) === JSON.stringify(before3), 'corrupt registry left exactly as found');
+    const after3 = ownFiles(ud);
+    check(['identity-registry/registry.json', 'identity-registry/keys.json'].every(k => after3[k] === before3[k]) && !Object.keys(after3).some(k => k.startsWith('identity-registry/quarantine/')), 'corrupt registry left exactly as found');
     fs.writeFileSync(path.join(dir, 'registry.json'), good);
     const importable = await main.evaluate(() => !!document.getElementById('workspace') && typeof window.api.importFiles === 'function' && typeof window.api.commitImportTransaction === 'function');
     check(importable, 'main import workspace still present and wired after browsing the registry');
     await app.close(); app = null;
 
+    if (keychainHas(KEYCHAIN_ITEM)) { try { execFileSync('security', ['delete-generic-password', '-s', KEYCHAIN_ITEM], { stdio: 'ignore' }); } catch { /* reported below */ } }
     check(!keychainHas(KEYCHAIN_ITEM), 'no test Keychain item exists after the run');
     const prodAfter = ['auto-ingest Safe Storage', 'AutoIngest Safe Storage'].map(keychainHas);
     check(JSON.stringify(prodAfter) === JSON.stringify(prodBefore), 'production Keychain items untouched (presence unchanged)');

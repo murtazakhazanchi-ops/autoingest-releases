@@ -162,13 +162,23 @@ async function seedRegistry(dir) {
     check(JSON.stringify(ownFiles(ud)) === JSON.stringify(before2), 'registry, keys, settings, lists unchanged by inspection');
     check(!fs.existsSync(path.join(dir, 'quarantine')) || fs.readdirSync(path.join(dir, 'quarantine')).length === 0, 'nothing quarantined');
 
-    // ── Corrupt registry while the app runs: reported, untouched ─────────────
+    await app.close(); app = null;
+
+    // ── Corrupt registry at launch: reported, untouched ──────────────────────
+    // CAM-001 opens the registry at startup and inspection then reads the open store, so the
+    // damage is in place before the launch, where startup recognition meets it first.
     fs.writeFileSync(path.join(dir, 'registry.json'), '{ damaged');
     const before3 = ownFiles(ud);
+    app = await launch(work, ud, drivesFile);
     const v3 = await inspect(app);
-    check(v3.status.state === 'corrupt' && v3.cameras.length === 0 && v3.photographers.length >= 312, 'corrupt registry → "corrupt", names still browsable');
-    check(JSON.stringify(ownFiles(ud)) === JSON.stringify(before3), 'corrupt registry left exactly as found (no quarantine, no reset)');
+    check(v3.status.state === 'corrupt' && v3.cameras.length === 0 && v3.photographers.length >= 312, `corrupt registry → "corrupt", names still browsable (got ${v3.status.state})`);
+    const after3 = ownFiles(ud);
+    check(['identity-registry/registry.json', 'identity-registry/keys.json'].every(k => after3[k] === before3[k]) && !Object.keys(after3).some(k => k.startsWith('identity-registry/quarantine/')), 'corrupt registry left exactly as found (no quarantine, no reset)');
     await app.close(); app = null;
+
+    // CAM-001: startup recognition read the seeded key through the key helper, which may have
+    // created this test identity's own Safe Storage item; it is removed here.
+    if (keychainHas(KEYCHAIN_ITEM)) { try { execFileSync('security', ['delete-generic-password', '-s', KEYCHAIN_ITEM], { stdio: 'ignore' }); } catch { /* reported below */ } }
 
     check(!keychainHas(KEYCHAIN_ITEM), 'no test Keychain item exists after the run');
     const prodAfter = ['auto-ingest Safe Storage', 'AutoIngest Safe Storage'].map(keychainHas);

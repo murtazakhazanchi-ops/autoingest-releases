@@ -666,6 +666,9 @@ async function act(fx, request, label = request.action) {
     for (const m of ['../services/photographerLearningRuntime', '../services/settings', '../main/userManager', '../main/listManager', '../services/electronSecureStorage']) delete require.cache[require.resolve(m)];
     require('../main/listManager').init(userData);
     const runtime = require('../services/photographerLearningRuntime');
+    // CAM-001: on macOS the runtime decrypts through a helper process (a real Electron app); this
+    // Node test supplies the in-process adapter over the fake safeStorage instead.
+    runtime._forTests.useSecureStorage(require('../services/electronSecureStorage').createElectronSecureStorage(fakeElectron));
     const dir = path.join(userData, 'identity-registry');
     assert.deepEqual(await runtime.openRegistryForManagement(), { ok: false, reason: 'no-registry' });
     assert.equal(fs.existsSync(dir), false, 'missing registry is not created');
