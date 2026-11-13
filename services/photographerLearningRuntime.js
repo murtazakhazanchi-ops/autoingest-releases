@@ -8,8 +8,14 @@
  *   inspectRegistry()       Q5a: read-only Photographer Registry view (Q5c browser loader)
  *   openRegistryForManagement()  Q5d: the registry store for operator decisions — an EXISTING,
  *                           healthy registry only; never creates, initialises, recovers or resets
+ *   startRegistryForSuggestions()  CAM-001: once at startup, opens an EXISTING registry so the
+ *                           companion can recognise a card's camera before any import
  * Nothing is created at launch or on card insert: the registry, its key, the journal and the
  * pending list are created lazily by the first eligible committed import.
+ *
+ * Secure storage (CAM-001): on macOS every Keychain operation runs in a helper process
+ * (secureStorageHelper.js) — the main process never calls safeStorage, so a Keychain prompt or a
+ * stalled Keychain cannot freeze it. Elsewhere (Windows DPAPI) the in-process adapter is used.
  *
  * Camera evidence for the NEWLY COPIED files of a live import, read-only, never guessed:
  *  1. The companion's Q2/Q3 assessment, when EVERY committed file is in a completed job whose
@@ -43,6 +49,14 @@ let _store = null;
 let _fallback = null; // the running re-read assessor, if any
 let _opening = Promise.resolve(); // serialises opening the one shared store instance
 let _closedForQuit = false;
+let _secure = null; // the one secure-storage adapter of this process
+
+// CAM-001 readiness for the companion: idle → starting [→ waiting-keychain] → ready | unavailable | off
+let _startup = { phase: 'idle', reason: null };
+let _startupRun = null;
+const _listeners = new Set();
+const KEY_RETRY_MS = 60000;
+let _lastKeyRetry = 0;
 
 function _deps() {
   const { app } = require('electron');
@@ -190,9 +204,8 @@ function _sharedStore({ initialize }) {
   const run = _opening.then(async () => {
     if (!_store) {
       const { createIdentityRegistryStore } = require('./identityRegistryStore');
-      const { createElectronSecureStorage } = require('./electronSecureStorage');
       const { settings, dir } = _deps();
-      _store = createIdentityRegistryStore({ dir, secureStorage: createElectronSecureStorage(), computerId: settings.getDeviceId() });
+      _store = createIdentityRegistryStore({ dir, secureStorage: _secureStorage(), computerId: settings.getDeviceId() });
     }
     if (_closedForQuit || _store.getStatus().state === 'ready') return _store;
     if (_store.getStatus().state === 'disabled') await _store.close();
@@ -201,6 +214,83 @@ function _sharedStore({ initialize }) {
   });
   _opening = run.catch(() => {});
   return run;
+}
+
+/**
+ * CAM-001 — the secure-storage adapter for the registry's keys. macOS: the helper process (the
+ * app's own executable; same Keychain item, same access rules). Other platforms: in-process.
+ */
+function _secureStorage() {
+  if (_secure) return _secure;
+  const electron = require('electron');
+  if (process.platform === 'darwin') {
+    const { createHelperSecureStorage, spawnElectronHelper } = require('./secureStorageHelper');
+    _secure = createHelperSecureStorage({
+      identity: electron.app.getName(), backend: 'macos-keychain', spawnHelper: spawnElectronHelper({ electron }),
+      onWaiting: (w) => {
+        if (w && _startup.phase === 'starting') _setPhase('waiting-keychain', null);
+        else if (!w && _startup.phase === 'waiting-keychain') _setPhase('starting', null);
+      },
+    });
+  } else {
+    _secure = require('./electronSecureStorage').createElectronSecureStorage(electron);
+  }
+  return _secure;
+}
+
+function _setPhase(phase, reason) {
+  if (_startup.phase === phase && _startup.reason === reason) return;
+  _startup = { phase, reason };
+  _peekCache = null;
+  for (const fn of _listeners) { try { fn(); } catch { /* listener */ } }
+}
+
+/** Registry readiness changes (the companion re-renders suggestions). Returns an unsubscribe. */
+function onRegistryChange(fn) {
+  _listeners.add(fn);
+  return () => _listeners.delete(fn);
+}
+
+function _phaseFromStore(store) {
+  const st = store.getStatus();
+  if (st.state !== 'ready') return _setPhase('unavailable', 'registry-unavailable');
+  _setPhase('ready', st.bodyMatching ? null : st.keyStatus);
+}
+
+/**
+ * CAM-001 — once, right after launch: open an EXISTING, healthy registry (exactly as the Photographer
+ * Registry tab does — never creates, initialises, recovers or resets), so a card's camera can be
+ * recognised before any import. The key is decrypted through _secureStorage(): the main process
+ * never waits on the Keychain. With photographer learning switched off nothing is opened.
+ * Never throws; never awaited by startup.
+ */
+function startRegistryForSuggestions() {
+  if (_startupRun) return _startupRun;
+  _startupRun = (async () => {
+    try {
+      if (_closedForQuit) return _startup;
+      if (!_deps().settings.getPhotographerLearningEnabled()) { _setPhase('off', 'learning-off'); return _startup; }
+      _setPhase('starting', null);
+      const r = await openRegistryForManagement();
+      _lastKeyRetry = Date.now();   // a helper failure is retried a minute later at the earliest
+      if (!r.ok) _setPhase('unavailable', r.reason === 'no-registry' || r.reason === 'registry-locked' ? r.reason : 'registry-unavailable');
+      else _phaseFromStore(r.store);
+    } catch {
+      _setPhase('unavailable', 'registry-unavailable');
+    }
+    return _startup;
+  })();
+  return _startupRun;
+}
+
+/** CAM-001 — after a helper timeout/failure only: try the key again (rate-limited, never awaited). */
+function _retryKeysSoon() {
+  const now = Date.now();
+  if (_closedForQuit || !_store || typeof _store.reloadKeys !== 'function' || now - _lastKeyRetry < KEY_RETRY_MS) return;
+  _lastKeyRetry = now;
+  const store = _store;
+  _setPhase('starting', null);
+  store.reloadKeys().then(() => { if (_store === store) _phaseFromStore(store); }, () => { if (_store === store) _phaseFromStore(store); });
 }
 
 function _get() {
@@ -344,35 +434,54 @@ async function openRegistryForManagement() {
 
 let _peekCache = null;
 
+/** Key outcomes the companion explains differently (everything else: body matching unavailable). */
+const _keyReasonForCompanion = (keyStatus) => (
+  keyStatus === 'secure-storage-unavailable' ? 'keychain-denied'
+    : keyStatus === 'secure-storage-timeout' || keyStatus === 'secure-storage-helper-failed' ? 'keychain-helper-failed'
+      : 'body-matching-unavailable');
+
 /**
- * EQI-1.2 — the registry for the companion's camera-based photographer suggestions, ONLY when
- * this process has already opened it (learning after an import, or a Photographer Registry
- * decision). Never opens, initialises, locks or decrypts anything and never touches secure
- * storage: opening the key needs the macOS Keychain, which can stall the main process behind a
- * prompt, so the menu bar never triggers it. The derived state is cached per registry revision.
+ * The registry for the companion's camera-based photographer suggestions (EQI-1.2, CAM-001).
+ * Never opens, initialises, locks or decrypts anything itself and never touches secure storage:
+ * startRegistryForSuggestions() opens the registry at launch through the helper, learning or the
+ * Photographer Registry may open it later. Until it is ready the reason says why:
+ *   registry-starting | keychain-waiting | learning-off | no-registry | registry-locked |
+ *   registry-unavailable | registry-not-open (startup not run)
+ * A ready registry without a usable key is returned with keyring null and `keyReason`
+ * (keychain-denied | keychain-helper-failed | body-matching-unavailable); a helper failure is
+ * retried in the background at most once a minute. The derived state is cached per revision.
  * Never throws.
- * @returns {{ ok: true, keyring: object|null, state: object, retired: Set<string>, shipped: object, revision: string }
- *         | { ok: false, reason: 'registry-not-open'|'learning-off'|'registry-unavailable' }}
+ * @returns {{ ok: true, keyring: object|null, keyReason: string|null, state: object, retired: Set<string>, shipped: object, revision: string }
+ *         | { ok: false, reason: string }}
  */
 function peekOpenRegistry() {
   try {
-    if (_closedForQuit || !_store || _store.getStatus().state !== 'ready') {
-      // With learning switched off nothing opens the registry in this process (only a registry
-      // decision would), so say so rather than promising recognition after an import.
+    if (_closedForQuit) return { ok: false, reason: 'registry-unavailable' };
+    if (!_store || _store.getStatus().state !== 'ready') {
+      const ph = _startup.phase;
+      if (ph === 'starting') return { ok: false, reason: 'registry-starting' };
+      if (ph === 'waiting-keychain') return { ok: false, reason: 'keychain-waiting' };
+      if (ph === 'off' || ph === 'unavailable') return { ok: false, reason: _startup.reason || 'registry-unavailable' };
       let learningOn = true;
       try { learningOn = _deps().settings.getPhotographerLearningEnabled(); } catch { /* assume on */ }
       return { ok: false, reason: learningOn ? 'registry-not-open' : 'learning-off' };
     }
+    const status = _store.getStatus();
     const events = _store.getEvents();
     const keyring = _store.getKeyring();
-    const revision = `${events.length}:${events.length ? events[events.length - 1].eventId : ''}:${keyring ? 'k' : '-'}`;
+    const keyReason = keyring ? null : _keyReasonForCompanion(status.keyStatus);
+    if (keyReason === 'keychain-helper-failed') _retryKeysSoon();
+    if (keyReason && (_startup.phase === 'starting' || _startup.phase === 'waiting-keychain')) {
+      return { ok: false, reason: _startup.phase === 'waiting-keychain' ? 'keychain-waiting' : 'registry-starting' };
+    }
+    const revision = `${events.length}:${events.length ? events[events.length - 1].eventId : ''}:${keyring ? 'k' : `-${keyReason}`}`;
     if (_peekCache && _peekCache.revision === revision) return _peekCache;
     const shippedNames = _readJsonOr(path.join(__dirname, '..', 'data', 'photographers.json'), []);
     const state = _store.deriveState({ shippedNames });
     if (!state) return { ok: false, reason: 'registry-unavailable' };
     const { retiredIds } = require('./photographerNameModel');
     const P = require('./photographerIdentity');
-    _peekCache = { ok: true, keyring, state, retired: retiredIds(events, { state }), shipped: P.bootstrapShippedIds(shippedNames), revision };
+    _peekCache = { ok: true, keyring, keyReason, state, retired: retiredIds(events, { state }), shipped: P.bootstrapShippedIds(shippedNames), revision };
     return _peekCache;
   } catch {
     return { ok: false, reason: 'registry-unavailable' };
@@ -385,9 +494,11 @@ function shutdown() {
   try { if (_service) _service.shutdown(); } catch { /* ignore */ }
   try { if (_fallback) _fallback.shutdown(); } catch { /* ignore */ }
   try { if (_store) _store.releaseLockSync(); } catch { /* ignore */ }
+  try { if (_secure && _secure.close) _secure.close(); } catch { /* ignore */ }
 }
 
 module.exports = {
   onImportCommitted, scheduleRecoveryAfterLaunch, shutdown, inspectRegistry, openRegistryForManagement, registryNames, peekOpenRegistry,
-  _forTests: { get: () => _service, store: () => _store, useStore: (s) => { _store = s; }, recoverNow: (opts) => _get().recoverPending(opts), whenIdle: () => _get().whenIdle() },
+  startRegistryForSuggestions, onRegistryChange,
+  _forTests: { get: () => _service, store: () => _store, useStore: (s) => { _store = s; _peekCache = null; }, startup: () => ({ ..._startup }), useSecureStorage: (s) => { _secure = s; }, recoverNow: (opts) => _get().recoverPending(opts), whenIdle: () => _get().whenIdle() },
 };

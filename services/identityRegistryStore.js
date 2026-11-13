@@ -36,7 +36,7 @@ const crypto = require('crypto');
 const path = require('path');
 const { validateEvent, canonicalJson, createEvent } = require('./identityEvents');
 const { deriveRegistryState } = require('./associationModel');
-const { createIdentityKeyStore } = require('./identityKeyStore');
+const { createIdentityKeyStore, HELPER_REASONS } = require('./identityKeyStore');
 const { atomicWriteFile, readIfExists, stamp, TMP_MARK } = require('./identityFileOps');
 const P = require('./photographerIdentity');
 const { resolveOfficialName } = require('./photographerNameModel');
@@ -175,6 +175,9 @@ function createIdentityRegistryStore(opts) {
     if (!keyIds.length) {
       const g = await keyStore.generateInitialKey(registryId);
       if (g.keyId) keyIds = [g.keyId];
+      // CAM-001: a helper that could not answer (yet) must not leave a registry without a key
+      // for good; nothing is created and the next eligible import tries again.
+      else if (HELPER_REASONS.has(g.reason)) return disable(g.reason);
     }
     const fresh = { format: FORMAT, schemaVersion: SCHEMA_VERSION, registryId, createdAt: now().toISOString(), createdBy: { computerId }, keyIds, events: [], held: [] };
     const text = serialize(fresh);
@@ -202,6 +205,7 @@ function createIdentityRegistryStore(opts) {
         if (buf === null) {
           if ((await _backupNames()).length) return disable('registry-missing-backups-present');
           await _initialize();
+          if (state !== 'ready') await _releaseLock();
           return getStatus();
         }
         let parsed;
@@ -388,12 +392,24 @@ function createIdentityRegistryStore(opts) {
     keyring = null; state = 'closed'; reason = 'shutdown';
   }
 
+  /**
+   * CAM-001: load the keys again when the last attempt failed only because the secure-storage
+   * helper did not answer (timeout / helper failure). Never for a refusal or a damaged key file,
+   * and never generates or replaces a key. Never throws.
+   */
+  function reloadKeys() {
+    return serial(async () => {
+      if (state === 'ready' && doc && !keyring && HELPER_REASONS.has(keyReason)) await _loadKeys();
+      return getStatus();
+    });
+  }
+
   function close() {
     return serial(async () => { await _releaseLock(); keyring = null; doc = null; lastSerialized = null; state = 'closed'; reason = null; });
   }
 
   return {
-    open, close, releaseLockSync, getStatus, appendEvents, appendEventsChecked, ensurePhotographerId, listRecoveryCandidates, recoverFromBackup,
+    open, close, reloadKeys, releaseLockSync, getStatus, appendEvents, appendEventsChecked, ensurePhotographerId, listRecoveryCandidates, recoverFromBackup,
     /** Main-process only. Null whenever body matching is disabled. Never send to a renderer. */
     getKeyring: () => (state === 'ready' ? keyring : null),
     getEvents: () => (doc ? doc.events.slice() : []),

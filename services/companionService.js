@@ -165,10 +165,12 @@ function _assessmentView(sourceId) {
 }
 
 /**
- * EQI-1.2: camera-based photographer suggestion for one card (companionPhotographerSuggestion.js
- * over the card's own Q3 assessment). The registry is used only if this process already has it
- * open — the menu bar never opens it (Keychain). Recomputed when the registry or the photographer
- * list changes; a new card is a new job, so nothing carries over between cards. Never throws.
+ * EQI-1.2 / CAM-001: camera-based photographer suggestion for one card
+ * (companionPhotographerSuggestion.js over the card's own Q3 assessment). The registry is opened at
+ * launch by photographerLearningRuntime.startRegistryForSuggestions() — the menu bar itself never
+ * opens it and never touches the Keychain. Recomputed when the registry, its readiness or the
+ * photographer list changes; a new card is a new job, so nothing carries over between cards.
+ * Never throws.
  */
 function _photographerSuggestion(job) {
   if (job.state !== 'complete' || !job.cameras) return { status: 'unknown', reason: 'assessing', candidates: [] };
@@ -605,11 +607,13 @@ function _contextMenu() {
  * @param {() => void} opts.openApp  focus/restore the main window or reopen it via splash
  * @param {(msg: string) => void} [opts.log]
  */
-function init({ monitor, openApp, log, isImported = () => false, listPhotographers = () => [], scanEvents = null, registryForSuggestions = null }) {
+function init({ monitor, openApp, log, isImported = () => false, listPhotographers = () => [], scanEvents = null, registryForSuggestions = null, onRegistryChange = null }) {
   if (_tray) return;
   _monitor = monitor;
   _listPhotographers = listPhotographers;
   _registryForSuggestions = registryForSuggestions;
+  // CAM-001: the registry becoming ready (or failing) re-renders every card's suggestion at once.
+  if (onRegistryChange) { try { onRegistryChange(() => _pushSnapshot()); } catch { /* suggestions stay on the poll */ } }
   _openApp = openApp;
   if (log) _log = log;
 

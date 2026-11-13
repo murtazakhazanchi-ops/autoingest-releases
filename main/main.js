@@ -1,5 +1,13 @@
 const { app, BrowserWindow, ipcMain, dialog, screen, Menu } = require('electron');
 
+// ── Secure-storage helper (CAM-001) ──────────────────────────────────────────
+// This executable relaunched by secureStorageHelper.js to make the macOS Keychain calls off the
+// main process: no window, tray, single-instance lock or app services — only safeStorage.
+if (process.argv.includes(require('../services/secureStorageHelperProcess').HELPER_FLAG)) {
+  require('../services/secureStorageHelperProcess').runKeyHelper();
+  return; // CommonJS module scope: nothing below runs in the helper
+}
+
 // ── Single instance (AI-FEAT-061 Q1) ─────────────────────────────────────────
 // Must run before anything below has side effects (e.g. the What's New file is
 // read-and-deleted at module load). A second launch hands its arguments to the
@@ -343,6 +351,9 @@ app.whenReady().then(() => {
       .catch((err) => log(`[main] mxControlService failed to restart: ${err.message}`));
   });
   _startCompanion();
+  // CAM-001 — open an existing Photographer Registry now, so a card's camera is recognised before
+  // any import. Never awaited; the key is decrypted in a helper process (main never waits on the Keychain).
+  photographerLearning.startRegistryForSuggestions();
   // AI-FEAT-063 Q4d — only if an earlier run left photographer learning pending: one bounded,
   // delayed recovery pass (creates nothing; waits while an import/sync/transfer runs).
   photographerLearning.scheduleRecoveryAfterLaunch();
@@ -373,9 +384,10 @@ function _startCompanion() {
         const r = await _scanEventsCore(collectionPath, `companion-${Date.now().toString(36)}`);
         return r && r.ok && Array.isArray(r.events) ? r.events : [];
       },
-      // EQI-1.2 camera-based photographer suggestions: the identity registry only if this process
-      // already opened it — never opened from the menu bar (Keychain).
+      // EQI-1.2 / CAM-001 camera-based photographer suggestions: the identity registry opened at
+      // launch (startRegistryForSuggestions, Keychain work in a helper process) — never from the menu bar.
       registryForSuggestions: () => require('../services/photographerLearningRuntime').peekOpenRegistry(),
+      onRegistryChange: (fn) => require('../services/photographerLearningRuntime').onRegistryChange(fn),
     });
   } catch (err) {
     log(`[main] companion failed to start: ${err.message}`);

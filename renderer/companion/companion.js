@@ -150,7 +150,14 @@
 
   // EQI-1.2: camera → photographer recognition, from main (existing registry evidence only).
   const RECOG_UNKNOWN = {
-    'registry-not-open': 'Camera recognition starts after the first import this session',
+    'registry-not-open': 'Camera recognition is not available yet',
+    // CAM-001: the registry is opened at launch (Keychain work in a helper process).
+    'registry-starting': 'Checking camera history — this updates by itself',
+    'keychain-waiting': 'Waiting for Keychain access — if macOS asks, allow AutoIngest to use its key',
+    'keychain-denied': 'Keychain access was not granted — camera recognition is off this session',
+    'keychain-helper-failed': 'Could not read the camera key — retrying in the background',
+    'no-registry': 'No camera history yet — it builds up as photos are imported',
+    'registry-locked': 'Camera history is in use by another copy of AutoIngest',
     'learning-off': 'Photographer learning is switched off — no camera-based suggestions',
     'body-matching-unavailable': 'Camera bodies cannot be matched on this computer',
     'registry-unavailable': 'Photographer registry unavailable',
@@ -169,9 +176,15 @@
       case 'confirmed': return `Camera confirmed: ${names[0]}`;
       case 'observed': return `Camera seen with ${names[0]} · unconfirmed`;
       case 'multiple': return `Camera shared by ${names.length} photographers`;
-      default: return 'Photographer not recognised from camera';
+      default: return RECOG_SHORT[sug.reason] || 'Photographer not recognised from camera';
     }
   }
+  /** Compact wording for the passing states (the expanded view explains in full). */
+  const RECOG_SHORT = {
+    'registry-starting': 'Checking camera history…',
+    'keychain-waiting': 'Waiting for Keychain access…',
+    'keychain-helper-failed': 'Camera key unavailable — retrying',
+  };
 
   function dumpResultText(op) {
     const r = op.result || {};

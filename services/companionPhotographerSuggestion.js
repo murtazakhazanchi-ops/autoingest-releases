@@ -17,7 +17,7 @@
  *   observed   one photographer seen with this camera before, never confirmed (likely / possible)
  *   multiple   several photographers (a shared camera, or several cameras on the card)
  *   unknown    nothing asserted: unrecognised camera, model-only evidence, conflicting evidence,
- *              no registry open, or no usable key — `reason` says which
+ *              registry not (yet) open, or no usable key — `reason` says which
  * Model-only evidence never names a photographer here (the registry's "weak" level is not shown).
  * Candidate names are mapped to the app's photographer list; a registry name that is not on the
  * list is not offered (the companion can only select listed names).
@@ -48,7 +48,7 @@ function _listName(state, shipped, photographerId, listIndex) {
  * @param {{
  *   records: object[]|null,                          // the card's Q3 records (main process only)
  *   assessed: {groups: object[], unknown: number[], conflicts: number[], identities: object[]}|null,
- *   registry: { ok: true, keyring: object|null, state: object, retired: Set<string>, shipped: object }
+ *   registry: { ok: true, keyring: object|null, keyReason?: string|null, state: object, retired: Set<string>, shipped: object }
  *           | { ok: false, reason: string },
  *   listNames: string[],                             // the app's photographer list
  * }} input
@@ -58,7 +58,7 @@ function _listName(state, shipped, photographerId, listIndex) {
 function suggestForCard({ records, assessed, registry, listNames }) {
   if (!assessed || !Array.isArray(assessed.groups) || !assessed.groups.length) return _unknown('no-camera-evidence');
   if (!registry || !registry.ok) return _unknown((registry && registry.reason) || 'registry-not-open');
-  if (!registry.keyring) return _unknown('body-matching-unavailable');
+  if (!registry.keyring) return _unknown(registry.keyReason || 'body-matching-unavailable');
 
   const { state, retired, shipped } = registry;
   const protectedCard = protectCameraGroups(records, assessed, registry.keyring);

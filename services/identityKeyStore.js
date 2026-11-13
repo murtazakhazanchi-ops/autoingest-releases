@@ -22,6 +22,10 @@
  * cannot be decrypted, belongs to another registry, secure storage unavailable) yields NO
  * keyring and a reason. Body matching is then disabled. A missing key is never silently
  * replaced: generation only happens for a registry that has no keys yet.
+ *
+ * CAM-001: the adapter may be asynchronous (secureStorageHelper.js runs the macOS Keychain work in
+ * a helper process); every call is awaited. A helper that could not answer is reported as
+ * 'secure-storage-timeout' / 'secure-storage-helper-failed' — transient, unlike a refusal.
  */
 
 'use strict';
@@ -35,6 +39,9 @@ const KEY_FILE = 'keys.json';
 const KEY_FORMAT = 'autoingest-identity-keys';
 const KEY_FILE_VERSION = 1;
 const KEY_BYTES = 32;
+const HELPER_REASONS = new Set(['secure-storage-timeout', 'secure-storage-helper-failed']);
+/** A helper failure keeps its own (transient) reason; anything else is the caller's reason. */
+const _reasonFor = (err, fallback) => (err && HELPER_REASONS.has(err.code) ? err.code : fallback);
 
 function _validateKeyDoc(doc) {
   const errors = [];
@@ -91,7 +98,9 @@ function createIdentityKeyStore({ dir, secureStorage, fs: fsx = require('fs').pr
       const k = r.doc.keys.find(x => x.keyId === keyId);
       if (k && k.identity !== String(secureStorage.identity || '')) return { keyring: null, reason: 'key-protection-identity-mismatch' };
     }
-    if (!secureStorage.isAvailable()) return { keyring: null, reason: 'secure-storage-unavailable' };
+    try {
+      if (!(await secureStorage.isAvailable())) return { keyring: null, reason: 'secure-storage-unavailable' };
+    } catch (err) { return { keyring: null, reason: _reasonFor(err, 'secure-storage-unavailable') }; }
     const entries = [];
     try {
       for (const keyId of keyIds) {
@@ -104,7 +113,7 @@ function createIdentityKeyStore({ dir, secureStorage, fs: fsx = require('fs').pr
         const material = Buffer.from(k.material, 'base64');
         if (crypto.createHash('sha256').update(material).digest('hex') !== k.sha256) return { keyring: null, reason: 'key-file-corrupt' };
         let key;
-        try { key = secureStorage.decrypt(material); } catch { return { keyring: null, reason: 'key-undecryptable' }; }
+        try { key = await secureStorage.decrypt(material); } catch (err) { return { keyring: null, reason: _reasonFor(err, 'key-undecryptable') }; }
         if (!Buffer.isBuffer(key) || key.length !== KEY_BYTES) return { keyring: null, reason: 'key-undecryptable' };
         entries.push({ keyId, key });
       }
@@ -120,14 +129,17 @@ function createIdentityKeyStore({ dir, secureStorage, fs: fsx = require('fs').pr
    * @returns {Promise<{ keyId: string|null, reason: string|null }>}
    */
   async function generateInitialKey(registryId) {
-    if (!secureStorage.isAvailable()) return { keyId: null, reason: 'secure-storage-unavailable' };
+    try {
+      if (!(await secureStorage.isAvailable())) return { keyId: null, reason: 'secure-storage-unavailable' };
+    } catch (err) { return { keyId: null, reason: _reasonFor(err, 'secure-storage-unavailable') }; }
     const existing = await readDoc();
     if (existing.status === 'corrupt') return { keyId: null, reason: 'key-file-corrupt' };
     if (existing.status === 'present' && existing.doc.registryId !== registryId) return { keyId: null, reason: 'key-registry-mismatch' };
     const key = randomBytes(KEY_BYTES);
     try {
       const keyId = `local-${randomBytes(6).toString('hex')}`;
-      const material = secureStorage.encrypt(key);
+      let material;
+      try { material = await secureStorage.encrypt(key); } catch (err) { return { keyId: null, reason: _reasonFor(err, 'secure-storage-unavailable') }; }
       const entry = {
         keyId, createdAt: now().toISOString(), protection: 'os-secure-storage', backend: String(secureStorage.backend || 'unknown'),
         identity: String(secureStorage.identity || ''),
@@ -150,4 +162,4 @@ function createIdentityKeyStore({ dir, secureStorage, fs: fsx = require('fs').pr
   return { load, generateInitialKey, existingRegistryId, file };
 }
 
-module.exports = { createIdentityKeyStore, KEY_FILE };
+module.exports = { createIdentityKeyStore, KEY_FILE, HELPER_REASONS };
