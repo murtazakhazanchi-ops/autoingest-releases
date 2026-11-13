@@ -246,30 +246,85 @@ select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px
   * { transition: none !important; }
 }
 
-/* ── AI-FEAT-064 EQI-1: Review / Event Dump mode switch and the Event Dump section ── */
-.mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-btn); }
-.mode-btn {
-  padding: 5px var(--space-1); border: none; border-radius: calc(var(--radius-btn) - 2px);
-  background: transparent; color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer;
-  transition: background var(--duration-fast), color var(--duration-fast);
-}
-.mode-btn:hover { background: var(--surface-hover); }
-.mode-btn.is-on { background: var(--accent-strong); color: #fff; }
-.mode-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+/* ── AI-FEAT-064 EQI-1.1: adaptive companion (compact card overview ↔ expanded Event Dump) ── */
 
-.dump { display: flex; flex-direction: column; gap: var(--space-2); }
-.dump p { margin: 0; }
-.dump-event { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px var(--space-2); }
-.dump-event .field-label { grid-column: 1 / -1; }
-.dump-event-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dump-event-name[data-empty="yes"] { color: var(--warning); font-weight: 500; }
-.dump-event-actions { display: flex; gap: 4px; align-items: baseline; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
-.dump-photographer { width: 100%; }
-.dump-counts, .dump-suggest { font-size: 12px; color: var(--text-secondary); }
+/* Scrolling: subtle, theme-matched overlay scrollbars instead of the bright native bar; content
+   still scrolls by trackpad, wheel and keyboard. Never horizontal. */
+.scroll-area { overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text-muted) 45%, transparent) transparent; }
+.scroll-area::-webkit-scrollbar { width: 8px; height: 0; }
+.scroll-area::-webkit-scrollbar-track { background: transparent; }
+.scroll-area::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text-muted) 35%, transparent); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+.scroll-area::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--text-muted) 60%, transparent); }
+
+/* Compact overview additions */
+.import-status { margin: 0; font-size: 12px; color: var(--text-secondary); }
+.event-dump-btn { width: 100%; padding: 7px var(--space-2); font-size: 12px; }
+.dump-last { margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--text-secondary); }
+.dump-last[data-state="completed"] { color: var(--success); }
+.dump-last[data-state="completed-with-errors"] { color: var(--warning); }
+.dump-last[data-state="refused"], .dump-last[data-state="failed"], .dump-last[data-state="cancelled"] { color: var(--danger); }
+
+/* Expanded: scrollable content + pinned import action */
+.xp { min-height: 0; display: grid; grid-template-rows: 1fr auto; }
+.xp-body { min-height: 0; padding: var(--space-3) var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.xp-section { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-row); background: var(--surface); border: 1px solid var(--border); }
+.xp-section p { margin: 0; }
+.xp-title { margin: 0; font-size: 11px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.05em; text-transform: uppercase; }
+.xp-card-head { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+/* The expanded card header has its own classes: .card-label / .card-meta mean a card row's own. */
+.xp-card-label { font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.xp-card-meta { font-size: 11px; color: var(--text-secondary); white-space: normal; overflow-wrap: anywhere; }
+.xp-grid { display: grid; grid-template-columns: minmax(180px, 240px) 1fr; gap: var(--space-3); align-items: end; }
+.xp-counts-main { font-size: 13px; font-weight: 600; }
+.xp-counts-sub { font-size: 12px; color: var(--text-secondary); }
+
+/* The selected event: the complete canonical name, wrapping — never ellipsized. */
+.xp-event-coll { font-size: 11.5px; color: var(--text-muted); overflow-wrap: anywhere; }
+.xp-event-name { font-size: 15px; font-weight: 650; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; word-break: normal; }
+.xp-event-name[data-empty="yes"] { color: var(--warning); font-weight: 500; }
+.xp-event-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.xp-event-actions .btn { padding: 6px var(--space-3); font-size: 12px; }
+
+.text-input {
+  width: 100%; padding: 7px 10px; border-radius: var(--radius-btn); border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 70%, var(--surface)); color: var(--text); font: inherit; font-size: 13px; user-select: text;
+}
+.text-input:focus { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+/* Event picker */
+.picker { display: flex; flex-direction: column; gap: var(--space-2); padding-top: var(--space-1); }
+.picker-list { list-style: none; margin: 0; padding: 2px; max-height: 220px; border: 1px solid var(--border); border-radius: var(--radius-btn); }
+.picker-item { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); padding: 7px 9px; border-radius: 5px; cursor: pointer; }
+.picker-item:hover { background: var(--surface-hover); }
+.picker-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.picker-item[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.picker-name { font-size: 12.5px; line-height: 1.35; overflow-wrap: anywhere; }
+.picker-tag { flex: none; font-size: 10.5px; color: var(--text-muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; }
+.picker-note { font-size: 12px; color: var(--text-secondary); }
+.picker-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.picker-actions .btn { padding: 6px var(--space-3); font-size: 12px; }
+
+/* Photographer combobox */
+.combo { position: relative; }
+.combo-list { position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); list-style: none; margin: 0; padding: 3px; max-height: 210px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-btn); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+.combo-item { padding: 6px 9px; border-radius: 5px; font-size: 12.5px; cursor: pointer; overflow-wrap: anywhere; }
+.combo-item:hover, .combo-item[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.combo-empty { padding: 6px 9px; font-size: 12px; color: var(--text-muted); }
+.xp-ph-state { font-size: 12px; color: var(--text-secondary); }
+.xp-ph-state[data-empty="yes"] { color: var(--warning); }
+.dump-suggest { margin: 0; font-size: 12px; color: var(--text-secondary); }
+.xp-dest { font-size: 12px; color: var(--text-secondary); overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.xp-action { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); background: var(--bg); }
+.xp-import { width: 100%; padding: 9px var(--space-2); font-size: 13px; }
 .dump-earlier-row { display: flex; gap: var(--space-1); align-items: center; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
-.dump-import { width: 100%; padding: 8px var(--space-2); }
-.dump-progress { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
-.dump-result { font-size: 12px; line-height: 1.45; color: var(--text-secondary); }
+.dump-progress { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.dump-result { margin: 0; font-size: 12px; line-height: 1.45; color: var(--text-secondary); }
 .dump-result[data-state="completed"] { color: var(--success); }
 .dump-result[data-state="completed-with-errors"] { color: var(--warning); }
 .dump-result[data-state="refused"], .dump-result[data-state="failed"], .dump-result[data-state="cancelled"] { color: var(--danger); }
+
+/* Footer in the expanded presentation: back + open, side by side */
+.popup[data-view="expanded"] .actions { flex-direction: row; padding-top: var(--space-2); padding-bottom: var(--space-3); }
+.popup[data-view="expanded"] .actions .btn { flex: 1; }

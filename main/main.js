@@ -368,6 +368,11 @@ function _startCompanion() {
       isImported: (name, size) => typeof name === 'string' && Number.isFinite(size)
         && !!importIndex[name.toLowerCase() + '_' + size],
       listPhotographers: () => require('./listManager').getList('photographers'),
+      // EQI-1.1 one-click Change Event: the Event Creator's own collection scan (master:scanEvents).
+      scanEvents: async (collectionPath) => {
+        const r = await _scanEventsCore(collectionPath, `companion-${Date.now().toString(36)}`);
+        return r && r.ok && Array.isArray(r.events) ? r.events : [];
+      },
     });
   } catch (err) {
     log(`[main] companion failed to start: ${err.message}`);

@@ -20,6 +20,8 @@
 
 'use strict';
 
+const path = require('path');
+
 const SOURCE_ID_RE = /^src-\d+$/;
 const NOTICE_TTL_MS = 10 * 60 * 1000;
 const MAX_PHOTOGRAPHER_LEN = 120;
@@ -35,6 +37,8 @@ const MAX_PHOTOGRAPHER_LEN = 120;
  * @param {(name: string, size: number) => boolean} deps.isImported      global import index lookup
  * @param {() => string[]} deps.listPhotographers                        the app's photographer list
  * @param {() => boolean} deps.isBusy                                    an import/sync/transfer/checksum is running
+ * @param {(collectionPath: string) => Promise<object[]>} [deps.scanEvents]  the Event Creator's own event scan
+ *                                                                       (master:scanEvents) of one collection
  * @param {() => void} deps.pushSnapshot
  * @param {(opts?: object) => void} deps.showPopup
  * @param {() => void} deps.hidePopup
@@ -57,6 +61,9 @@ function createEventDumpController(deps) {
   let _lastPickerOpen = false;     // the main window's latest report: is Event Management open?
   /** The card mode last chosen this session; new cards start in it ('review' = the Q2 actions). */
   let _lastMode = 'review';
+
+  /** The last event listing sent to the popup: chooseEvent accepts only one of these folders. */
+  let _listed = null;
 
   const _optionsFor = (sourceId) => _options.get(sourceId) || { mode: _lastMode, photographer: null, includeEarlier: false };
 
@@ -209,8 +216,11 @@ function createEventDumpController(deps) {
     _activeSourceId = sourceId;
     _record(sourceId, { state: 'pending', reason: null, result: null, progress: { done: 0, total: plan.files.length }, metadata: null });
     log(`[event-dump] import started: ${plan.files.length} file(s) → event Dump`);
+    // EQI-1.1: the main window's renderer runs the import where it is (hidden, minimized or behind
+    // other apps) — AutoIngest is not brought forward for an ordinary Dump import.
     const started = deps.handoff.request('dump-import', {
       sourceId,
+      foreground: false,
       channel: 'companion:dumpImport',
       payload: (requestId) => ({ requestId, eventPath, photographer, files: plan.files, source: { label: card.label, path: card.mountpoint } }),
     });
@@ -256,6 +266,52 @@ function createEventDumpController(deps) {
     return { state: final.state, reason: final.reason || null };
   }
 
+  /**
+   * EQI-1.1 one-click Change Event: the events of the active event's collection, from the Event
+   * Creator's own scan (only events with a valid event.json — a Dump needs one). Names only.
+   */
+  async function listEvents() {
+    if (!_event) return { ok: false, reason: 'no-event' };
+    if (typeof deps.scanEvents !== 'function') return { ok: false, reason: 'unavailable' };
+    const collectionPath = path.dirname(_event.eventPath);
+    let scanned;
+    try { scanned = await deps.scanEvents(collectionPath); } catch { return { ok: false, reason: 'scan-failed' }; }
+    const events = (Array.isArray(scanned) ? scanned : [])
+      .filter(e => e && e.isFromJson === true && e.isCorrupt !== true && typeof e.folderName === 'string' && e.folderName)
+      .map(e => ({ folderName: e.folderName, hijriDate: typeof e.hijriDate === 'string' ? e.hijriDate : null }))
+      .sort((a, b) => b.folderName.localeCompare(a.folderName));
+    _listed = { collectionPath, collectionName: _event.collectionName, names: new Set(events.map(e => e.folderName)) };
+    return { ok: true, collectionName: _event.collectionName, active: path.basename(_event.eventPath), events };
+  }
+
+  /**
+   * Selects one of the listed events in the main window WITHOUT bringing it forward (the
+   * renderer adopts it through the same path it uses at startup). If an Import workspace is open
+   * there, its assignments must not be disturbed: the existing event picker opens instead.
+   * @param {unknown} payload  { folderName } from the popup
+   */
+  async function chooseEvent(payload) {
+    const p = payload && typeof payload === 'object' ? payload : {};
+    if (Object.keys(p).some(k => k !== 'folderName') || typeof p.folderName !== 'string') return { state: 'refused', reason: 'invalid' };
+    if (!_listed || !_listed.names.has(p.folderName)) return { state: 'refused', reason: 'not-listed' };
+    if (deps.handoff.getActive() || _activeSourceId) return { state: 'refused', reason: 'busy' };
+    if (_event && path.basename(_event.eventPath) === p.folderName && path.dirname(_event.eventPath) === _listed.collectionPath) {
+      return { state: 'completed', reason: null };
+    }
+    const started = deps.handoff.request('event-select', {
+      foreground: false,
+      channel: 'companion:selectEvent',
+      payload: (requestId) => ({ requestId, collectionPath: _listed.collectionPath, collectionName: _listed.collectionName, folderName: p.folderName }),
+    });
+    const final = await started.done;
+    if (final.state !== 'completed' && final.reason === 'workspace-open') {
+      log('[event-dump] an Import workspace is open — using the main window\'s event picker');
+      return openPicker({ mode: 'choose' });
+    }
+    log(`[event-dump] event selected from the companion: ${final.state}`);
+    return { state: final.state, reason: final.reason || null };
+  }
+
   /** copyFileJobs progress for the running Dump import (counts only). */
   function onImportProgress(progress) {
     if (!_activeSourceId || !progress) return;
@@ -280,7 +336,7 @@ function createEventDumpController(deps) {
 
   function forget(sourceId) { _options.delete(sourceId); _ops.delete(sourceId); }
 
-  return { cardView, globalView, onWorkspaceEvent, setOptions, startImport, openPicker, onImportProgress, onMetadataBatch, forget };
+  return { cardView, globalView, onWorkspaceEvent, setOptions, startImport, openPicker, listEvents, chooseEvent, onImportProgress, onMetadataBatch, forget };
 }
 
 module.exports = { createEventDumpController };

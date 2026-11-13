@@ -188,11 +188,24 @@ function createWorkspaceHandoff({
    * picker / Event Creator. `payload(id)` builds the message; its result fields are kept (cleaned).
    * @param {'dump-import'|'event-picker'} kind
    */
-  function request(kind, { sourceId = null, channel, payload }) {
-    return _start(kind, sourceId, channel, payload);
+  function request(kind, { sourceId = null, channel, payload, foreground = true }) {
+    return _start(kind, sourceId, channel, payload, foreground);
   }
 
-  function _start(kind, sourceId, channel, payload) {
+  /** The main window's renderer, when it exists and has announced itself ready. */
+  function _readyContents() {
+    const wc = _mainContents();
+    return wc && _ready.has(wc.id) ? wc : null;
+  }
+
+  /**
+   * @param {boolean} foreground  bring AutoIngest forward first (Review handoff, event picker).
+   *   false (EQI-1.1 Event Dump import, event selection): the request goes to the main window's
+   *   renderer while it stays where it is — hidden, minimized or behind other apps. Only when
+   *   that renderer does not exist yet (window closed: the splash and operator sign-in come
+   *   first) is AutoIngest opened.
+   */
+  function _start(kind, sourceId, channel, payload, foreground = true) {
     if (_active) return { started: false, operation: _publicView(_active), done: Promise.resolve(_publicView(_active)) };
     let resolve;
     const done = new Promise(r => { resolve = r; });
@@ -208,7 +221,7 @@ function createWorkspaceHandoff({
     try { onChange(_publicView(op)); } catch { /* ignore */ }
 
     (async () => {
-      openApp();
+      if (foreground || !_readyContents()) openApp();
       const wc = await _waitForReadyWorkspace(op);
       if (TERMINAL.has(op.state)) return; // cancelled while waiting (card removed)
       if (!wc) return _finish(op, 'cancelled', 'workspace-not-opened');

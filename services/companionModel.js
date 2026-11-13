@@ -17,6 +17,30 @@ const POPUP_HEIGHT = 600;
 /** Gap between the tray icon and the popup edge. */
 const POPUP_MARGIN = 6;
 
+// EQI-1.1 adaptive companion: the same popup window in two presentations.
+//   compact  — card overview (default): what is on the card, and what to do with it
+//   expanded — Event Dump: event, photographer, destination, import and progress
+const POPUP_SIZES = Object.freeze({
+  compact:  { width: 360, height: 600, minHeight: 360 },
+  expanded: { width: 620, height: 720, minHeight: 440 },
+});
+/** Space kept free around the popup inside the display's work area. */
+const POPUP_EDGE_GAP = 12;
+
+/**
+ * Popup size for a presentation, fitted to the display it opens on (small laptop screens,
+ * scaled displays): never wider or taller than the work area minus a small gap.
+ * @param {'compact'|'expanded'} view
+ * @param {{width:number,height:number}} workArea
+ * @returns {{ width: number, height: number }}
+ */
+function computePopupSize(view, workArea) {
+  const want = POPUP_SIZES[view] || POPUP_SIZES.compact;
+  const maxW = Math.max(300, workArea.width - 2 * POPUP_EDGE_GAP);
+  const maxH = Math.max(want.minHeight, workArea.height - 2 * POPUP_EDGE_GAP - POPUP_MARGIN);
+  return { width: Math.min(want.width, maxW), height: Math.min(want.height, maxH) };
+}
+
 /**
  * Builds the CompanionSnapshot (v2). Q1 detection fields plus, per card, the Q2
  * capture-date assessment view (counts and dates only — never a path). Archive status
@@ -182,6 +206,8 @@ module.exports = {
   SNAPSHOT_SCHEMA_VERSION,
   POPUP_WIDTH,
   POPUP_HEIGHT,
+  POPUP_SIZES,
+  computePopupSize,
   buildSnapshot,
   formatCapacity,
   computePopupPosition,

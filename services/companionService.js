@@ -34,8 +34,7 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen } = require
 const windowRegistry = require('./windowRegistry');
 const operatorActivity = require('./operatorActivity');
 const {
-  buildSnapshot, computePopupPosition, resolveTrayAnchor, createAutoOpenTracker, handoffStatusText, localDateString,
-  POPUP_WIDTH, POPUP_HEIGHT,
+  buildSnapshot, computePopupPosition, computePopupSize, resolveTrayAnchor, createAutoOpenTracker, handoffStatusText, localDateString,
 } = require('./companionModel');
 const { createCardAssessor } = require('./cardAssessmentService');
 const { summarize, filesForSelection, normalizeSelection } = require('./dateAssessmentModel');
@@ -65,6 +64,7 @@ const IPC_HANDLE_CHANNELS = [
   'companion:getSnapshot', 'companion:openAutoIngest', 'companion:quit', 'companion:hide',
   'companion:selectDate', 'companion:reviewSelected', 'companion:reviewEarlier',
   'companion:setDumpOptions', 'companion:dumpImport', 'companion:openEventPicker',
+  'companion:setView', 'companion:listEvents', 'companion:chooseEvent',
 ];
 
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
@@ -87,6 +87,11 @@ let _autoOpenSuppressedCount = 0;
 let _assessor = null;
 let _handoff = null;
 let _dump = null;                // EQI-1 Event Dump controller (eventDumpCompanion.js)
+/**
+ * EQI-1.1 adaptive popup: 'compact' card overview, or 'expanded' Event Dump for one card. Kept in
+ * main, so closing and reopening the popup (or a resize) restores the working context.
+ */
+let _view = { mode: 'compact', sourceId: null };
 /**
  * Camera keys in the popup are HMACs under a secret that lives only for this process:
  * they let the popup tell cameras apart, reveal nothing about serials, and are useless
@@ -156,7 +161,7 @@ function _assessmentView(sourceId) {
 
 function _snapshot() {
   const snap = buildSnapshot(_monitor ? _monitor.getLatest() : null, new Date(), _assessmentView);
-  return { ...snap, dump: _dump ? _dump.globalView() : null };
+  return { ...snap, dump: _dump ? _dump.globalView() : null, view: { ..._view } };
 }
 
 function _pushSnapshot() {
@@ -207,6 +212,20 @@ function _registerIpc() {
     return _dump.openPicker(payload);
   });
   ipcMain.on('companion:workspaceEvent', _onWorkspaceEvent);
+  ipcMain.on('companion:attention', _onAttention);
+  // EQI-1.1 adaptive popup and one-click event change.
+  ipcMain.handle('companion:setView', (event, payload) => {
+    if (!_isFromPopup(event)) return { ok: false };
+    return _setView(payload);
+  });
+  ipcMain.handle('companion:listEvents', (event) => {
+    if (!_isFromPopup(event) || !_dump) return { ok: false, reason: 'invalid' };
+    return _dump.listEvents();
+  });
+  ipcMain.handle('companion:chooseEvent', (event, payload) => {
+    if (!_isFromPopup(event) || !_dump) return { state: 'refused', reason: 'invalid' };
+    return _dump.chooseEvent(payload);
+  });
   ipcMain.handle('companion:quit', (event) => {
     if (!_isFromPopup(event)) return { ok: false };
     hidePopup();
@@ -223,17 +242,48 @@ function _onWorkspaceEvent(event, info) {
   _dump.onWorkspaceEvent(info);
 }
 
+/**
+ * A Dump import running in the (hidden) main window needs the operator — e.g. the existing
+ * busy-archive dialog. Bring AutoIngest forward so that dialog is never hidden behind other apps.
+ * Accepted only from the main window.
+ */
+function _onAttention(event) {
+  const main = windowRegistry.getMainWindow();
+  if (!main || main.isDestroyed() || event.sender !== main.webContents) return;
+  hidePopup();
+  if (_openApp) _openApp();
+}
+
+/** @param {unknown} payload  { mode: 'compact'|'expanded', sourceId? } from the popup */
+function _setView(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  if (Object.keys(p).some(k => !['mode', 'sourceId'].includes(k))) return { ok: false, reason: 'invalid' };
+  if (p.mode === 'compact') {
+    _view = { mode: 'compact', sourceId: null };
+  } else if (p.mode === 'expanded' && typeof p.sourceId === 'string' && SOURCE_ID_RE.test(p.sourceId) && _attachedCard(p.sourceId)) {
+    _view = { mode: 'expanded', sourceId: p.sourceId };
+    if (_dump) _dump.setOptions({ sourceId: p.sourceId, mode: 'dump' });
+  } else {
+    return { ok: false, reason: 'invalid' };
+  }
+  _resizePopup();
+  _pushSnapshot();
+  return { ok: true };
+}
+
 function _unregisterIpc() {
   if (!_ipcRegistered) return;
   for (const ch of IPC_HANDLE_CHANNELS) ipcMain.removeHandler(ch);
   ipcMain.removeListener('companion:workspaceEvent', _onWorkspaceEvent);
+  ipcMain.removeListener('companion:attention', _onAttention);
   _ipcRegistered = false;
 }
 
 function _createPopup() {
+  const { width, height } = _popupGeometry();
   const win = new BrowserWindow({
-    width: POPUP_WIDTH,
-    height: POPUP_HEIGHT,
+    width,
+    height,
     show: false,
     frame: false,
     resizable: false,
@@ -272,8 +322,13 @@ function _createPopup() {
   return win;
 }
 
-function _positionPopup(win) {
-  if (!_tray) return;
+/**
+ * Size and position for the current presentation, anchored under the menu-bar icon (above the
+ * taskbar icon on Windows) on the display that holds it, fitted to that display's work area.
+ */
+function _popupGeometry() {
+  const fallback = computePopupSize(_view.mode, { width: 1440, height: 900 });
+  if (!_tray) return { ...fallback, x: undefined, y: undefined };
   const trayBounds = resolveTrayAnchor({
     trayBounds: _tray.getBounds(),
     displays: screen.getAllDisplays(),
@@ -281,8 +336,20 @@ function _positionPopup(win) {
     platform: process.platform,
   });
   const { workArea } = screen.getDisplayNearestPoint({ x: trayBounds.x, y: trayBounds.y });
-  const { x, y } = computePopupPosition({ trayBounds, workArea, platform: process.platform });
-  win.setPosition(x, y, false);
+  const { width, height } = computePopupSize(_view.mode, workArea);
+  const { x, y } = computePopupPosition({ trayBounds, workArea, platform: process.platform, width, height });
+  return { x, y, width, height };
+}
+
+function _positionPopup(win) {
+  if (!_tray) return;
+  const { x, y, width, height } = _popupGeometry();
+  win.setBounds({ x, y, width, height }, false);
+}
+
+/** Re-fits the open popup to the current presentation (compact ↔ expanded) or a display change. */
+function _resizePopup() {
+  if (_popup && !_popup.isDestroyed()) _positionPopup(_popup);
 }
 
 /**
@@ -444,6 +511,7 @@ function _onPoll(latest) {
     _selections.delete(id);
     _ops.delete(id);
     if (_dump) _dump.forget(id);
+    if (_view.sourceId === id) { _view = { mode: 'compact', sourceId: null }; _resizePopup(); }
   }
   if (_assessor) _assessor.sync(latest && latest.cards);
   _pushSnapshot();
@@ -510,7 +578,7 @@ function _contextMenu() {
  * @param {() => void} opts.openApp  focus/restore the main window or reopen it via splash
  * @param {(msg: string) => void} [opts.log]
  */
-function init({ monitor, openApp, log, isImported = () => false, listPhotographers = () => [] }) {
+function init({ monitor, openApp, log, isImported = () => false, listPhotographers = () => [], scanEvents = null }) {
   if (_tray) return;
   _monitor = monitor;
   _openApp = openApp;
@@ -554,6 +622,7 @@ function init({ monitor, openApp, log, isImported = () => false, listPhotographe
     selectionFor: (sourceId) => normalizeSelection(_selections.get(sourceId), localDateString(new Date())),
     isImported,
     listPhotographers,
+    scanEvents,
     isBusy: () => operatorActivity.isBusy(),
     pushSnapshot: _pushSnapshot,
     showPopup: (opts) => { if (_tray) showPopup(opts); },
@@ -562,6 +631,9 @@ function init({ monitor, openApp, log, isImported = () => false, listPhotographe
   });
   _unsubscribe = _monitor.subscribe(_onPoll);
   _monitor.acquire(MONITOR_CONSUMER);
+  // Display added/removed/resized (external monitor, resolution change): keep the open popup
+  // inside the work area under the menu-bar icon.
+  for (const ev of ['display-added', 'display-removed', 'display-metrics-changed']) screen.on(ev, _resizePopup);
   _log('[companion] tray started');
 }
 
@@ -595,6 +667,8 @@ function shutdown() {
   if (_assessor) { _assessor.shutdown(); _assessor = null; }
   if (_handoff) { _handoff.unregister(); _handoff = null; }
   _dump = null;
+  _view = { mode: 'compact', sourceId: null };
+  for (const ev of ['display-added', 'display-removed', 'display-metrics-changed']) screen.removeListener(ev, _resizePopup);
   _selections.clear();
   _ops.clear();
   _reviewStarting = false;

@@ -91,6 +91,9 @@ const EventDumpImport = (() => {
       for (;;) {
         const lockCheck = await window.api.checkDirectArchiveLocks({ fileJobs });
         if (!lockCheck || !lockCheck.blocked || !lockCheck.blocked.length) break;
+        // The import runs with the main window in the background: bring it forward for this
+        // decision, so the dialog is never hidden behind other apps (EQI-1.1).
+        try { window.api.companionRequestAttention(); } catch { /* companion disabled */ }
         const pick = await _showDirectArchiveBusyDialog(lockCheck.blocked, lockCheck.currentDeviceName ?? null);
         if (pick === 'refresh' || pick === 'clear') continue;
         return _refuse('archive-busy');
@@ -171,6 +174,33 @@ const EventDumpImport = (() => {
     };
   }
 
+  /**
+   * EQI-1.1 one-click Change Event from the companion, WITHOUT bringing this window forward: the
+   * event is adopted through the same path AutoIngest uses at startup (setLastEvent →
+   * EventCreator.restoreLastEvent), as a landing-screen event change (session boundary, exactly as
+   * showEventCreatorResume does). With an Import workspace open, its assignments must not be
+   * disturbed — refused, and the companion opens the existing picker instead.
+   * @param {{ collectionPath: string, collectionName: string, folderName: string }} req
+   */
+  async function selectEvent(req) {
+    if (_running || importRunning || _sessionRunBusy) return _refuse('busy');
+    if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) return _refuse('workspace-open');
+    const workspaceLive = !!activeSource && document.getElementById('workspace').classList.contains('visible');
+    if (workspaceLive) return _refuse('workspace-open');
+    const { collectionPath, collectionName, folderName } = req || {};
+    if (!collectionPath || !collectionName || !folderName) return _refuse('invalid');
+    ImportSession.reset();
+    renderGroupPanel();
+    await window.api.setLastEvent({ collectionPath, collectionName, eventName: folderName, safeEventName: folderName });
+    await EventCreator.restoreLastEvent();
+    const ed = EventCreator.getActiveEventData();
+    if (!ed || !ed.event || ed.event.name !== folderName) return _refuse('event-unavailable');
+    if (typeof renderHome === 'function' && !document.getElementById('workspace').classList.contains('visible')) {
+      try { renderHome(); } catch { /* cosmetic only */ }
+    }
+    return { ok: true };
+  }
+
   /** Opens the existing event picker (and, for 'new', the existing Event Creator form). */
   function openPicker(mode) {
     if (importRunning || _sessionRunBusy) return _refuse('busy');
@@ -209,6 +239,15 @@ const EventDumpImport = (() => {
       window.api.companionOpenSourceResult(requestId, res);
       _report();
     });
+    window.api.onCompanionSelectEvent(async (req) => {
+      const requestId = req && req.requestId;
+      window.api.companionOpenSourceProgress(requestId);
+      let res;
+      try { res = await selectEvent(req || {}); }
+      catch (err) { res = _refuse('error', (err && err.message) || String(err)); }
+      window.api.companionOpenSourceResult(requestId, res);
+      _report();
+    });
     window.api.onCompanionOpenEventPicker((req) => {
       const res = openPicker(req && req.mode === 'new' ? 'new' : 'choose');
       window.api.companionOpenSourceResult(req && req.requestId, res);
@@ -217,7 +256,7 @@ const EventDumpImport = (() => {
     _report();
   }
 
-  return { init, run, openPicker, _activeEventInfo };
+  return { init, run, openPicker, selectEvent, _activeEventInfo };
 })();
 
 if (typeof module !== 'undefined') module.exports = EventDumpImport;

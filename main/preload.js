@@ -476,5 +476,9 @@ contextBridge.exposeInMainWorld('api', {
   onCompanionDumpImport:      (cb)                 => _register('companion:dumpImport', (_e, req) => cb(req)),
   onCompanionOpenEventPicker: (cb)                 => _register('companion:openEventPicker', (_e, req) => cb(req)),
   companionWorkspaceEvent:    (info)               => ipcRenderer.send('companion:workspaceEvent', info),
+  // EQI-1.1: one-click event selection from the companion (main window stays in the background),
+  // and a request to bring AutoIngest forward when a Dump import needs an operator decision.
+  onCompanionSelectEvent:     (cb)                 => _register('companion:selectEvent', (_e, req) => cb(req)),
+  companionRequestAttention:  ()                   => ipcRenderer.send('companion:attention'),
 
 });

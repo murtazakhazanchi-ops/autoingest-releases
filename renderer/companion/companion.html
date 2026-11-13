@@ -8,17 +8,21 @@
   <link rel="stylesheet" href="companion.css">
 </head>
 <body>
-  <main class="popup" aria-labelledby="popup-title">
+  <!-- EQI-1.1: one popup, two presentations — data-view="compact" (card overview) or "expanded"
+       (Event Dump for one card). main.js sizes the window to match; every value shown comes from
+       main's snapshot. -->
+  <main class="popup" data-view="compact" aria-labelledby="popup-title">
     <header class="popup-header">
       <!-- The official AutoIngest app icon (64 px rendition from assets/mac.icns), shown at 32 px. -->
       <img class="brand-mark" src="app-icon.png" width="32" height="32" alt="" aria-hidden="true">
       <div class="brand-text">
         <h1 id="popup-title">AutoIngest</h1>
-        <p class="brand-sub">Card companion</p>
+        <p class="brand-sub" id="brand-sub">Card companion</p>
       </div>
     </header>
 
-    <section class="status" aria-live="polite" aria-labelledby="status-heading">
+    <!-- ── Compact: card overview ───────────────────────────────────────────── -->
+    <section class="status view-compact" aria-live="polite" aria-labelledby="status-heading">
       <h2 id="status-heading" class="status-heading">Checking for cards…</h2>
 
       <div id="empty-state" class="empty" hidden>
@@ -29,12 +33,91 @@
         <p>Insert a memory card to see it here.</p>
       </div>
 
-      <ul id="card-list" class="card-list" hidden></ul>
+      <ul id="card-list" class="card-list scroll-area" hidden></ul>
+    </section>
+
+    <!-- ── Expanded: Event Dump for one card ─────────────────────────────────── -->
+    <section class="xp view-expanded" id="xp" hidden aria-label="Event Dump">
+      <div class="xp-body scroll-area">
+        <section class="xp-section xp-card" aria-label="Card">
+          <div class="xp-card-head">
+            <svg class="card-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M7 3h7.5L19 7.5V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>
+              <path d="M10 3v4M13 3v4"/>
+            </svg>
+            <div class="card-text">
+              <span class="xp-card-label" id="xp-card-label"></span>
+              <span class="xp-card-meta" id="xp-card-meta"></span>
+            </div>
+          </div>
+          <div class="xp-grid">
+            <label class="field">
+              <span class="field-label">Shoot date</span>
+              <select id="xp-date"></select>
+            </label>
+            <div class="xp-counts">
+              <p class="xp-counts-main" id="xp-counts"></p>
+              <p class="xp-counts-sub" id="xp-counts-sub"></p>
+            </div>
+          </div>
+          <label class="dump-earlier-row" id="xp-earlier-row" hidden>
+            <input type="checkbox" id="xp-earlier">
+            <span id="xp-earlier-text"></span>
+          </label>
+        </section>
+
+        <section class="xp-section" aria-labelledby="xp-event-title">
+          <h3 class="xp-title" id="xp-event-title">Selected Event</h3>
+          <p class="xp-event-coll" id="xp-event-coll"></p>
+          <p class="xp-event-name" id="xp-event-name"></p>
+          <div class="xp-event-actions">
+            <button type="button" class="btn btn-secondary" id="xp-change-event">Change Event</button>
+            <button type="button" class="btn btn-secondary" id="xp-new-event">Create New Event</button>
+          </div>
+          <!-- One-click event picker (companion-owned; the Event Creator's own event scan). -->
+          <div class="picker" id="xp-picker" hidden>
+            <input type="search" id="xp-picker-search" class="text-input" placeholder="Search events" aria-label="Search events" autocomplete="off" spellcheck="false">
+            <ul class="picker-list scroll-area" id="xp-picker-list" role="listbox" aria-label="Events"></ul>
+            <p class="picker-note" id="xp-picker-note" hidden></p>
+            <div class="picker-actions">
+              <button type="button" class="btn btn-quiet" id="xp-picker-cancel">Cancel</button>
+              <button type="button" class="btn btn-primary" id="xp-picker-use" disabled>Use This Event</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="xp-section" aria-labelledby="xp-ph-title">
+          <h3 class="xp-title" id="xp-ph-title">Photographer</h3>
+          <div class="combo" id="xp-combo">
+            <input type="text" id="xp-ph-input" class="text-input" role="combobox" aria-expanded="false" aria-controls="xp-ph-list"
+                   aria-autocomplete="list" placeholder="Type to search photographers" autocomplete="off" spellcheck="false">
+            <ul class="combo-list scroll-area" id="xp-ph-list" role="listbox" hidden></ul>
+          </div>
+          <p class="xp-ph-state" id="xp-ph-state"></p>
+          <p class="dump-suggest" id="xp-ph-suggest" hidden>Last used: <button type="button" class="link-btn" id="xp-ph-use-last"></button></p>
+        </section>
+
+        <section class="xp-section" aria-labelledby="xp-dest-title">
+          <h3 class="xp-title" id="xp-dest-title">Destination</h3>
+          <p class="xp-dest" id="xp-dest"></p>
+        </section>
+      </div>
+
+      <!-- Pinned: the import action and its progress stay reachable while the content scrolls. -->
+      <div class="xp-action">
+        <div class="dump-progress" id="xp-progress" role="status" hidden>
+          <span id="xp-progress-text"></span>
+          <div class="progress-track" aria-hidden="true"><div class="progress-bar" id="xp-bar"></div></div>
+        </div>
+        <p class="dump-result" id="xp-result" role="status" aria-live="polite" hidden></p>
+        <button type="button" class="btn btn-primary xp-import" id="xp-import">Import to Dump</button>
+      </div>
     </section>
 
     <footer class="actions">
+      <button type="button" id="back-btn" class="btn btn-secondary view-expanded" hidden>← Card Overview</button>
       <button type="button" id="open-btn" class="btn btn-primary">Open AutoIngest</button>
-      <button type="button" id="quit-btn" class="btn btn-quiet">Quit AutoIngest</button>
+      <button type="button" id="quit-btn" class="btn btn-quiet view-compact">Quit AutoIngest</button>
     </footer>
   </main>
 
@@ -69,12 +152,6 @@
         <p class="assess-error" role="alert" hidden></p>
 
         <div class="assess-result" hidden>
-          <!-- EQI-1: Review in AutoIngest (Q2) or Event Dump Quick Import into the active event. -->
-          <div class="mode-switch" role="radiogroup" aria-label="What to do with this card">
-            <button type="button" class="mode-btn" data-mode="review" role="radio">Review in AutoIngest</button>
-            <button type="button" class="mode-btn" data-mode="dump" role="radio">Event Dump</button>
-          </div>
-
           <label class="field">
             <span class="field-label">Shoot date</span>
             <select class="date-select"></select>
@@ -82,6 +159,8 @@
 
           <p class="selected-line"><strong class="selected-num"></strong> <span class="selected-caption"></span></p>
           <p class="selected-breakdown"></p>
+          <!-- EQI-1.1: import status at a glance (file-level history). -->
+          <p class="import-status"></p>
 
           <dl class="buckets">
             <div class="bucket"><dt>Earlier</dt><dd class="earlier-count"></dd></div>
@@ -90,38 +169,11 @@
           </dl>
 
           <div class="card-actions">
-            <button type="button" class="btn btn-primary review-selected">Review Selected Date</button>
+            <button type="button" class="btn btn-secondary review-selected">Review Selected Date</button>
             <button type="button" class="btn btn-secondary review-earlier">Review Earlier Files</button>
           </div>
-
-          <!-- EQI-1 Event Dump: everything NEW from the shoot date → the active event's Dump/<photographer>. -->
-          <div class="dump" hidden>
-            <div class="dump-event">
-              <span class="field-label">Event</span>
-              <span class="dump-event-name"></span>
-              <span class="dump-event-actions">
-                <button type="button" class="link-btn dump-choose-event">Change event</button>
-                <span aria-hidden="true">·</span>
-                <button type="button" class="link-btn dump-new-event">Create New Event</button>
-              </span>
-            </div>
-            <label class="field">
-              <span class="field-label">Photographer</span>
-              <select class="dump-photographer"></select>
-            </label>
-            <p class="dump-suggest" hidden>Last used: <button type="button" class="link-btn dump-use-last"></button></p>
-            <p class="dump-counts"></p>
-            <label class="dump-earlier-row" hidden>
-              <input type="checkbox" class="dump-earlier">
-              <span class="dump-earlier-text"></span>
-            </label>
-            <button type="button" class="btn btn-primary dump-import">Import to Dump</button>
-            <div class="dump-progress" role="status" hidden>
-              <span class="dump-progress-text"></span>
-              <div class="progress-track" aria-hidden="true"><div class="progress-bar dump-bar"></div></div>
-            </div>
-            <p class="dump-result" role="status" aria-live="polite" hidden></p>
-          </div>
+          <button type="button" class="btn btn-primary event-dump-btn">Event Dump</button>
+          <p class="dump-last" hidden></p>
 
           <p class="suggestion" hidden><span class="suggestion-text"></span> <button type="button" class="link-btn use-suggestion"></button></p>
           <p class="assess-note" hidden></p>
@@ -135,6 +187,7 @@
     </li>
   </template>
 
+  <script src="photographerMatch.js"></script>
   <script src="companion.js"></script>
 </body>
 </html>

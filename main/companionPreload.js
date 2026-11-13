@@ -25,6 +25,10 @@ contextBridge.exposeInMainWorld('companion', {
   setDumpOptions:  (sourceId, options) => ipcRenderer.invoke('companion:setDumpOptions', { sourceId, ...options }),
   dumpImport:      (sourceId) => ipcRenderer.invoke('companion:dumpImport', { sourceId }),
   openEventPicker: (mode) => ipcRenderer.invoke('companion:openEventPicker', { mode }),
+  // EQI-1.1 — adaptive popup (compact card overview ↔ expanded Event Dump) and one-click event change
+  setView:         (mode, sourceId = null) => ipcRenderer.invoke('companion:setView', mode === 'expanded' ? { mode, sourceId } : { mode }),
+  listEvents:      () => ipcRenderer.invoke('companion:listEvents'),
+  chooseEvent:     (folderName) => ipcRenderer.invoke('companion:chooseEvent', { folderName }),
   /** @param {(snapshot: object) => void} cb @returns {() => void} unsubscribe */
   onSnapshot: (cb) => {
     const listener = (_e, snapshot) => cb(snapshot);
