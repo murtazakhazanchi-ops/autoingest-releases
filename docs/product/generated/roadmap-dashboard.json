@@ -351,10 +351,10 @@
         "AI-FEAT-064"
       ],
       "name": "Event Quick Import & Dump Sorting",
-      "next_action": "Owner feedback on RC `v0.9.18-rc.3` (EQI-1.2); then EQI-2 when authorized. *(Earlier 2026-11-13: owner live-event feedback on RC `v0.9.18-rc.2`.)* *(2026-11-12: owner review at the EQI-1 release gate.)*",
+      "next_action": "Owner feedback on RC `v0.9.18-rc.4` (CAM-001); then EQI-2 when authorized. *(Earlier 2026-11-13: owner feedback on RC `v0.9.18-rc.3` (EQI-1.2).)* *(Earlier 2026-11-13: owner live-event feedback on RC `v0.9.18-rc.2`.)* *(2026-11-12: owner review at the EQI-1 release gate.)*",
       "objective": "Menu-bar Event Dump Quick Import into the selected event (`Event/Dump/<Photographer>/`, never PC-sequenced), optional division between events, sorting the Dump through the existing Import Workspace, and safe source-card cleanup — reusing existing services, UI and transactions.",
       "planned_estimate": "Evidence pending — not yet documented as fact",
-      "status": "**Active — PRIORITY 1 (from 2026-11-12).** EQI-0 done. EQI-1 RC Preview `v0.9.18-rc.1` (live-event used); EQI-1.1 RC Preview `v0.9.18-rc.2`; EQI-1.2 RC Preview `v0.9.18-rc.3` (macOS verified; Windows unverified). EQI-2 to EQI-5 not started. *(2026-11-12: EQI-1 implemented and verified, local, unmerged, unreleased.)*"
+      "status": "**Active — PRIORITY 1 (from 2026-11-12).** EQI-0 done. EQI-1 RC Preview `v0.9.18-rc.1` (live-event used); EQI-1.1 RC Preview `v0.9.18-rc.2`; EQI-1.2 RC Preview `v0.9.18-rc.3`; CAM-001 startup recognition RC Preview `v0.9.18-rc.4` (macOS verified; Windows unverified). EQI-2 to EQI-5 not started. *(2026-11-12: EQI-1 implemented and verified, local, unmerged, unreleased.)*"
     },
     {
       "current_risks": "Hosts the remaining scope of AI-RM-006 (Integrity Verification — Archive-Wide) since 2026-10-27, including its AI-FEAT-025 disambiguation risk. Migration from the existing capped, per-computer name+size import index has to be designed so that history is not lost and confidence is not overstated.",

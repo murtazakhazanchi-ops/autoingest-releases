@@ -7,6 +7,15 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-11-14 — AI-FEAT-064 CAM-001 startup photographer recognition recorded; RC Preview v0.9.18-rc.4
+
+- **Task type**: feature journal + roadmap status (documentation only, on `docs/roadmap-quick-ingest-priority`; code on `fix/cam-001-startup-recognition` — `491e7fe`, `0a95901`)
+- **What changed**: AI-FEAT-064 header (stage state, latest update, evidence, release notes, testing coverage — prior values kept), stage table (new CAM-001 row), new § 4c CAM-001 implemented behaviour (root cause of the delay and the freeze, Keychain helper process, startup readiness phases, failure states, Keychain-item side effect), evidence and dated milestones. Roadmap current position, AI-RM-016 status and next action. Registry status text.
+- **Affected feature(s)**: AI-FEAT-064 (also supersedes the "menu bar never opens the registry" statement in its § 4b)
+- **Affected roadmap milestone(s)**: AI-RM-016
+- **Unresolved gaps**: dashboard (04) not regenerated; Windows not verified; AI-FEAT-063 (registry) record not updated for the startup open; technical docs under `docs/` not updated while unmerged
+- **Evidence confidence**: commits `491e7fe` + `0a95901`, unit/live/packaged test runs, release workflow run 43500830453 and the downloaded `v0.9.18-rc.4` arm64 artifact
+
 ## 2026-11-13 — AI-FEAT-064 EQI-1.2 visual hierarchy and camera suggestions recorded; RC Preview v0.9.18-rc.3
 
 - **Task type**: feature journal + roadmap status (documentation only, on `docs/roadmap-quick-ingest-priority`; code on `fix/eqi-companion-hierarchy` — `3799164`, `cdeb0ea`)

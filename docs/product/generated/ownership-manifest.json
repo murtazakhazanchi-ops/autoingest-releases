@@ -1553,6 +1553,8 @@
       "test/photographerLearningQ4dLive.test.js"
     ],
     "AI-FEAT-064": [
+      "test/cam001RegistryStartup.test.js",
+      "test/cam001StartupRecognitionLive.test.js",
       "test/eqiCompanionAdaptiveEQI11.test.js",
       "test/eqiCompanionAdaptiveLive.test.js",
       "test/eqiCompanionHierarchyEQI12.test.js",
@@ -1819,6 +1821,12 @@
     ]
   },
   "test_to_features": {
+    "test/cam001RegistryStartup.test.js": [
+      "AI-FEAT-064"
+    ],
+    "test/cam001StartupRecognitionLive.test.js": [
+      "AI-FEAT-064"
+    ],
     "test/companionQ1.test.js": [
       "AI-FEAT-061"
     ],
