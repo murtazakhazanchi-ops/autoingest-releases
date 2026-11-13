@@ -5,15 +5,15 @@
 | Feature ID | AI-FEAT-064 |
 | Category | Import |
 | Status | In active development |
-| Stage state | EQI-1 implemented and verified on `feature/event-quick-import-dump` (local, unmerged, unreleased); EQI-2 to EQI-5 planned |
+| Stage state | EQI-1 released as RC Preview `v0.9.18-rc.1` (`4e4fd81`) and used at a live event; EQI-1.1 (adaptive companion stabilization) released as RC Preview `v0.9.18-rc.2` (`000f103`, `fix/eqi-companion-adaptive-ui`); not merged to Stable; EQI-2 to EQI-5 planned. *(2026-11-12: EQI-1 implemented and verified on `feature/event-quick-import-dump`, local, unmerged, unreleased.)* |
 | Maturity | Experimental |
 | Parent feature | AI-FEAT-061 (Quick Ingest & Desktop Companion) |
 | Roadmap milestone | AI-RM-016 — Event Quick Import & Dump Sorting (PRIORITY 1 from 2026-11-12) |
 | Dependencies | AI-FEAT-061 Q1–Q3 (companion, capture-date assessment, camera summary); AI-FEAT-063 Q4 learning (unchanged; Dump imports are learning-eligible imports); AI-FEAT-047 multi-event import engine (ImportSessionRunner); existing import transaction, Event Creator, Event Management, Sort QMZ, Delete from Source |
 | Not a dependency | AI-FEAT-063 Q5e-2c META, S2–S8 and live photographer renaming (paused, see AI-RM-014) — no demonstrated data-integrity dependency |
 | Owner direction | 2026-11-12: highest-priority active milestone, to be used during a live event; incremental, isolated macOS Preview builds, starting with the simplest complete Event Dump import |
-| Latest major update | 2026-11-12 — milestone created; EQI-1 implemented |
-| Evidence status | EQI-1 implemented on `feature/event-quick-import-dump` (EQI-1 commit: `ede3fcd`) — local, unmerged, unreleased. macOS verified (unit, isolated live, isolated packaged arm64); Windows NOT verified. Stable unchanged. |
+| Latest major update | 2026-11-13 — EQI-1.1 adaptive companion, RC Preview `v0.9.18-rc.2` *(2026-11-12 — milestone created; EQI-1 implemented)* |
+| Evidence status | EQI-1.1 commits `b073e48` (app) + `000f103` (tests) on `fix/eqi-companion-adaptive-ui`, published as prerelease `v0.9.18-rc.2` (rc channel) and verified from the downloaded artifacts. macOS verified (unit, isolated live with screenshots, isolated packaged arm64); Windows NOT verified (installer built by CI, untested). Stable unchanged (`v0.9.17` Latest). *(2026-11-12: EQI-1 `ede3fcd`, local, unmerged, unreleased.)* |
 
 ---
 
@@ -26,8 +26,8 @@
 | Related bugs | None recorded |
 | Related postmortems | None |
 | Related architectural evolution sections | None yet |
-| Related release notes | Not applicable — not released |
-| Testing coverage | `test/eventDumpQuickImportEQI1.test.js` (unit), `test/eventDumpQuickImportLive.test.js` (isolated live, real companion popup), the EQI-1 exceptions in the stage-boundary/UI-freeze guards; isolated packaged macOS run recorded in the EQI-1 report |
+| Related release notes | GitHub prereleases `v0.9.18-rc.1` (EQI-1) and `v0.9.18-rc.2` (EQI-1.1), rc channel only; no Stable release notes *(previously: not released)* |
+| Testing coverage | `test/eventDumpQuickImportEQI1.test.js` (unit), `test/eventDumpQuickImportLive.test.js` and `test/eventDumpRoundTripRecoveryLive.test.js` (isolated live, real companion popup), EQI-1.1: `test/eqiCompanionAdaptiveEQI11.test.js` (unit) and `test/eqiCompanionAdaptiveLive.test.js` (isolated live, window bounds + screenshots, sanitized real-world Dump fixture `test/fixtures/eqi11-realworld-dump-event.json`); the EQI-1 exceptions in the stage-boundary/UI-freeze guards; isolated packaged macOS runs recorded in the EQI-1/EQI-1.1 reports |
 | Documentation completeness | Rules, stage plan and EQI-1 behaviour recorded; technical docs under `docs/` not updated while unmerged |
 
 ## 1. Purpose
@@ -80,7 +80,8 @@ Stable v0.9.17 QMZ attribution protections, Q4 learning, Q5 registry, the Q5 ren
 | Stage | Scope | State |
 |---|---|---|
 | EQI-0 | Discovery, architecture, roadmap update | Done 2026-11-12 |
-| EQI-1 | Menu-bar Event Dump Quick Import (single destination) | **Implemented and verified** on `feature/event-quick-import-dump` — awaiting owner review at the EQI-1 release gate |
+| EQI-1 | Menu-bar Event Dump Quick Import (single destination) | **Released as RC Preview `v0.9.18-rc.1`** (`4e4fd81`); used at a live event 2026-11-12 (89 files: 88 CR3 + 1 MP4 into `Event/Dump/<Photographer>/`, unsequenced, metadata complete, source untouched). *(Earlier: implemented and verified on `feature/event-quick-import-dump`, awaiting owner review.)* |
+| EQI-1.1 | Adaptive menu-bar companion & live-event usability stabilization | **Released as RC Preview `v0.9.18-rc.2`** (`000f103`) — awaiting owner live-event feedback; not Stable |
 | EQI-2 | Multi-event manual time assignment | Planned — not started |
 | EQI-3 | Sort Dump through the existing Import Workspace | Planned — not started |
 | EQI-4 | Safe source cleanup and repeated-session deletion fix | Planned — not started |
@@ -98,13 +99,26 @@ Stable v0.9.17 QMZ attribution protections, Q4 learning, Q5 registry, the Q5 ren
 - **Attribution**: Audit, Repair and resume resolve the photographer of `Dump/<Name>/…` as `<Name>` (never "Dump", never the last import's photographer); in multi-component events a Dump file reconstructs as the explicit no-component group the import wrote, not as ambiguous.
 - **Not in EQI-1**: Divide Photos Between Events, Sort Dump, source deletion (unchanged and off), registry-based photographer suggestion in the companion (Q4 suggestions are not yet wired to the companion; opening the encrypted registry from the menu bar is deferred until the Keychain/main-thread risk recorded on AI-RM-014 is addressed), Windows.
 
+## 4a. Implemented behaviour — EQI-1.1 (fact; `fix/eqi-companion-adaptive-ui`, RC `v0.9.18-rc.2`)
+
+Live-event feedback on RC.1: the popup was too narrow, the event name was cut off, the photographer dropdown held hundreds of names, the scrollbar was oversized, Change Event went through the main window, and Import to Dump brought the main window forward. EQI-1.1 replaces the companion part of §4 (the per-card *Review | Event Dump* switch); the import path, Dump rules and guards in §4 are unchanged.
+
+- **Two presentations of one popup window**: compact card overview (360 px; per card the Q2/Q3 assessment, *Review Selected Date*, *Event Dump*, import status) and expanded Event Dump (620 × 720 px), each fitted to the display's work area, kept under the menu-bar icon and re-fitted when displays change. *← Card Overview* returns to compact. Card, event and photographer choices survive view switches and closing/reopening the popup.
+- **Selected Event**: the complete canonical event name in its own section, wrapping, never truncated; *Change Event* and *Create New Event* beneath it; destination preview `Collection / Event / Dump / Photographer`.
+- **Photographer search**: a combobox over the app's existing photographer list — case-, accent- and punctuation-insensitive, partial and word-prefix matching (a stored initial may be omitted: "Murtaza Kha" finds "M Murtaza Khazanchi"), Up/Down/Enter/Escape. Typed text is never a selection; nothing is ever created; no registry/Keychain access from the menu bar.
+- **One-click Change Event**: a companion-owned searchable picker listing the collection's events from the Event Creator's own scan (valid event.json only). The main window adopts the chosen event through its startup restore path **without coming forward** and its home card is refreshed. With an Import workspace open, the existing main-window picker opens instead (assignments untouched).
+- **Create New Event**: opens the existing Event Creator in the main window in one click (architectural fallback — the Creator is coupled to the main window's DOM; extracting it into a separate window was judged unsafe). The companion returns to the expanded view afterwards; cancel keeps every choice.
+- **Import to Dump stays in the background**: root cause on RC.1 — the workspace handoff called `openApp()` unconditionally. Now the main window is opened only if its renderer is not ready (e.g. closed on macOS, where splash/sign-in are needed). Progress and completion are shown in the companion. Safety dialogs (busy archive / locks) still bring the main window forward so the operator sees them; no lock is cleared without the operator's explicit choice; nothing is deleted from the source.
+- **Scrolling**: thin theme-matched scrollbars; no horizontal scrolling. Dark and light themes both verified on screenshots.
+- **Unchanged**: Dump folders never PC-sequenced; date filtering; the image-data re-import guard (`4e4fd81`); Local First behaviour and its documented limitation; the original Quick Import concept.
+
 ## Engineering Evolution
 
 **Initial implementation**: EQI-1 (2026-11-12) on `feature/event-quick-import-dump` — `ede3fcd`, not merged.
 
 **Architectural / workflow decisions**: the companion requests the import and the main window's existing import machinery runs it (no second copy engine, no second event form); the import-mode rule and the per-event prepare step are shared with the existing imports rather than re-implemented. *Rejected*: running the import in the companion's main-process layer (would duplicate Local First mirroring, lock checks and sync registration that live in the renderer); a simplified event form in the companion (the brief requires the existing Event Creator).
 
-**Other dated milestones**: 2026-11-12 — milestone, rules and EQI-1.
+**Other dated milestones**: 2026-11-12 — milestone, rules and EQI-1; EQI-1 RC `v0.9.18-rc.1` (`4e4fd81`) and live-event use. 2026-11-13 — EQI-1.1 adaptive companion, RC `v0.9.18-rc.2` (`000f103`).
 
 ## 5. Evidence
 
@@ -113,5 +127,11 @@ EQI-1 commit `ede3fcd` on `feature/event-quick-import-dump`:
 - `test/eventDumpQuickImportLive.test.js` — 37/37 (isolated dev Electron, real companion popup), and 37/37 against an isolated packaged arm64 build of `ede3fcd` (test-only identity, bundled ExifTool 13.00, real `node_modules`, no symlinks); packaged attribution verifier 33/33.
 - Regression on the branch: unit 91 pass / 3 inherited Stable QMZ failures (A5, D4, TEST 1); live 25 suites pass; `companionQ1Live` intermittently fails on a popup-closed race that the Q5 baseline `60055ae` shows too (2 of 3 baseline runs) — inherited, not EQI-1.
 - An unpublished, ad-hoc-signed experimental Preview (`0.9.18-eqi1.experimental.1`, arm64) was built locally from `ede3fcd`; it is not released, and Gatekeeper rejects it (no Developer ID on the build machine — the existing release workflow signs only in CI on tag push).
+
+EQI-1.1 commits `b073e48` + `000f103` (`fix/eqi-companion-adaptive-ui`, from `bf822c0`):
+- `test/eqiCompanionAdaptiveEQI11.test.js` — 11/11; `test/eqiCompanionAdaptiveLive.test.js` — 47/47 dev and 47/47 packaged arm64 (test-only identity), screenshots of every state in both themes inspected.
+- Packaged (test identity, built from `000f103`): `eventDumpQuickImportLive` 37/37, `eventDumpRoundTripRecoveryLive` 69/69, attribution verifier 33/33.
+- Regression: unit 90 pass + guard fixed (allow-list) / inherited QMZ failures A5, D4, TEST 1 unchanged; `qmzExpandedTypesRegression` run time is load-dependent (408 s on the RC.1 baseline). Focused live (companion, Event Dump, EQI, multi-event; 14 suites) all pass after fixing a `.card-label` selector collision found by `companionAutoPopupLive`/`companionQ1Live`.
+- RC `v0.9.18-rc.2`: release branch `release/v0.9.18-rc.2` @ `000f103`, workflow_dispatch run 43413383248 (rc-tag, rc-build-mac, rc-build-windows succeeded; Stable jobs skipped); downloaded arm64 app = 0.9.18-rc.2 / `com.autoingest.app`, key files byte-identical to `000f103`, no `test/` in the asar, bundled ExifTool 13.00; ad-hoc signature (unsigned-mac RC path, as RC.1). Inherited: `rc-mac.yml` lists only the x64 files.
 
 Windows: **not verified**.

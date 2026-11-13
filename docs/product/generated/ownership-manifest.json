@@ -1553,8 +1553,11 @@
       "test/photographerLearningQ4dLive.test.js"
     ],
     "AI-FEAT-064": [
+      "test/eqiCompanionAdaptiveEQI11.test.js",
+      "test/eqiCompanionAdaptiveLive.test.js",
       "test/eventDumpQuickImportEQI1.test.js",
-      "test/eventDumpQuickImportLive.test.js"
+      "test/eventDumpQuickImportLive.test.js",
+      "test/eventDumpRoundTripRecoveryLive.test.js"
     ]
   },
   "ipc_to_features": {
@@ -1827,10 +1830,19 @@
       "AI-FEAT-034",
       "AI-FEAT-035"
     ],
+    "test/eqiCompanionAdaptiveEQI11.test.js": [
+      "AI-FEAT-064"
+    ],
+    "test/eqiCompanionAdaptiveLive.test.js": [
+      "AI-FEAT-064"
+    ],
     "test/eventDumpQuickImportEQI1.test.js": [
       "AI-FEAT-064"
     ],
     "test/eventDumpQuickImportLive.test.js": [
+      "AI-FEAT-064"
+    ],
+    "test/eventDumpRoundTripRecoveryLive.test.js": [
       "AI-FEAT-064"
     ],
     "test/eventJsonStore.test.js": [

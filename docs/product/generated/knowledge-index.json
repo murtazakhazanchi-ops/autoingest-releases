@@ -3337,9 +3337,9 @@
         "openBugs": []
       },
       "lastUpdated": {
-        "evidenceStatus": "EQI-1 implemented on `feature/event-quick-import-dump` (EQI-1 commit: `ede3fcd`) — local, unmerged, unreleased. macOS verified (unit, isolated live, isolated packaged arm64); Windows NOT verified. Stable unchanged.",
+        "evidenceStatus": "EQI-1.1 commits `b073e48` (app) + `000f103` (tests) on `fix/eqi-companion-adaptive-ui`, published as prerelease `v0.9.18-rc.2` (rc channel) and verified from the downloaded artifacts. macOS verified (unit, isolated live with screenshots, isolated packaged arm64); Windows NOT verified (installer built by CI, untested). Stable unchanged (`v0.9.17` Latest). *(2026-11-12: EQI-1 `ede3fcd`, local, unmerged, unreleased.)*",
         "introducedVersion": "Evidence pending",
-        "lastModifiedVersion": "2026-11-12 — milestone created; EQI-1 implemented"
+        "lastModifiedVersion": "2026-11-13 — EQI-1.1 adaptive companion, RC Preview `v0.9.18-rc.2` *(2026-11-12 — milestone created; EQI-1 implemented)*"
       },
       "operatorStatus": "PARTIALLY_AVAILABLE",
       "relatedFeatures": [

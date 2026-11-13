@@ -7,6 +7,16 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-11-13 — AI-FEAT-064 EQI-1.1 adaptive companion recorded; RC Previews v0.9.18-rc.1 and rc.2
+
+- **Task type**: feature journal + roadmap status (documentation only, on `docs/roadmap-quick-ingest-priority`; code on `fix/eqi-companion-adaptive-ui` — `b073e48`, `000f103`)
+- **What changed**: AI-FEAT-064 header (stage state, latest update, evidence, release notes, testing coverage — prior values kept in italics), stage table (EQI-1 released as RC `v0.9.18-rc.1` and live-event used; new EQI-1.1 row), new § 4a EQI-1.1 implemented behaviour (adaptive compact/expanded popup, full event name, photographer search, companion-owned Change Event, import without foregrounding, root causes), evidence and dated milestones. Roadmap current position and AI-RM-016 status/next action (previous kept). Registry status text.
+- **Affected feature(s)**: AI-FEAT-064
+- **Affected roadmap milestone(s)**: AI-RM-016
+- **Unresolved gaps**: dashboard (04) not regenerated; Windows not verified; technical docs under `docs/` not updated while unmerged; the RC.1 record is added retroactively here (it was published after the 2026-11-12 entry)
+- **Evidence confidence**: commits, unit/live/packaged test runs, release workflow run 43413383248 and the downloaded `v0.9.18-rc.2` artifacts
+
+
 ## 2026-11-12 — AI-RM-016 Event Quick Import & Dump Sorting created (AI-FEAT-064); AI-RM-014 Q5e paused
 
 - **Task type**: roadmap milestone + feature record (documentation only, on `docs/roadmap-quick-ingest-priority`; code on `feature/event-quick-import-dump`)

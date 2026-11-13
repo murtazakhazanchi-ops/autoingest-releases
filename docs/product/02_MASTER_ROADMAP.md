@@ -6,7 +6,9 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 
 **Design decisions (2026-10-28)**: six owner design decisions for AI-RM-014 approved in [DEC-029](decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md) — four final (single photographer list, rename keeps alias, multi-photographer handoff, calendar date + optional cross-midnight range), two approved with investigations pending (Q8 dependency audit; per-manufacturer camera tags). No implementation phase is approved by this.
 
-**Current position (2026-11-12)**: Active milestone: **AI-RM-016 — Event Quick Import & Dump Sorting** (owner direction 2026-11-12, PRIORITY 1, for use during a live event) — [AI-FEAT-064](features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md). EQI-0 done; EQI-1 (menu-bar Event Dump Quick Import) implemented and verified on `feature/event-quick-import-dump`, awaiting owner review at the EQI-1 release gate. AI-RM-014's remaining Q5e work (META, S3, COMP, S2–S8, live photographer renaming) is **paused** — not cancelled, not completed.
+**Current position (2026-11-13)**: Active milestone: **AI-RM-016** — EQI-1 released as RC Preview `v0.9.18-rc.1` and used at a live event; EQI-1.1 (adaptive menu-bar companion) released as RC Preview `v0.9.18-rc.2` (`000f103`), awaiting owner feedback; not Stable. EQI-2 to EQI-5 not started; AI-RM-014 Q5e still paused.
+
+**Previous position (2026-11-12)**: Active milestone: **AI-RM-016 — Event Quick Import & Dump Sorting** (owner direction 2026-11-12, PRIORITY 1, for use during a live event) — [AI-FEAT-064](features/AI-FEAT-064_EVENT_QUICK_IMPORT_AND_DUMP_SORTING.md). EQI-0 done; EQI-1 (menu-bar Event Dump Quick Import) implemented and verified on `feature/event-quick-import-dump`, awaiting owner review at the EQI-1 release gate. AI-RM-014's remaining Q5e work (META, S3, COMP, S2–S8, live photographer renaming) is **paused** — not cancelled, not completed.
 
 *Previous position statement (2026-10-28, kept per Append, Never Erase):* **Current position (2026-10-28)**: Active milestone: **AI-RM-014 — Quick Ingest & Desktop Experience**. Q1 (menu-bar/tray foundation) is implemented on `feature/menu-bar-companion-q1` @ `dd9493f` — Status Ladder rung 1 only, local, unmerged, owner review pending. On 2026-10-28 the owner expanded AI-RM-014 to phases Q0–Q9 (smart date-based assessment, camera identification, a shared photographer↔camera learning system, a Photographer Registry, merge-safe registry exchange, photographer suggestions in the Confirm Event Import modal, one-step Quick Ingest) — [DEC-028](decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md), [AI-FEAT-063](features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md). Q2 has not started. Following milestone unchanged: AI-RM-015.
 
@@ -315,7 +317,7 @@ The `Status` field keeps the word **Completed** only for milestones that reached
 
 | Field | Value |
 |---|---|
-| Status | **Active — PRIORITY 1 (from 2026-11-12).** EQI-0 done. EQI-1 implemented and verified on `feature/event-quick-import-dump` (local, unmerged, unreleased; macOS only), awaiting owner review. EQI-2 to EQI-5 not started. |
+| Status | **Active — PRIORITY 1 (from 2026-11-12).** EQI-0 done. EQI-1 RC Preview `v0.9.18-rc.1` (live-event used); EQI-1.1 RC Preview `v0.9.18-rc.2` (macOS verified; Windows unverified). EQI-2 to EQI-5 not started. *(2026-11-12: EQI-1 implemented and verified, local, unmerged, unreleased.)* |
 | Objective | Menu-bar Event Dump Quick Import into the selected event (`Event/Dump/<Photographer>/`, never PC-sequenced), optional division between events, sorting the Dump through the existing Import Workspace, and safe source-card cleanup — reusing existing services, UI and transactions. |
 | Included AI-FEAT IDs | AI-FEAT-064 |
 | Existing features extended | AI-FEAT-061 (companion), AI-FEAT-047 (multi-event import engine), Event Creator / Event Management, Sort QMZ (entry point only — behaviour unchanged), Delete from Source (EQI-4) |
@@ -324,7 +326,7 @@ The `Status` field keeps the word **Completed** only for milestones that reached
 | Acceptance criteria | The AI-FEAT-064 rules (§2) hold; per stage: unit, isolated live and packaged macOS tests green with the bundled ExifTool; an experimental macOS Preview RC only after EQI-1's safety gate, never a Stable release; no source deletion or photographer renaming silently enabled. |
 | Planned estimate | Evidence pending — not yet documented as fact |
 | Current risks | Live-event use before EQI-3 (Dump stays unsorted until then — by design); the AI-RM-014 Keychain/main-thread risk (a Keychain prompt can stall the app) is unchanged by EQI-1; Windows unverified. |
-| Next action | Owner review at the EQI-1 release gate (report + Preview checklist). Then EQI-2. |
+| Next action | Owner live-event feedback on RC `v0.9.18-rc.2`; then EQI-2 when authorized. *(2026-11-12: owner review at the EQI-1 release gate.)* |
 
 ---
 
