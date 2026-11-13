@@ -338,7 +338,10 @@ const add = (ev, additions, extra = {}) => {
       'services/eventEvidenceReconstruction.js', 'test/companionQ1UiFreeze.test.js', 'test/photographerRegistryQ5c.test.js',
       'test/eventDumpQuickImportEQI1.test.js', 'test/eventDumpQuickImportLive.test.js', 'test/companionQ1Live.test.js', 'test/eventDumpRoundTripRecoveryLive.test.js', 'test/support/eventDumpLiveHelpers.js',
       // EQI-1.1 adaptive companion: popup sizing model, photographer search, and their tests.
-      'services/companionModel.js', 'renderer/companion/photographerMatch.js', 'test/eqiCompanionAdaptiveEQI11.test.js', 'test/eqiCompanionAdaptiveLive.test.js', 'test/fixtures/eqi11-realworld-dump-event.json']);
+      'services/companionModel.js', 'renderer/companion/photographerMatch.js', 'test/eqiCompanionAdaptiveEQI11.test.js', 'test/eqiCompanionAdaptiveLive.test.js', 'test/fixtures/eqi11-realworld-dump-event.json',
+      // EQI-1.2: companion visual hierarchy + camera-based photographer suggestions (read-only peek).
+      // The runtime gains only peekOpenRegistry(): reads an ALREADY-open store, never opens one.
+      'services/photographerLearningRuntime.js', 'services/companionPhotographerSuggestion.js', 'test/eqiCompanionHierarchyEQI12.test.js', 'test/eqiCompanionHierarchyLive.test.js']);
     assert.deepEqual(changed.filter(f => !allowed.has(f)), []);
   });
 

@@ -293,8 +293,9 @@ const mainWin = async (app) => (await windows(app)).find(w => w.page === 'index.
       await page.click(`#xp-picker-list [data-folder="${REAL}"]`);
       await page.click('#xp-picker-use');
       await page.waitForFunction((n) => document.getElementById('xp-event-name').textContent === n, REAL, { timeout: 15000 });
-      const dest = await page.textContent('#xp-dest');
-      check(dest.includes(`${REAL} / Dump / `), `real-world event adopted from the companion; destination "${dest}"`);
+      // EQI-1.2: the visible destination is the short form; the canonical path is under "Full path".
+      const dest = await page.textContent('#xp-dest-full');
+      check(dest.includes(`${COLL} / ${REAL} / Dump / `), 'real-world event adopted from the companion; full destination is the canonical Event/Dump path');
     });
     check((await fsp.readFile(path.join(realDir, 'event.json'))).equals(realBytes), 'real-world event.json byte-identical after listing and adopting it');
     const realFiles = await listFiles(realDump);
