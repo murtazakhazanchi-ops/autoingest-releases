@@ -7,6 +7,15 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-11-13 — AI-FEAT-064 EQI-1.2 visual hierarchy and camera suggestions recorded; RC Preview v0.9.18-rc.3
+
+- **Task type**: feature journal + roadmap status (documentation only, on `docs/roadmap-quick-ingest-priority`; code on `fix/eqi-companion-hierarchy` — `3799164`, `cdeb0ea`)
+- **What changed**: AI-FEAT-064 header (stage state, latest update, evidence, release notes, testing coverage — prior values kept), stage table (new EQI-1.2 row), new § 4b EQI-1.2 implemented behaviour (compact and expanded hierarchy, camera-based suggestion states built on the Q3–Q5 chain, the exact Keychain dependency and `peekOpenRegistry()`), evidence and dated milestones. Roadmap current position, AI-RM-016 status and next action. Registry status text.
+- **Affected feature(s)**: AI-FEAT-064
+- **Affected roadmap milestone(s)**: AI-RM-016
+- **Unresolved gaps**: dashboard (04) not regenerated; Windows not verified; technical docs under `docs/` not updated while unmerged
+- **Evidence confidence**: commits `3799164` + `cdeb0ea`, unit/live/packaged test runs, release workflow run 43473813921 and the downloaded `v0.9.18-rc.3` arm64 artifact
+
 ## 2026-11-13 — AI-FEAT-064 EQI-1.1 adaptive companion recorded; RC Previews v0.9.18-rc.1 and rc.2
 
 - **Task type**: feature journal + roadmap status (documentation only, on `docs/roadmap-quick-ingest-priority`; code on `fix/eqi-companion-adaptive-ui` — `b073e48`, `000f103`)

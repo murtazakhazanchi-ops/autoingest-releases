@@ -1555,6 +1555,8 @@
     "AI-FEAT-064": [
       "test/eqiCompanionAdaptiveEQI11.test.js",
       "test/eqiCompanionAdaptiveLive.test.js",
+      "test/eqiCompanionHierarchyEQI12.test.js",
+      "test/eqiCompanionHierarchyLive.test.js",
       "test/eventDumpQuickImportEQI1.test.js",
       "test/eventDumpQuickImportLive.test.js",
       "test/eventDumpRoundTripRecoveryLive.test.js"
@@ -1834,6 +1836,12 @@
       "AI-FEAT-064"
     ],
     "test/eqiCompanionAdaptiveLive.test.js": [
+      "AI-FEAT-064"
+    ],
+    "test/eqiCompanionHierarchyEQI12.test.js": [
+      "AI-FEAT-064"
+    ],
+    "test/eqiCompanionHierarchyLive.test.js": [
       "AI-FEAT-064"
     ],
     "test/eventDumpQuickImportEQI1.test.js": [

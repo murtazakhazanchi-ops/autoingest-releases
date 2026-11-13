@@ -4051,10 +4051,10 @@
         "evidence_gap_count": 0,
         "narrative": "Rules, stage plan and EQI-1 behaviour recorded; technical docs under `docs/` not updated while unmerged"
       },
-      "evidence_status": "EQI-1.1 commits `b073e48` (app) + `000f103` (tests) on `fix/eqi-companion-adaptive-ui`, published as prerelease `v0.9.18-rc.2` (rc channel) and verified from the downloaded artifacts. macOS verified (unit, isolated live with screenshots, isolated packaged arm64); Windows NOT verified (installer built by CI, untested). Stable unchanged (`v0.9.17` Latest). *(2026-11-12: EQI-1 `ede3fcd`, local, unmerged, unreleased.)*",
+      "evidence_status": "EQI-1.2 commits `3799164` (app) + `cdeb0ea` (tests) on `fix/eqi-companion-hierarchy`, published as prerelease `v0.9.18-rc.3` (run 43473813921) and verified from the downloaded arm64 artifact; macOS verified (unit, isolated live with screenshots in both themes, isolated packaged arm64); Windows NOT verified. Stable unchanged (`v0.9.17` Latest). *(Earlier:* EQI-1.1 commits `b073e48` (app) + `000f103` (tests) on `fix/eqi-companion-adaptive-ui`, published as prerelease `v0.9.18-rc.2` (rc channel) and verified from the downloaded artifacts. macOS verified (unit, isolated live with screenshots, isolated packaged arm64); Windows NOT verified (installer built by CI, untested). Stable unchanged (`v0.9.17` Latest). *2026-11-12: EQI-1 `ede3fcd`, local, unmerged, unreleased.)*",
       "feature_id": "AI-FEAT-064",
       "introduced_version": "Evidence pending",
-      "last_modified_version": "2026-11-13 — EQI-1.1 adaptive companion, RC Preview `v0.9.18-rc.2` *(2026-11-12 — milestone created; EQI-1 implemented)*",
+      "last_modified_version": "2026-11-13 — EQI-1.2 visual hierarchy and camera-aware photographer suggestions, RC Preview `v0.9.18-rc.3` *(2026-11-13 — EQI-1.1 adaptive companion, RC Preview `v0.9.18-rc.2`; 2026-11-12 — milestone created; EQI-1 implemented)*",
       "maturity": "Experimental",
       "name": "Event Quick Import & Dump Sorting",
       "parent_feature": [
@@ -4065,6 +4065,18 @@
       ],
       "related_bugs": [],
       "related_changelog_entries": [
+        {
+          "date": "2026-11-13",
+          "excerpt": "## 2026-11-13 — AI-FEAT-064 EQI-1.2 visual hierarchy and camera suggestions recorded; RC Preview v0.9.18-rc.3"
+        },
+        {
+          "date": "2026-11-13",
+          "excerpt": "**What changed**: AI-FEAT-064 header (stage state, latest update, evidence, release notes, testing coverage — prior values kept), stage table (new EQI-1.2 row), new § 4b EQI-1.2 implemented behaviour "
+        },
+        {
+          "date": "2026-11-13",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-064"
+        },
         {
           "date": "2026-11-13",
           "excerpt": "## 2026-11-13 — AI-FEAT-064 EQI-1.1 adaptive companion recorded; RC Previews v0.9.18-rc.1 and rc.2"
@@ -4104,6 +4116,8 @@
       "related_tests": [
         "test/eqiCompanionAdaptiveEQI11.test.js",
         "test/eqiCompanionAdaptiveLive.test.js",
+        "test/eqiCompanionHierarchyEQI12.test.js",
+        "test/eqiCompanionHierarchyLive.test.js",
         "test/eventDumpQuickImportEQI1.test.js",
         "test/eventDumpQuickImportLive.test.js",
         "test/eventDumpRoundTripRecoveryLive.test.js"

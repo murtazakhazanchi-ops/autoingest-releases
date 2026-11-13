@@ -47,4 +47,4 @@ code_path_to_features only lists paths already explicitly authored in some featu
 ## Coverage
 
 - 110 explicitly-owned code path(s).
-- 36 test file(s) with a discoverable feature owner via Testing coverage citations.
+- 38 test file(s) with a discoverable feature owner via Testing coverage citations.
