@@ -27,7 +27,7 @@ const log = (...a) => console.log('[eqi1-live]', ...a);
 const check = (c, m) => { if (c) log('PASS —', m); else { failures++; log('FAIL —', m); } };
 const J = (x) => JSON.stringify(x);
 const { sleep, localDate, fakeDrive, waitFor, createHelpers, listFiles, noiseJpeg: _noise } = require('./support/eventDumpLiveHelpers');
-const { passSplash, withPopup, dumpView, importViaPopup, setActiveEvent: _setActive } = createHelpers({ projectRoot: PROJECT_ROOT });
+const { passSplash, withPopup, dumpView, importViaPopup, setActiveEvent: _setActive, ...H2 } = createHelpers({ projectRoot: PROJECT_ROOT });
 const noiseJpeg = () => _noise(PROJECT_ROOT);
 const setActiveEvent = (main, archiveRoot, folder) => _setActive(main, path.join(archiveRoot, COLL), COLL, folder);
 
@@ -194,9 +194,8 @@ const setActiveEvent = (main, archiveRoot, folder) => _setActive(main, path.join
     await main.evaluate(async () => { await window.api.setDefaultImportMode('direct-nas'); });
     const before = (await dumpView(app)).global.event;
     await withPopup(app, async (page) => {
-      await page.click('.mode-btn[data-mode="dump"]');
-      await page.waitForSelector('.dump:not([hidden])', { timeout: 10000 });
-      await page.click('.dump-new-event');
+      await H2.enterDump(page);
+      await page.click('#xp-new-event');
     });
     const opened = await main.waitForFunction(() => EventMgmt.isOpen() && EventMgmt.getMode() === 'create', null, { timeout: 15000 }).then(() => true, () => false);
     check(opened, 'Create New Event opens the existing Event Creator form (Event Management in create mode) in the main window');

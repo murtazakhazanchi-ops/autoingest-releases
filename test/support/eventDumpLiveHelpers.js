@@ -51,7 +51,8 @@ function createHelpers({ projectRoot, packaged = false }) {
     await mainRequire(app, '../services/companionService', 'm.showPopup(); return true;');
     const page = await pageP;
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForSelector('.card-row', { timeout: 30000 });
+    // EQI-1.1: the popup may reopen in the expanded view, where the card rows are hidden.
+    await page.waitForSelector('.card-row', { state: 'attached', timeout: 30000 });
     return page;
   }
 
@@ -74,21 +75,46 @@ function createHelpers({ projectRoot, packaged = false }) {
     return { card: src && src.assessment && src.assessment.dump, global: d.snapshot && d.snapshot.dump, assessment: src && src.assessment, popupOpen: d.popupOpen };
   }
 
-  /** Selects Event Dump + photographer in the REAL popup and clicks Import; waits for the outcome. */
+  /** EQI-1.1: from the compact card overview into the expanded Event Dump view (first card). */
+  async function enterDump(page) {
+    if (await page.evaluate(() => document.querySelector('.popup').dataset.view === 'expanded')) return;
+    await page.click('.card-row .event-dump-btn');
+    await page.waitForSelector('#xp:not([hidden])', { timeout: 10000 });
+  }
+
+  /** EQI-1.1: back from the expanded Event Dump view to the compact card overview. */
+  async function backToOverview(page) {
+    if (await page.evaluate(() => document.querySelector('.popup').dataset.view === 'compact')) return;
+    await page.click('#back-btn');
+    await page.waitForFunction(() => document.querySelector('.popup').dataset.view === 'compact', null, { timeout: 10000 });
+  }
+
+  /** Types into the photographer search and chooses the EXACT existing name from the suggestions. */
+  async function pickPhotographer(page, name, query = name) {
+    await page.fill('#xp-ph-input', '');
+    await page.type('#xp-ph-input', query);
+    await page.waitForSelector('#xp-ph-list .combo-item', { timeout: 5000 });
+    const items = await page.$$eval('#xp-ph-list .combo-item', els => els.map(e => e.textContent));
+    const i = items.indexOf(name);
+    if (i < 0) throw new Error(`photographer "${name}" not offered for "${query}" (${items.slice(0, 5).join(' | ')})`);
+    await page.locator('#xp-ph-list .combo-item').nth(i).dispatchEvent('mousedown');
+  }
+
+  /** Event Dump + photographer in the REAL expanded popup, then Import; waits for the outcome. */
   async function importViaPopup(app, photographer, { earlier = false, wait = true } = {}) {
     const label = await withPopup(app, async (page) => {
-      await page.click('.mode-btn[data-mode="dump"]');
-      await page.waitForSelector('.dump:not([hidden])', { timeout: 10000 });
-      await page.waitForFunction((p) => [...document.querySelectorAll('.dump-photographer option')].some(o => o.value === p), photographer, { timeout: 10000 });
-      await page.selectOption('.dump-photographer', photographer);
-      await waitFor(async () => (await dumpView(app)).card?.photographer === photographer, 5000);
-      if (earlier && !(await page.isChecked('.dump-earlier'))) {
-        await page.check('.dump-earlier');
+      await enterDump(page);
+      if ((await dumpView(app)).card?.photographer !== photographer) {
+        await pickPhotographer(page, photographer);
+        await waitFor(async () => (await dumpView(app)).card?.photographer === photographer, 5000);
+      }
+      if (earlier && !(await page.isChecked('#xp-earlier'))) {
+        await page.check('#xp-earlier');
         await waitFor(async () => (await dumpView(app)).card?.includeEarlier === true, 5000);
       }
-      await page.waitForFunction(() => !document.querySelector('.dump-import').disabled, null, { timeout: 10000 });
-      const text = await page.textContent('.dump-import');
-      await page.click('.dump-import');
+      await page.waitForFunction(() => !document.getElementById('xp-import').disabled, null, { timeout: 10000 });
+      const text = await page.textContent('#xp-import');
+      await page.click('#xp-import');
       return text;
     });
     if (!wait) return { op: null, label };
@@ -103,7 +129,7 @@ function createHelpers({ projectRoot, packaged = false }) {
     }, { collDir, coll: collName, folder });
   }
 
-  return { mainRequire, diag, passSplash, openPopup, withPopup, dumpView, importViaPopup, setActiveEvent };
+  return { mainRequire, diag, passSplash, openPopup, withPopup, dumpView, importViaPopup, setActiveEvent, enterDump, backToOverview, pickPhotographer };
 }
 
 const listFiles = async (dir) => {

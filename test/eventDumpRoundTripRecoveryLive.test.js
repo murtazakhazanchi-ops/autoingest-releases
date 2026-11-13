@@ -31,7 +31,7 @@ const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ELECTRON_BIN = require(path.join(PROJECT_ROOT, 'node_modules', 'electron'));
 const COLL = 'CollEQIRT';
 const P1 = 'Testali Bhai', P2 = 'Testhusain Bhai';
-const { mainRequire, passSplash, withPopup, dumpView, importViaPopup, setActiveEvent } = createHelpers({ projectRoot: PROJECT_ROOT });
+const { mainRequire, passSplash, withPopup, dumpView, importViaPopup, setActiveEvent, ...H2 } = createHelpers({ projectRoot: PROJECT_ROOT });
 
 let failures = 0;
 const log = (...a) => console.log('[eqi1-rt]', ...a);
@@ -113,15 +113,13 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
 
     // ═══ A. Event Creator round trip ═══
     await withPopup(app, async (page) => {
-      await page.click('.mode-btn[data-mode="dump"]');
-      await page.waitForSelector('.dump:not([hidden])', { timeout: 10000 });
-      await page.selectOption('.dump-photographer', P1);
+      await H2.enterDump(page);
+      await H2.pickPhotographer(page, P1);
     });
     await waitFor(async () => (await dumpView(app)).card?.photographer === P1, 5000);
     const clickNewEvent = () => withPopup(app, async (page) => {
-      await page.click('.mode-btn[data-mode="dump"]');
-      await page.waitForSelector('.dump:not([hidden])', { timeout: 10000 });
-      await page.click('.dump-new-event');
+      await H2.enterDump(page);
+      await page.click('#xp-new-event');
     });
     await clickNewEvent();
     const formOpen = await main.waitForSelector('#evHijriYear', { timeout: 15000 }).then(() => true, () => false);
@@ -192,24 +190,22 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
     if (await main.evaluate(() => EventMgmt.isOpen())) { await main.click('#emmBackBtn'); await sleep(300); if (await main.evaluate(() => EventMgmt.isOpen())) await main.click('#emmBackBtn'); }
     await waitFor(async () => (await dumpView(app)).popupOpen === true, 8000);
 
-    // choose an EXISTING event from the companion
+    // choose an EXISTING event from the companion's own picker (EQI-1.1: no main-window form)
     await withPopup(app, async (page) => {
-      await page.click('.mode-btn[data-mode="dump"]');
-      await page.waitForSelector('.dump:not([hidden])', { timeout: 10000 });
-      await page.click('.dump-choose-event');
+      await H2.enterDump(page);
+      await page.click('#xp-change-event');
+      await page.waitForSelector(`#xp-picker-list [data-folder="${E0}"]`, { timeout: 15000 });
+      await page.click(`#xp-picker-list [data-folder="${E0}"]`);
+      await page.click('#xp-picker-use');
     });
-    await main.waitForSelector(`.ec-evl-item[data-folder="${E0}"]`, { timeout: 15000 });
-    await main.click(`.ec-evl-item[data-folder="${E0}"]`);
-    await main.waitForFunction(() => !document.getElementById('emmContinueBtn').disabled, null, { timeout: 5000 });
-    await main.click('#emmContinueBtn');
-    await main.waitForFunction(() => !EventMgmt.isOpen(), null, { timeout: 15000 });
+    check(!(await main.evaluate(() => EventMgmt.isOpen())), 'Change Event (no workspace): chosen in the companion — the main-window Event Creator never opens');
     const back3 = await waitFor(async () => { const v = await dumpView(app); return v.popupOpen && v.global?.event?.eventName === E0 ? v : null; }, 10000);
     const v3 = await dumpView(app);
     check(!!back3, `Change event → existing event chosen → companion back with it selected (${J({ popup: v3.popupOpen, ev: v3.global?.event?.eventName, active: await main.evaluate(() => EventCreator.getActiveEventData()?.event?.name || null) })})`);
 
     // change events while an Import workspace is open (Review in AutoIngest → workspace)
     await withPopup(app, async (page) => {
-      await page.click('.mode-btn[data-mode="review"]');
+      await H2.backToOverview(page);
       await page.waitForSelector('.review-selected:not([disabled])', { timeout: 10000 });
       await page.click('.review-selected');
     });
@@ -217,9 +213,11 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
     check(wsOpen, 'Review in AutoIngest opens the card in the Import workspace (Q2 handoff unchanged)');
     await main.evaluate(() => { window.__eqiTiles = tileMap; });
     await withPopup(app, async (page) => {
-      await page.click('.mode-btn[data-mode="dump"]');
-      await page.waitForSelector('.dump:not([hidden])', { timeout: 10000 });
-      await page.click('.dump-choose-event');
+      await H2.enterDump(page);
+      await page.click('#xp-change-event');
+      await page.waitForSelector(`#xp-picker-list [data-folder="${created}"]`, { timeout: 15000 });
+      await page.click(`#xp-picker-list [data-folder="${created}"]`);
+      await page.click('#xp-picker-use');
     });
     await main.waitForSelector(`.ec-evl-item[data-folder="${created}"]`, { timeout: 15000 });
     await main.click(`.ec-evl-item[data-folder="${created}"]`);

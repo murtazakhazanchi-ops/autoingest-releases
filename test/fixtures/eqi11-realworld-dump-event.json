@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "hijriDate": "1448-05-14",
+  "sequence": 1,
+  "eventName": "Urs Mubarak-Majlis-Waaz-Raudat Tahera-Testcity",
+  "components": [
+    {
+      "id": 1,
+      "folderName": "Majlis-Raudat Tahera",
+      "location": "Raudat Tahera",
+      "city": "Testcity",
+      "country": "India",
+      "types": [
+        "Majlis"
+      ],
+      "additionalKeywords": []
+    },
+    {
+      "id": 2,
+      "folderName": "Waaz-Raudat Tahera",
+      "location": "Raudat Tahera",
+      "city": "Testcity",
+      "country": "India",
+      "types": [
+        "Waaz"
+      ],
+      "additionalKeywords": []
+    }
+  ],
+  "status": "complete",
+  "imports": [
+    {
+      "id": "fixture-eqi11-1",
+      "seq": 1,
+      "timestamp": "2026-11-12T16:40:11.000Z",
+      "photographer": "Testmurtaza Fixture",
+      "componentIndex": 0,
+      "componentName": "Dump",
+      "counts": {
+        "photos": 88,
+        "videos": 1
+      },
+      "source": {
+        "type": "memory-card",
+        "label": "EOS_DIGITAL",
+        "path": ""
+      },
+      "importedBy": {
+        "name": "EQI Operator",
+        "role": "QA"
+      },
+      "destination": "dump"
+    }
+  ],
+  "lastMetadataRun": {
+    "timestamp": "2026-11-12T16:41:30.000Z",
+    "status": "applied",
+    "processed": 89,
+    "failed": 0,
+    "skipped": 0,
+    "partial": 0,
+    "ambiguous": 0,
+    "metadataVersion": 1
+  },
+  "metadataSummary": [
+    {
+      "tag": "No component tag",
+      "fileCount": 89
+    }
+  ],
+  "metadataState": {
+    "counts": {
+      "complete": 89,
+      "failed": 0,
+      "pending": 0
+    },
+    "state": "complete",
+    "updatedAt": "2026-11-12T16:41:31.000Z"
+  }
+}

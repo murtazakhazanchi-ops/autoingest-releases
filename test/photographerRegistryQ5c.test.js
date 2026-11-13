@@ -364,7 +364,7 @@ function assertClean(payload, fx, label) {
     // EQI-1 re-import guard: a Dump import copies only the jobs not already in its Dump folder.
     '-      result = await importFileJobs(event, fileJobs, _teamImportProgress);',
   ];
-  const EQI1_PRELOAD_MEMBERS = ['onCompanionDumpImport', 'onCompanionOpenEventPicker', 'companionWorkspaceEvent'];
+  const EQI1_PRELOAD_MEMBERS = ['onCompanionDumpImport', 'onCompanionOpenEventPicker', 'companionWorkspaceEvent', 'onCompanionSelectEvent', 'companionRequestAttention'];
   await t('main.js / preload.js change since Q5b is additions only, confined to the Q5c block', async () => {
     let base;
     try { base = execFileSync('git', ['rev-parse', '--verify', 'aa58eb1^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { console.log('    (Q5b commit not available — skipped)'); return; }
@@ -416,7 +416,9 @@ function assertClean(payload, fx, label) {
       'services/eventDumpCompanion.js', 'services/eventDumpPaths.js', 'services/companionService.js', 'services/workspaceHandoff.js', 'services/eventEvidenceReconstruction.js',
       'main/companionPreload.js', 'renderer/eventDumpImport.js', 'renderer/importRouter.js', 'renderer/importSessionUI.js',
       'renderer/companion/companion.html', 'renderer/companion/companion.js', 'renderer/companion/companion.css',
-      'test/eventDumpQuickImportEQI1.test.js', 'test/eventDumpQuickImportLive.test.js', 'test/companionQ1Live.test.js', 'test/eventDumpRoundTripRecoveryLive.test.js', 'test/support/eventDumpLiveHelpers.js', 'test/eventPhotographerFoldersQ5e2a.test.js',
+      'test/eventDumpQuickImportEQI1.test.js', 'test/eventDumpQuickImportLive.test.js', 'test/companionQ1Live.test.js', 'test/eventDumpRoundTripRecoveryLive.test.js', 'test/support/eventDumpLiveHelpers.js',
+      // EQI-1.1 adaptive companion: popup sizing model, photographer search, and their tests.
+      'services/companionModel.js', 'renderer/companion/photographerMatch.js', 'test/eqiCompanionAdaptiveEQI11.test.js', 'test/eqiCompanionAdaptiveLive.test.js', 'test/fixtures/eqi11-realworld-dump-event.json', 'test/eventPhotographerFoldersQ5e2a.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });

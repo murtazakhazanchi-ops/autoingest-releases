@@ -336,7 +336,9 @@ const add = (ev, additions, extra = {}) => {
       'renderer/importRouter.js', 'renderer/importSessionUI.js', 'renderer/companion/companion.html', 'renderer/companion/companion.js',
       'renderer/companion/companion.css', 'services/eventDumpCompanion.js', 'services/eventDumpPaths.js', 'services/companionService.js', 'services/workspaceHandoff.js',
       'services/eventEvidenceReconstruction.js', 'test/companionQ1UiFreeze.test.js', 'test/photographerRegistryQ5c.test.js',
-      'test/eventDumpQuickImportEQI1.test.js', 'test/eventDumpQuickImportLive.test.js', 'test/companionQ1Live.test.js', 'test/eventDumpRoundTripRecoveryLive.test.js', 'test/support/eventDumpLiveHelpers.js']);
+      'test/eventDumpQuickImportEQI1.test.js', 'test/eventDumpQuickImportLive.test.js', 'test/companionQ1Live.test.js', 'test/eventDumpRoundTripRecoveryLive.test.js', 'test/support/eventDumpLiveHelpers.js',
+      // EQI-1.1 adaptive companion: popup sizing model, photographer search, and their tests.
+      'services/companionModel.js', 'renderer/companion/photographerMatch.js', 'test/eqiCompanionAdaptiveEQI11.test.js', 'test/eqiCompanionAdaptiveLive.test.js', 'test/fixtures/eqi11-realworld-dump-event.json']);
     assert.deepEqual(changed.filter(f => !allowed.has(f)), []);
   });
 
