@@ -34,16 +34,19 @@ const records = resolvePairs([
 function harness(over = {}) {
   const sent = [];
   let finish = null;
-  const handoff = {
-    _active: null,
-    getActive() { return this._active; },
-    request(kind, o) {
-      if (this._active) return { started: false, done: Promise.resolve({ state: 'refused', reason: 'busy' }) };
-      this._active = { kind };
-      const msg = o.payload(41);
-      sent.push({ kind, channel: o.channel, foreground: o.foreground, msg });
-      const done = new Promise(r => { finish = (res) => { this._active = null; r(res); }; });
-      return { started: true, done };
+  // EQI-2.1: the plan runs in the main process (companionImportService) — a fake service here.
+  let running = null, svcView = null;
+  const importService = {
+    isRunning: () => !!running,
+    runningSourceId: () => (running ? running.sourceId : null),
+    view: () => svcView,
+    forget: () => {},
+    run(plan) {
+      running = plan;
+      sent.push(plan);
+      svcView = { kind: plan.kind, state: 'pending', startedAt: Date.now(), finishedAt: null,
+        events: plan.batches.map(b => ({ eventId: b.eventId, photographer: b.photographer, status: 'waiting', bytes: { copied: 0, skipped: 0, failed: 0 }, metadata: null })) };
+      return new Promise(r => { finish = (res, events) => { running = null; svcView = { ...svcView, state: res.state, finishedAt: Date.now(), events: events || svcView.events }; r(res); }; });
     },
   };
   let active = { eventPath: `${COLL}/${EA}`, collectionName: 'Coll', pendingSync: false, localFirst: false };
@@ -53,7 +56,7 @@ function harness(over = {}) {
   const job = { state: 'complete', datesReady: true, records, cameras: null };
   const scan = [EA, EB, EC].map(f => ({ folderName: f, isFromJson: true, isCorrupt: false }));
   const deps = {
-    handoff,
+    importService,
     getCard: (id) => (id === 'src-1' ? { mountpoint: '/Volumes/CARD', label: 'EOS_DIGITAL' } : null),
     peekJob: () => job,
     verifyJob: async () => job,
@@ -74,7 +77,7 @@ function harness(over = {}) {
     ...over,
   };
   const c = createDivideController(deps);
-  return { c, sent, finish: (r) => finish(r), journal, pushes, job, scan,
+  return { c, sent, finish: (r, e) => finish(r, e), journal, pushes, job, scan,
     setActive: (a) => { active = a; }, setPhotographer: (p) => { photographer = p; } };
 }
 const cmd = (c, name, args = {}) => c.command({ sourceId: 'src-1', cmd: name, ...args });
@@ -188,46 +191,37 @@ const setup = async (h) => {
     assert.equal(h.c.view('src-1').notice, 'new-event-other-collection');
   });
 
-  await t('one plan: a batch per (event, photographer), event paths inside the collection, every file once, Dump only', async () => {
+  await t('one plan: a batch per (event, photographer), event paths inside the collection, every file once with its size, Dump only — run in main (EQI-2.1)', async () => {
     const h = harness();
     await setup(h);
     const p = h.c.startImport({ sourceId: 'src-1' });
     await new Promise(r => setTimeout(r, 0));
     assert.equal(h.sent.length, 1);
-    const { kind, channel, foreground, msg } = h.sent[0];
-    assert.deepEqual([kind, channel, foreground], ['dump-plan', 'companion:dumpPlanImport', false]);
-    assert.equal(msg.collectionPath, COLL);
-    assert.deepEqual(msg.batches.map(b => [b.folderName, b.eventPath, b.photographer, b.files.length]),
+    const plan = h.sent[0];
+    assert.deepEqual([plan.kind, plan.sourceId, plan.collectionName, plan.localFirstEvent], ['multi', 'src-1', 'Coll', false]);
+    assert.deepEqual(plan.source, { label: 'EOS_DIGITAL', path: '/Volumes/CARD' });
+    assert.deepEqual(plan.batches.map(b => [b.eventId, b.eventPath, b.photographer, b.files.length]),
       [[EA, path.join(COLL, EA), 'Ali Bhai', 3], [EB, path.join(COLL, EB), 'Ali Bhai', 2]]);
-    const all = msg.batches.flatMap(b => b.files);
+    const all = plan.batches.flatMap(b => b.files.map(f => f.path));
     assert.equal(new Set(all).size, all.length);
+    assert.ok(plan.batches.every(b => b.files.every(f => f.size === records.find(r => r.path === f.path).size)), 'planned with the assessed sizes');
     assert.ok(!all.some(f => f.endsWith('IMG_0003.JPG')), 'unassigned photo is not in the plan');
-    assert.equal(h.c.view('src-1').op.state, 'pending');
+    assert.equal(h.c.view('src-1').op.state, 'pending', 'the service progress is the division op');
     assert.equal((await cmd(h.c, 'addRange')).reason, 'busy', 'no edits while the plan runs');
-    // per-event progress, then the flat result
-    h.c.onPlanEvent({ requestId: 41, phase: 'start', index: 0 });
-    h.c.onPlanEvent({ requestId: 41, phase: 'end', index: 0, status: 'completed', copied: 3, skipped: 0, errors: 0 });
-    h.c.onPlanEvent({ requestId: 99, phase: 'start', index: 1 });
-    assert.equal(h.c.view('src-1').op.events[1].status, 'waiting', 'progress from another request is ignored');
-    h.finish({ state: 'completed', reason: null, result: { ok: true, events: 2,
-      e0_status: 'completed', e0_copied: 3, e0_skipped: 0, e0_errors: 0, e0_batch: 'b-1', e0_error: null,
-      e1_status: 'failed', e1_copied: 0, e1_skipped: 0, e1_errors: 0, e1_batch: null, e1_error: 'Archive folder busy' } });
+    h.finish({ state: 'partial' }, [{ eventId: EA, photographer: 'Ali Bhai', status: 'completed', bytes: { copied: 3, skipped: 0, failed: 0 }, metadata: { state: 'complete' } },
+      { eventId: EB, photographer: 'Ali Bhai', status: 'failed', error: 'Archive folder busy', bytes: { copied: 0, skipped: 0, failed: 0 }, metadata: null }]);
     const out = await p;
     assert.equal(out.state, 'partial', 'never reported as fully completed when one event failed');
     const op = h.c.view('src-1').op;
-    assert.deepEqual(op.events.map(e => [e.eventId, e.status, e.copied]), [[EA, 'completed', 3], [EB, 'failed', 0]]);
-    assert.equal(op.events[1].error, 'Archive folder busy');
-    assert.deepEqual(op.events[0].metadata, { state: 'writing' });
-    h.c.onMetadataBatch({ event: 'batch_complete', batchId: 'b-1', failed: 0, partial: 0 });
-    assert.equal(h.c.view('src-1').op.events[0].metadata.state, 'complete');
+    assert.deepEqual(op.events.map(e => [e.eventId, e.status]), [[EA, 'completed'], [EB, 'failed']]);
     // durable record: started + outcome, names and sizes only
     assert.equal(h.journal.length, 2);
     assert.equal(h.journal[0].state, 'started');
     assert.deepEqual(h.journal[0].batches.map(b => [b.event, b.photographer, b.files.length]), [[EA, 'Ali Bhai', 3], [EB, 'Ali Bhai', 2]]);
     assert.equal(JSON.stringify(h.journal).includes('/Volumes'), false);
     assert.equal(h.journal[1].state, 'partial');
-    // ranges stay for the retry
-    assert.equal(h.c.view('src-1').ranges.length, 2);
+    assert.equal(h.c.view('src-1').ranges.length, 2, 'ranges stay for the retry');
+    assert.equal(h.c.view('src-1').review.totalBytes > 0, true, 'EQI-2.1: the review carries the transfer size');
   });
 
   await t('pre-flight refusals: photographer, archive, missing event, changed source, removed card', async () => {

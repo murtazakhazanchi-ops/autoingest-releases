@@ -152,28 +152,34 @@ async function verifyFile(srcPath, destPath, srcSize) {
  * @param {string} destDir
  * @param {string} filename
  * @param {number} sourceSize  bytes of the source file
+ * @param {Set<string>|null} [reserved]  destinations already claimed by in-flight copies (treated as taken)
  * @returns {Promise<{ action: 'copy'|'rename'|'skip', destPath: string|null, reason: string|null }>}
  */
-async function resolveDestPath(destDir, filename, sourceSize) {
+async function resolveDestPath(destDir, filename, sourceSize, reserved = null) {
   const ext       = path.extname(filename);
   const base      = path.basename(filename, ext);
   const candidate = path.join(destDir, filename);
+  const isReserved = (p) => !!(reserved && reserved.has(p));
 
-  try {
-    const st = await fsp.stat(candidate);
-    if (st.isFile() && st.size === sourceSize) {
-      return { action: 'skip', destPath: null, reason: 'already exists (same size)' };
+  // a name another in-flight copy of this run has claimed is taken, whatever is on disk yet
+  if (!isReserved(candidate)) {
+    try {
+      const st = await fsp.stat(candidate);
+      if (st.isFile() && st.size === sourceSize) {
+        return { action: 'skip', destPath: null, reason: 'already exists (same size)' };
+      }
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        return { action: 'copy', destPath: candidate, reason: null };
+      }
+      throw err;
     }
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      return { action: 'copy', destPath: candidate, reason: null };
-    }
-    throw err;
   }
 
   const MAX_RENAME_ATTEMPTS = 9999;
   for (let n = 1; n <= MAX_RENAME_ATTEMPTS; n++) {
     const numbered = path.join(destDir, `${base}_${n}${ext}`);
+    if (isReserved(numbered)) continue;
     try {
       const st = await fsp.stat(numbered);
       if (st.isFile() && st.size === sourceSize) {
@@ -187,6 +193,42 @@ async function resolveDestPath(destDir, filename, sourceSize) {
     }
   }
   throw new Error(`Could not find free rename slot for ${filename} after ${MAX_RENAME_ATTEMPTS} attempts`);
+}
+
+// ── Crash-safe destination writes (EQI-2.1) ───────────────────────────────────
+//
+// A copy is written to a hidden sibling "<name>.aiimport-partial" and renamed to its final name only
+// after verification. A crash (or power loss, or card removal) mid-copy therefore never leaves a
+// truncated file under the photo's real name — which a later import would see as a name conflict
+// and import again as "<name>_1", keeping the broken file in the archive. A stale partial of the
+// same name (from such a crash) is removed before copying again.
+
+const PARTIAL_SUFFIX = '.aiimport-partial';
+const partialPathOf = (destPath) => destPath + PARTIAL_SUFFIX;
+
+// While a copy is in flight its file exists only as the partial, so the final name looks free on disk.
+// Every destination a run is writing is therefore claimed in `reserved` (no await between the check
+// and the claim), so two files of the same name in one import get "<name>" and "<name>_1" — never
+// the same name twice.
+async function claimDestPath(destDir, filename, sourceSize, reserved) {
+  for (;;) {
+    const resolved = await resolveDestPath(destDir, filename, sourceSize, reserved);
+    if (resolved.action === 'skip') return resolved;
+    if (!reserved.has(resolved.destPath)) { reserved.add(resolved.destPath); return resolved; }
+  }
+}
+
+/** Final step of a verified copy: the partial becomes the photo — never over an existing file. */
+async function commitPartial(destPath) {
+  try {
+    await fsp.access(destPath);
+    const e = new Error(`Destination appeared during the copy: ${path.basename(destPath)}`);
+    e.code = 'EEXIST';
+    throw e;
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+  await fsp.rename(partialPathOf(destPath), destPath);
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -211,6 +253,7 @@ async function copyFiles(filePaths, destination, onProgress) {
   isAborted = false; // always start fresh
 
   const total = filePaths.length;
+  const reserved = new Set();   // destinations claimed by this run's in-flight copies
   if (total === 0) {
     return { copied: 0, skipped: 0, errors: 0, skippedReasons: [], failedFiles: [], duration: 0 };
   }
@@ -320,7 +363,7 @@ async function copyFiles(filePaths, destination, onProgress) {
     // ── Resolve destination path (handles rename for size-conflict) — Patch 2 ─────
     let resolved;
     try {
-      resolved = await resolveDestPath(destination, filename, fileSize);
+      resolved = await claimDestPath(destination, filename, fileSize, reserved);
     } catch (err) {
       errors++;
       completedCount++;
@@ -349,7 +392,8 @@ async function copyFiles(filePaths, destination, onProgress) {
       try {
         // Measure raw copy time (excludes pause, stat overhead)
         const copyStart = Date.now();
-        await fsp.copyFile(srcPath, resolved.destPath);
+        await fsp.unlink(partialPathOf(resolved.destPath)).catch(() => {});
+        await fsp.copyFile(srcPath, partialPathOf(resolved.destPath));
         const copyDuration = (Date.now() - copyStart) / 1000;
 
         // Feed speed sampler (ignore sub-ms copies — tiny files give noisy data)
@@ -361,7 +405,8 @@ async function copyFiles(filePaths, destination, onProgress) {
         }
 
         // Mandatory size verification (+ optional checksum)
-        await verifyFile(srcPath, resolved.destPath, fileSize);
+        await verifyFile(srcPath, partialPathOf(resolved.destPath), fileSize);
+        await commitPartial(resolved.destPath);
 
         // ── Success ──────────────────────────────────────────────────────────────
         copied++;
@@ -383,8 +428,8 @@ async function copyFiles(filePaths, destination, onProgress) {
 
       } catch (err) {
         lastError = err;
-        // Remove partial or corrupted dest file before retrying
-        try { await fsp.unlink(resolved.destPath); } catch { /* already gone */ }
+        // Remove the partial copy before retrying (the final name is only ever a verified file)
+        try { await fsp.unlink(partialPathOf(resolved.destPath)); } catch { /* already gone */ }
         // On last attempt, fall through to failure handling below
       }
     }
@@ -456,7 +501,14 @@ async function copyFiles(filePaths, destination, onProgress) {
  *     event-import flow is in place and resumability can be tested end-to-end).
  *   • pause / abort state is shared with copyFiles (one operation at a time).
  */
-async function copyFileJobs(fileJobs, onProgress) {
+/**
+ * @param {Array<{src:string,dest:string}>} fileJobs
+ * @param {Function} onProgress  per-file progress (see above)
+ * @param {{ onCopyStart?: (c: {src:string,dest:string,size:number}) => void, onCopyEnd?: (c: {src:string,dest:string}) => void }} [hooks]
+ *        EQI-2.1 byte instrumentation (optional): the resolved destination and size of every copy
+ *        attempt while it runs, so an observer can measure in-flight bytes without rereading data.
+ */
+async function copyFileJobs(fileJobs, onProgress, hooks = null) {
   if (!Array.isArray(fileJobs) || fileJobs.length === 0) {
     return { copied: 0, skipped: 0, errors: 0, skippedReasons: [], failedFiles: [], copiedFiles: [], skippedFiles: [], duration: 0 };
   }
@@ -466,6 +518,7 @@ async function copyFileJobs(fileJobs, onProgress) {
 
   const total   = fileJobs.length;
   const startTime = Date.now();
+  const reserved  = new Set();   // destinations claimed by this run's in-flight copies
 
   // ── Pre-flight ──────────────────────────────────────────────────────────────
   const avgFileSize = await estimateAvgSize(fileJobs.map(j => j.src));
@@ -564,7 +617,7 @@ async function copyFileJobs(fileJobs, onProgress) {
     // ── Resolve destination (skip / copy / rename) ─────────────────────────────
     let resolved;
     try {
-      resolved = await resolveDestPath(destDir, filename, fileSize);
+      resolved = await claimDestPath(destDir, filename, fileSize, reserved);
     } catch (err) {
       errors++;
       completedCount++;
@@ -593,7 +646,14 @@ async function copyFileJobs(fileJobs, onProgress) {
       if (isAborted) return;
       try {
         const copyStart    = Date.now();
-        await fsp.copyFile(job.src, resolved.destPath);
+        const _attempt = { src: job.src, dest: partialPathOf(resolved.destPath), size: fileSize };
+        await fsp.unlink(_attempt.dest).catch(() => {});
+        if (hooks && hooks.onCopyStart) { try { hooks.onCopyStart(_attempt); } catch { /* observer only */ } }
+        try {
+          await fsp.copyFile(job.src, _attempt.dest);
+        } finally {
+          if (hooks && hooks.onCopyEnd) { try { hooks.onCopyEnd(_attempt); } catch { /* observer only */ } }
+        }
         const copyDuration = (Date.now() - copyStart) / 1000;
 
         if (copyDuration > 0.001) {
@@ -603,7 +663,8 @@ async function copyFileJobs(fileJobs, onProgress) {
           adjustConcurrency();
         }
 
-        await verifyFile(job.src, resolved.destPath, fileSize);
+        await verifyFile(job.src, _attempt.dest, fileSize);
+        await commitPartial(resolved.destPath);
 
         // ── Success ──────────────────────────────────────────────────────────────
         copied++;
@@ -624,7 +685,9 @@ async function copyFileJobs(fileJobs, onProgress) {
 
       } catch (err) {
         lastError = err;
-        try { await fsp.unlink(resolved.destPath); } catch { /* already gone */ }
+        // Only the partial is ever removed — never a file at the final name (another file may own it).
+        try { await fsp.unlink(partialPathOf(resolved.destPath)); } catch { /* already gone */ }
+        if (err && err.code === 'EEXIST') break;
       }
     }
 
@@ -663,4 +726,5 @@ async function copyFileJobs(fileJobs, onProgress) {
   });
 }
 
-module.exports = { copyFiles, copyFileJobs, resolveDestPath, setPaused, getFileHash, abortCopy };
+module.exports = {
+  PARTIAL_SUFFIX, copyFiles, copyFileJobs, resolveDestPath, setPaused, getFileHash, abortCopy };

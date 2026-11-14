@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld('companion', {
   divideThumbs:    (sourceId, ids) => ipcRenderer.invoke('companion:divideThumbs', { sourceId, ids }),
   divideReview:    (sourceId) => ipcRenderer.invoke('companion:divideReview', { sourceId }),
   divideImport:    (sourceId) => ipcRenderer.invoke('companion:divideImport', { sourceId }),
+  // EQI-2.1 — the operator's answer to an import decision (busy archive folder): 'recheck' | 'clear' | 'cancel'
+  importDecision:  (sourceId, choice) => ipcRenderer.invoke('companion:importDecision', { sourceId, choice }),
   /** @param {(snapshot: object) => void} cb @returns {() => void} unsubscribe */
   onSnapshot: (cb) => {
     const listener = (_e, snapshot) => cb(snapshot);

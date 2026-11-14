@@ -367,6 +367,39 @@ function _handleTracked(channel, kind, handler) {
   ipcMain.handle(channel, operatorActivity.wrap(kind, handler));
 }
 
+/**
+ * EQI-2.1: the companion's destination event, resolved from disk — { eventPath, eventName,
+ * collectionName, componentCount, pendingSync, localFirst, types, places }, or null. The event is a
+ * managed event (a readable event.json). An event that exists only in Local Staging (the archive
+ * copy unavailable) is pending sync and imports Local First — the main window's own rule.
+ * @param {{ eventPath?: string, collectionPath?: string, collectionName?: string, folderName?: string,
+ *           eventName?: string, safeEventName?: string, pendingSync?: boolean, localFirst?: boolean }} ref
+ */
+async function _resolveCompanionEvent(ref) {
+  if (!ref || typeof ref !== 'object') return null;
+  const { componentsFromEventJson, labelsOf } = require('../services/eventComponents');
+  const folder = ref.folderName || ref.safeEventName || ref.eventName || (ref.eventPath ? path.basename(ref.eventPath) : null);
+  const collPath = ref.collectionPath || (ref.eventPath ? path.dirname(ref.eventPath) : null);
+  if (!folder || !collPath || /[\/]/.test(folder) || folder === '.' || folder === '..') return null;
+  const collName = ref.collectionName || path.basename(collPath);
+  const staging = settings.getLocalStagingRoot();
+  const candidates = [path.join(collPath, folder)];
+  if (staging) candidates.push(path.join(staging, collName, folder));
+  for (const eventPath of candidates) {
+    let json = null;
+    try { json = await _readEventJson(eventPath); } catch { json = null; }
+    const comps = componentsFromEventJson(json);
+    if (!comps) continue;
+    const inStaging = !!staging && path.resolve(eventPath).startsWith(path.resolve(staging) + path.sep);
+    return {
+      eventPath, eventName: folder, collectionName: collName, componentCount: comps.length,
+      pendingSync: ref.pendingSync === true || inStaging, localFirst: ref.localFirst === true,
+      ...labelsOf(comps),
+    };
+  }
+  return null;
+}
+
 // Menu-bar (macOS) / system-tray (Windows) companion — AI-FEAT-061. Opt out with
 // "companionEnabled": false in settings.json, or AUTOINGEST_DISABLE_COMPANION=1.
 function _startCompanion() {
@@ -392,6 +425,22 @@ function _startCompanion() {
       // durable record of each division plan in this profile.
       archiveStatus: () => _archiveOperationsStatus(),
       journalDir: path.join(app.getPath('userData'), 'event-dump-plans'),
+      // EQI-2.1: Event Dump imports run here, in the main process — no main window needed.
+      importDeps: {
+        commit: (params, hooks) => _commitImportTransaction({ sender: null }, params, hooks),
+        readEventJson: (p) => _readEventJson(p).catch(() => null),
+        ensureLocalMirror: (params) => localMirrorService.ensureLocalMirror(params),
+        updateEventJson: (p, patch) => updateEventJson(p, patch),
+        checkLocks: (args) => _checkDirectArchiveLocks(args),
+        clearSelfStaleLock: (args) => _clearSelfStaleLock(args),
+        // The workspace refreshed the queue after its own appends; with no window, main does it.
+        appendSyncJob: async (args) => { const r = await _appendSyncJob(args); syncQueueService.refreshQueue().catch(() => {}); return r; },
+        activeUser: () => { try { return userManager.getActiveUser(); } catch { return null; } },
+        resolveEvent: (ref) => _resolveCompanionEvent(ref),
+        persistLastEvent: (ev) => settings.setLastEvent({ collectionPath: path.dirname(ev.eventPath), collectionName: ev.collectionName,
+          eventName: ev.eventName, safeEventName: path.basename(ev.eventPath) }),
+        lastEvent: () => settings.getLastEvent(),
+      },
     });
   } catch (err) {
     log(`[main] companion failed to start: ${err.message}`);
@@ -452,7 +501,18 @@ app.on('will-quit', () => {
 // this guard blocks the FIRST before-quit just long enough to let it finish,
 // then re-issues quit() so app exit proceeds normally.
 let _mxControlShutdownDone = false;
+let _companionQuitConfirmed = false;
 app.on('before-quit', (event) => {
+  // EQI-2.1: a menu-bar import may run with no window at all — confirm before stopping it.
+  if (!_companionQuitConfirmed && companionService.isImportRunning()) {
+    const choice = dialog.showMessageBoxSync({
+      type: 'warning', buttons: ['Keep Importing', 'Quit Anyway'], defaultId: 0, cancelId: 0,
+      message: 'An import is still running',
+      detail: 'Quitting now stops the import. Every file already copied and verified is kept; import the card again later to finish the rest.',
+    });
+    if (choice === 0) { event.preventDefault(); return; }
+    _companionQuitConfirmed = true;
+  }
   if (_mxControlShutdownDone) return;
   event.preventDefault();
   mxControlService.shutdown()
@@ -801,7 +861,7 @@ async function _resolveSeqPhotographerFolders(jobs) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function importFileJobs(event, fileJobs, onTeamProgress = null) {
+async function importFileJobs(event, fileJobs, onTeamProgress = null, hooks = null) {
   if (!Array.isArray(fileJobs) || fileJobs.length === 0) {
     return { copied: 0, skipped: 0, errors: 0, skippedReasons: [], failedFiles: [], duration: 0, integrity: 'verified' };
   }
@@ -828,10 +888,12 @@ async function importFileJobs(event, fileJobs, onTeamProgress = null) {
   let result;
   try {
     result = await copyFileJobs(resolvedJobs, (progress) => {
-      if (!event.sender.isDestroyed()) {
+      // EQI-2.1: a companion import has no renderer sender (no main window needed).
+      if (event && event.sender && !event.sender.isDestroyed()) {
         event.sender.send('import:progress', progress);
       }
-      companionService.notifyImportProgress(progress);   // EQI-1: only shown while a Dump import runs
+      if (hooks && hooks.onProgress) { try { hooks.onProgress(progress); } catch { /* observer only */ } }
+      companionService.notifyImportProgress(progress);   // observation point (no-op in the companion)
       if (progress.status === 'done' || progress.status === 'renamed') {
         bytesCopiedSoFar += progress.fileSize || 0;
         fileIndex++;
@@ -840,7 +902,7 @@ async function importFileJobs(event, fileJobs, onTeamProgress = null) {
         }
         if (onTeamProgress) onTeamProgress(progress.completedCount, progress.total);
       }
-    });
+    }, hooks);
   } catch (err) {
     // mkdir pre-flight failure (e.g. disk full, permission denied)
     log(`Import (jobs) mkdir failed: ${err.message}`);
@@ -1142,7 +1204,21 @@ async function _verifyTransferBatch(mainArchiveRoot, batchId) {
   }
 }
 
-_handleTracked('import:commitTransaction', 'import', async (event, {
+_handleTracked('import:commitTransaction', 'import', (event, params) => {
+  // EQI-2.1: one copy at a time — the copy engine's pause/abort state is shared.
+  if (companionService.isImportRunning()) throw new Error('A menu-bar import is running. Try again when it finishes.');
+  return _commitImportTransaction(event, params);
+});
+
+/**
+ * The import transaction (copy + verify, locks, atomic event.json commit, import index, metadata
+ * batch). Shared by the main window (import:commitTransaction) and, since EQI-2.1, the menu-bar
+ * companion's Event Dump imports (companionImportService) — one engine, two callers. `event` is the
+ * IPC event, or { sender: null } for a companion import (no renderer is needed or used).
+ * @param {object} [hooks]  EQI-2.1 instrumentation: onProgress(copyProgress), onCopyStart/onCopyEnd
+ *        (byte progress), onMetadata(progress) — observers only, never change the transaction.
+ */
+async function _commitImportTransaction(event, {
   fileJobs,
   eventJsonPath,
   groups,
@@ -1161,7 +1237,7 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
   destination = null,         // 'dump' (EQI-1 Event Dump import) | null — every job then targets Event/Dump/<photographer>/
   archiveEventPath = null,    // EQI-2 Local First Dump only: the archive event folder, read (never written) by the
                               // re-import guard when the staging copy was cleared after an earlier sync
-}) => {
+} = {}, hooks = null) {
   let originalEventJson = null;
   if (destination !== null && destination !== 'dump') throw new Error(`Unknown import destination: ${destination}`);
   if (destination === 'dump') {
@@ -1303,7 +1379,7 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
     let result;
     try {
       result = _jobsToCopy.length > 0
-        ? await importFileJobs(event, _jobsToCopy, _teamImportProgress)
+        ? await importFileJobs(event, _jobsToCopy, _teamImportProgress, hooks)
         : { copied: 0, skipped: 0, errors: 0, skippedReasons: [], failedFiles: [], copiedFiles: [], skippedFiles: [], duration: 0, wasAborted: false };
       if (_alreadyInDump.length) {
         result.skipped = (result.skipped || 0) + _alreadyInDump.length;
@@ -1490,14 +1566,15 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
           }
         : null;
 
-      // emitFn is non-null when a window is open OR when locks need deferred release.
+      // EQI-2.1: emitFn is always present. It used to exist only when a window was open or locks
+      // needed deferred release, so a windowless import never recorded lastMetadataRun / metadata
+      // state or told the companion — the menu-bar companion now imports with no window at all.
       // For direct-nas: release archive locks at batch_complete — all file writes are done.
-      const emitFn = (baseEmit || _willWriteNasMetadata)
-        ? async (p) => {
+      const emitFn = async (p) => {
+            if (hooks && hooks.onMetadata) { try { hooks.onMetadata(p); } catch { /* observer only */ } }
             if (_willWriteNasMetadata && p.event === 'batch_complete') {
               _releaseDirectNasLocks(_directNasLocks);
             }
-            if (p.event === 'batch_complete') companionService.notifyMetadataBatch(p);   // EQI-1 Dump outcome
             if (p.event === 'batch_complete' && eventJsonPath) {
               try {
                 await _writeLastMetadataRun(path.join(eventJsonPath, 'event.json'), p, metaContext.groups);
@@ -1507,8 +1584,7 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
               await _persistMetadataStateAndCompact(p.batchId, path.join(eventJsonPath, 'event.json'));
             }
             if (baseEmit) baseEmit(p);
-          }
-        : null;
+          };
 
       exifService.applyBatch(batchId, result.copiedFiles, metaContext, emitFn);
       result.metadataBatchId = batchId;
@@ -1584,7 +1660,7 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
     }
     throw err;
   }
-});
+}
 
 /**
  * thumb:get — returns thumbnail URL; logs failures without throwing.
@@ -2428,7 +2504,10 @@ ipcMain.handle('event:publishRegistry', async (_event, { eventFolderPath, collec
 });
 
 // Read event.json from a folder. Returns a valid parsed object or null.
-ipcMain.handle('event:read', async (_event, eventFolderPath) => {
+ipcMain.handle('event:read', async (_event, eventFolderPath) => _readEventJson(eventFolderPath));
+
+/** event.json, read → normalized → validated (shared by event:read and the companion, EQI-2.1). */
+async function _readEventJson(eventFolderPath) {
   if (!eventFolderPath || typeof eventFolderPath !== 'string') return null;
 
   const jsonPath = path.join(eventFolderPath, 'event.json');
@@ -2463,7 +2542,7 @@ ipcMain.handle('event:read', async (_event, eventFolderPath) => {
     console.error('[MAIN VALIDATION FAILED] parse error:', err.message);
     throw err;
   }
-});
+}
 
 // Atomically write event.json. Detects full vs. partial payload:
 // - Full (has hijriDate + sequence + components): writes the complete canonical shape.
@@ -3496,7 +3575,10 @@ ipcMain.handle('archive:writeSyncManifest', async (_event, { localEventPath, man
 ipcMain.handle('archive:readSyncManifest',  async (_event, { localEventPath }) =>
   localSyncManifest.readManifest(localEventPath));
 
-ipcMain.handle('archive:appendSyncJob', async (_event, { localEventPath, job }) => {
+ipcMain.handle('archive:appendSyncJob', async (_event, args = {}) => _appendSyncJob(args));
+
+/** Shared by the IPC handler and the companion's Event Dump imports (EQI-2.1). */
+async function _appendSyncJob({ localEventPath, job } = {}) {
   if (!localEventPath || typeof localEventPath !== 'string') {
     return { ok: false, reason: 'Invalid localEventPath.' };
   }
@@ -3528,7 +3610,7 @@ ipcMain.handle('archive:appendSyncJob', async (_event, { localEventPath, job }) 
   }
 
   return localSyncManifest.appendJob(localEventPath, job);
-});
+}
 
 // ── Direct-archive lock helpers ───────────────────────────────────────────────
 
@@ -3897,7 +3979,10 @@ _handleTracked('archive:syncAllReadyJobs', 'sync', async () => {
 
 // ── Direct archive lock check (advisory pre-flight) ──────────────────────────
 
-ipcMain.handle('archive:checkDirectArchiveLocks', async (_event, { fileJobs } = {}) => {
+ipcMain.handle('archive:checkDirectArchiveLocks', async (_event, args = {}) => _checkDirectArchiveLocks(args));
+
+/** Shared by the IPC handler and the companion's Event Dump imports (EQI-2.1). */
+async function _checkDirectArchiveLocks({ fileJobs } = {}) {
   const nasRoot = settings.getNasRoot();
   const currentDeviceName = os.hostname();
   if (!nasRoot) return { ok: true, blocked: [], currentDeviceName };
@@ -3916,9 +4001,12 @@ ipcMain.handle('archive:checkDirectArchiveLocks', async (_event, { fileJobs } = 
     }
   }
   return { ok: true, blocked, currentDeviceName };
-});
+}
 
-ipcMain.handle('archive:clearSelfStaleLock', async (_event, { lockPath, force = false } = {}) => {
+ipcMain.handle('archive:clearSelfStaleLock', async (_event, args = {}) => _clearSelfStaleLock(args));
+
+/** Shared by the IPC handler and the companion's Event Dump imports (EQI-2.1). */
+async function _clearSelfStaleLock({ lockPath, force = false } = {}) {
   if (!lockPath || typeof lockPath !== 'string') return { ok: false, reason: 'invalid-path' };
   const nas  = settings.getNasRoot();
   const main = settings.getMainArchiveRoot();
@@ -3930,7 +4018,7 @@ ipcMain.handle('archive:clearSelfStaleLock', async (_event, { lockPath, force = 
   const result = await archiveLockService.clearSelfLock(lockPath, configuredRoots, { force: allowForce });
   if (result.ok) log(`[import] Cleared self-stale lock: ${path.basename(lockPath)}`);
   return result;
-});
+}
 
 // ── EXIF metadata service ─────────────────────────────────────────────────────
 

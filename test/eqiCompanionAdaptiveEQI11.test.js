@@ -105,7 +105,10 @@ const tick = () => new Promise(r => setImmediate(r));
       },
     };
     const c = createEventDumpController({
-      handoff,
+      // EQI-2.1: no main-window handoff for selection — the companion resolves the event itself.
+      importService: { isRunning: () => false, runningSourceId: () => null, view: () => null, forget: () => {} },
+      resolveEvent: async (ref) => (ref.folderName === 'gone' ? null : { eventPath: `${ref.collectionPath}/${ref.folderName}`, eventName: ref.folderName, collectionName: ref.collectionName, componentCount: 1, pendingSync: false, localFirst: false, types: [], places: [] }),
+      persistLastEvent: async (ev) => { sent.push({ kind: 'persist', ev }); },
       getCard: () => null,
       verifyJob: async () => null,
       classify,
@@ -144,7 +147,7 @@ const tick = () => new Promise(r => setImmediate(r));
     assert.equal((await hf.c.listEvents()).reason, 'scan-failed');
   });
 
-  await t('chooseEvent: validates input, only listed events, and selects WITHOUT foregrounding the main window', async () => {
+  await t('chooseEvent: validates input, only listed events, and selects in the companion — the main window is never involved (EQI-2.1)', async () => {
     const h = harness({ scanned });
     h.c.onWorkspaceEvent({ eventPath: '/Arc/1448 Coll/1448-05-20 _01-Waaz-Surat', eventName: '1448-05-20 _01-Waaz-Surat', collectionName: '1448 Coll' });
     assert.equal((await h.c.chooseEvent({ folderName: LONG })).reason, 'not-listed', 'nothing listed yet');
@@ -153,34 +156,18 @@ const tick = () => new Promise(r => setImmediate(r));
     assert.equal((await h.c.chooseEvent(null)).reason, 'invalid');
     assert.equal((await h.c.chooseEvent({ folderName: 'random folder' })).reason, 'not-listed');
     assert.equal((await h.c.chooseEvent({ folderName: '../x' })).reason, 'not-listed');
-    assert.equal((await h.c.chooseEvent({ folderName: '1448-05-20 _01-Waaz-Surat' })).state, 'completed', 'the current event: nothing to do');
-    assert.equal(h.sent.length, 0);
-
-    const p = h.c.chooseEvent({ folderName: LONG });
-    await tick();
-    assert.equal(h.sent.length, 1);
-    assert.equal(h.sent[0].kind, 'event-select');
-    assert.equal(h.sent[0].opts.foreground, false);
-    assert.equal(h.sent[0].opts.channel, 'companion:selectEvent');
-    assert.deepEqual(h.sent[0].msg, { requestId: 9, collectionPath: '/Arc/1448 Coll', collectionName: '1448 Coll', folderName: LONG });
-    assert.equal((await h.c.chooseEvent({ folderName: '1448-05-20 _01-Waaz-Surat' })).reason, 'busy', 'one request at a time');
-    h.finish({ state: 'completed' });
-    assert.deepEqual(await p, { state: 'completed', reason: null });
+    assert.deepEqual(await h.c.chooseEvent({ folderName: LONG }), { state: 'completed', reason: null });
+    assert.equal(h.c.globalView().event.eventName, LONG);
+    assert.equal(h.c.activeEvent().eventPath, `/Arc/1448 Coll/${LONG}`);
+    assert.ok(h.sent.every(x => x.kind === 'persist'), 'nothing is sent to the main window; only AutoIngest\'s last event is remembered');
   });
 
-  await t('chooseEvent: an open Import workspace falls back to the main window\'s existing event picker', async () => {
+  await t('chooseEvent: an open Import workspace is never disturbed — selection no longer goes through the main window (EQI-2.1)', async () => {
     const h = harness({ scanned });
-    h.c.onWorkspaceEvent({ eventPath: '/Arc/1448 Coll/1448-05-20 _01-Waaz-Surat', eventName: 'x', collectionName: '1448 Coll' });
+    h.c.onWorkspaceEvent({ eventPath: '/Arc/1448 Coll/1448-05-20 _01-Waaz-Surat', eventName: 'x', collectionName: '1448 Coll', pickerOpen: true });
     await h.c.listEvents();
-    const p = h.c.chooseEvent({ folderName: LONG });
-    await tick();
-    h.finish({ state: 'refused', reason: 'workspace-open' });
-    await tick(); await tick();
-    assert.equal(h.sent.length, 2);
-    assert.equal(h.sent[1].kind, 'event-picker');
-    assert.notEqual(h.sent[1].opts.foreground, false, 'the fallback opens the main window');
-    h.finish({ state: 'completed' });
-    await p;
+    assert.equal((await h.c.chooseEvent({ folderName: LONG })).state, 'completed');
+    assert.ok(!h.sent.some(x => x.kind === 'event-picker' || x.kind === 'event-select'));
   });
 
   // ── Handoff foreground option ─────────────────────────────────────────────

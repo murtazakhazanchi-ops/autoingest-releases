@@ -10,9 +10,11 @@
  *   - Assignment rules are eventDumpAssignmentModel.js (pure): half-open ranges, conflicts block the
  *     import, unreliable times are never range-assigned, RAW/JPEG pairs travel together.
  *   - Destinations are events of ONE collection (the active event's), chosen from the Event
- *     Creator's own scan; a new event is made with the existing Event Creator in the main window.
- *   - The import is ONE plan — a batch per (event, photographer) — executed by the main window's
- *     existing ImportSessionRunner and commitImportTransaction (destination 'dump'), so locks,
+ *     Creator's own scan; a new event is made with the existing Event Creator in the companion's
+ *     own Event Creator window (EQI-2.1 — never the main application).
+ *   - The import is ONE plan — a batch per (event, photographer) — executed in the main process by
+ *     companionImportService (EQI-2.1) over the existing ImportSessionRunner and import
+ *     transaction (destination 'dump'), with no main window, so locks,
  *     Local First / Direct Archive, event.json, metadata, the import index and sync registration
  *     are the validated EQI-1 paths. Never PC-sequenced, never a component, never a source delete.
  *   - The popup only receives names, times and counts — never a path.
@@ -34,7 +36,7 @@ const MAX_NAME_LEN = 200;
 
 /**
  * @param {object} deps
- * @param {{ request: Function, getActive: Function }} deps.handoff
+ * @param {object} deps.importService                                    companionImportService (runs the plan in main)
  * @param {(sourceId: string) => object|null} deps.getCard
  * @param {(sourceId: string) => object|null} deps.peekJob                current assessment job
  * @param {(sourceId: string) => Promise<object|null>} deps.verifyJob      complete, still-valid job
@@ -60,10 +62,8 @@ function createDivideController(deps) {
   const statSize = deps.statSize || (async () => null);
   /** sourceId → session */
   const _sessions = new Map();
-  /** sourceId → latest plan operation */
+  /** sourceId → a refusal before the import service ran */
   const _ops = new Map();
-  let _active = null;            // { sourceId, requestId, batches } while a plan import runs
-  const _batchMeta = new Map();  // metadataBatchId → outcome (batch can finish before the result)
 
   const _photographers = () => {
     try { const l = deps.listPhotographers(); return Array.isArray(l) ? [...new Set(l.filter(n => typeof n === 'string' && n.trim()).map(n => n.trim()))] : []; }
@@ -121,11 +121,13 @@ function createDivideController(deps) {
   function _ensureViewDate(s, assets) {
     const counts = new Map();
     for (const a of assets) if (!a.imported) counts.set(a.date, (counts.get(a.date) || 0) + 1);
-    if (s.viewDate && counts.has(s.viewDate)) return;
+    const any = new Set(assets.map(a => a.date));
+    if (s.viewDate && (counts.has(s.viewDate) || (!counts.size && any.has(s.viewDate)))) return;
     let chosen = null;
     try { chosen = deps.selectedDate ? deps.selectedDate(s.sourceId) : null; } catch { chosen = null; }
     s.viewDate = chosen && counts.has(chosen) ? chosen
-      : counts.size ? [...counts].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? 1 : -1))[0][0] : null;
+      : counts.size ? [...counts].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? 1 : -1))[0][0]
+      : chosen && any.has(chosen) ? chosen : any.size ? [...any].sort().reverse()[0] : null;
   }
 
   /** Distinct identified cameras among the new photos: 2+ → each camera's photographer is chosen. */
@@ -156,23 +158,21 @@ function createDivideController(deps) {
     const s = _sessions.get(sourceId);
     if (!s) return null;
     const assets = _assetsFor(s, deps.peekJob(sourceId));
-    const op = _ops.get(sourceId);
-    const showOp = op && (op.state === 'pending' || Date.now() - op.at < NOTICE_TTL_MS);
     const base = {
       collectionName: s.collectionName, notice: s.notice, pendingNewFor: s.pendingNewFor, rev: s.rev,
-      op: showOp ? { ...op, events: op.events.map(e => ({ ...e })) } : null,
+      op: _opView(sourceId),
     };
     if (!assets) return { ...base, ready: false };
     const res = M.assign(assets, s.ranges, s.overrides);
     const sum = M.summarize(assets, res, s.ranges);
     const cam = _cameraMode(s, assets);
     const { batches, missingPhotographer } = M.buildBatches(assets, res, _photographerFor(s, cam.mode, sourceId));
+    // Every capture date stays listed (an imported date still shows its photos as "already imported").
     const dates = new Map();
     for (const a of assets) {
-      if (a.imported) continue;
-      const d = dates.get(a.date) || { date: a.date, assets: 0, assigned: 0 };
-      d.assets++;
-      if (res.byAsset.get(a.id).eventId) d.assigned++;
+      const d = dates.get(a.date) || { date: a.date, assets: 0, assigned: 0, imported: 0 };
+      if (a.imported) d.imported++;
+      else { d.assets++; if (res.byAsset.get(a.id).eventId) d.assigned++; }
       dates.set(a.date, d);
     }
     const dateList = [...dates.values()].sort((x, y) => (x.date < y.date ? 1 : -1));
@@ -186,6 +186,7 @@ function createDivideController(deps) {
     });
     const events = [...sum.events].map(([eventId, c]) => ({
       eventId, assets: c.assets, files: c.files,
+      bytes: batches.filter(b => b.eventId === eventId).reduce((n, b) => n + _bytesOf(assets, b.files), 0),
       photographers: batches.filter(b => b.eventId === eventId).map(b => ({ name: b.photographer, files: b.files.length })),
     }));
     const blockers = [];
@@ -213,8 +214,9 @@ function createDivideController(deps) {
         .map(g => ({ key: g.key, atId: g.atId, time: M.shortTime(g.time), gapMinutes: g.gapMinutes, inRange: s.ranges.some(r => !M.rangeProblem(r) && (() => { const iv = M.rangeInterval(r); return iv.start < g.sec && g.sec < iv.end; })()) })) : [],
       review: {
         blockers,
-        batches: batches.map(b => ({ eventId: b.eventId, photographer: b.photographer, files: b.files.length, assets: b.assetIds.length })),
+        batches: batches.map(b => ({ eventId: b.eventId, photographer: b.photographer, files: b.files.length, assets: b.assetIds.length, bytes: _bytesOf(assets, b.files) })),
         totalFiles: batches.reduce((n, b) => n + b.files.length, 0),
+        totalBytes: batches.reduce((n, b) => n + _bytesOf(assets, b.files), 0),
       },
     };
   }
@@ -225,7 +227,7 @@ function createDivideController(deps) {
   const _session = (p) => (p && typeof p.sourceId === 'string' && SOURCE_ID_RE.test(p.sourceId) && deps.getCard(p.sourceId) ? _sessions.get(p.sourceId) || null : null);
   const _range = (s, id) => (typeof id === 'string' && ID_RE.test(id) ? s.ranges.find(r => r.id === id) || null : null);
   const _ok = (s) => { s.notice = null; s.rev++; deps.pushSnapshot(); return { ok: true }; };
-  const _busy = (sourceId) => !!(_active && _active.sourceId === sourceId);
+  const _busy = (sourceId) => !!deps.importService && deps.importService.runningSourceId() === sourceId;
 
   /** Opens (or resumes) the division for a card. Needs the active event: it names the collection. */
   function open(sourceId) {
@@ -365,14 +367,15 @@ function createDivideController(deps) {
         return _ok(s);
       }
       case 'newEvent': {
-        // The existing Event Creator in the main window; on return the new event is selected for
-        // this range (never imported automatically). Cancelling leaves everything unchanged.
+        // The companion's own Event Creator window (the existing Event Creator, never the main
+        // application); on return the new event is selected for this range (never imported
+        // automatically). Cancelling leaves everything unchanged (onActiveEvent sets the notice).
         if (!_strict(p, ['sourceId', 'cmd', 'rangeId']) || !_range(s, p.rangeId)) return { ok: false, reason: 'invalid' };
         const ev = deps.getActiveEvent();
         s.pendingNewFor = { rangeId: p.rangeId, before: ev ? ev.eventPath : null };
         deps.pushSnapshot();
         const r = await deps.openPicker('new');
-        if (!r || r.state !== 'completed') { s.pendingNewFor = null; deps.pushSnapshot(); return { ok: false, reason: (r && r.reason) || 'picker-unavailable' }; }
+        if (!r || r.state === 'refused') { s.pendingNewFor = null; deps.pushSnapshot(); return { ok: false, reason: (r && r.reason) || 'picker-unavailable' }; }
         return { ok: true };
       }
       default:
@@ -451,11 +454,28 @@ function createDivideController(deps) {
 
   // ── the import ───────────────────────────────────────────────────────────
 
+  /** A refusal before the import service ran (kept briefly so the popup can explain it). */
   function _record(sourceId, patch) {
-    _ops.set(sourceId, { ...(_ops.get(sourceId) || { events: [] }), ...patch, at: Date.now() });
+    _ops.set(sourceId, { ...patch, at: Date.now() });
     const s = _sessions.get(sourceId);
-    if (s && patch.state) s.rev++;
+    if (s) s.rev++;
     deps.pushSnapshot();
+  }
+
+  /** The card's latest multi-event import (service view), or a refusal. Names, counts, bytes only. */
+  function _opView(sourceId) {
+    const ref = _ops.get(sourceId);
+    const svc = deps.importService ? deps.importService.view(sourceId) : null;
+    if (ref && (!svc || ref.at >= svc.startedAt)) return Date.now() - ref.at < NOTICE_TTL_MS ? { kind: 'multi', state: 'refused', reason: ref.reason, detail: ref.detail || null, events: [] } : null;
+    if (!svc || svc.kind !== 'multi') return null;
+    return svc.state === 'pending' || Date.now() - (svc.finishedAt || 0) < NOTICE_TTL_MS ? svc : null;
+  }
+
+  function _bytesOf(assets, files) {
+    const set = new Set(files);
+    let n = 0;
+    for (const a of assets) for (const f of a.files) if (set.has(f.path)) n += Number(f.size) || 0;
+    return n;
   }
 
   /** Destination archive mode and whether it can be used now (the workspace re-checks at run time). */
@@ -493,7 +513,7 @@ function createDivideController(deps) {
     const { sourceId } = p;
     const s = _sessions.get(sourceId);
     if (!s) return { state: 'refused', reason: 'invalid' };
-    if (deps.handoff.getActive() || _active) return { state: 'refused', reason: 'busy' };
+    if (deps.importService.isRunning()) return { state: 'refused', reason: 'busy' };
     const refuse = (reason, detail = null) => { _record(sourceId, { state: 'refused', reason, detail, events: [], progress: null }); return { state: 'refused', reason }; };
     const card = deps.getCard(sourceId);
     if (!card) return refuse('source-detached');
@@ -527,101 +547,38 @@ function createDivideController(deps) {
     }
     if (!deps.getCard(sourceId)) return refuse('source-detached');
 
-    const plan = batches.map((b) => ({ folderName: b.eventId, eventPath: path.join(s.collectionPath, b.eventId), photographer: b.photographer, files: [...b.files] }));
-    const opEvents = plan.map(b => ({ eventId: b.folderName, photographer: b.photographer, files: b.files.length, status: 'waiting', copied: 0, skipped: 0, errors: 0, error: null, metadata: null }));
+    const ev = deps.getActiveEvent();
+    const plan = batches.map((b) => ({ eventId: b.eventId, eventPath: path.join(s.collectionPath, b.eventId), photographer: b.photographer,
+      files: b.files.map(f => ({ path: f, size: byPath.get(f).size })) }));
     const total = plan.reduce((n, b) => n + b.files.length, 0);
-    _active = { sourceId, batchIds: new Map() };
-    _record(sourceId, { state: 'pending', reason: null, detail: null, events: opEvents, progress: { index: 0, total: plan.length, done: 0, files: 0, totalFiles: total }, mode: arch.mode });
+    _ops.delete(sourceId);
     const journalId = `plan-${Date.now().toString(36)}`;
     _journal({ id: journalId, at: new Date().toISOString(), state: 'started', card: card.label, collectionName: s.collectionName, mode: arch.mode,
-      batches: plan.map(b => ({ event: b.folderName, photographer: b.photographer, files: b.files.map(f => ({ name: path.basename(f), size: byPath.get(f).size })) })) });
-    log(`[event-divide] plan import started: ${plan.length} event batch(es), ${total} file(s)`);
-
-    const started = deps.handoff.request('dump-plan', {
-      sourceId,
-      foreground: false,
-      channel: 'companion:dumpPlanImport',
-      payload: (requestId) => {
-        _active.requestId = requestId;
-        return { requestId, collectionPath: s.collectionPath, batches: plan, source: { label: card.label, path: card.mountpoint } };
-      },
+      batches: plan.map(b => ({ event: b.eventId, photographer: b.photographer, files: b.files.map(f => ({ name: path.basename(f.path), size: f.size })) })) });
+    log(`[event-divide] plan import started: ${plan.length} event batch(es), ${total} file(s) (no main window)`);
+    s.rev++;
+    const final = await deps.importService.run({
+      sourceId, kind: 'multi', source: { label: card.label, path: card.mountpoint },
+      localFirstEvent: !!(ev && path.dirname(ev.eventPath) === s.collectionPath && (ev.pendingSync || ev.localFirst)),
+      collectionName: s.collectionName, batches: plan,
     });
-    if (!started.started) { _active = null; return refuse('busy'); }
-    const final = await started.done;
-    const r = final.result || {};
-    const cur = _ops.get(sourceId) || { events: opEvents };
-    const events = cur.events.map((e, i) => {
-      // The handoff keeps only flat scalar result fields: one e<i>_* group per batch.
-      const x = typeof r[`e${i}_status`] === 'string' ? { status: r[`e${i}_status`], copied: r[`e${i}_copied`], skipped: r[`e${i}_skipped`], errors: r[`e${i}_errors`],
-        error: r[`e${i}_error`], metadataBatchId: r[`e${i}_batch`] } : null;
-      if (!x) return e.status === 'waiting' || e.status === 'running' ? { ...e, status: 'not-started' } : e;
-      const batchId = typeof x.metadataBatchId === 'string' ? x.metadataBatchId : null;
-      if (batchId) _active.batchIds.set(batchId, i);
-      return { ...e, status: _status(x.status), copied: _n(x.copied), skipped: _n(x.skipped), errors: _n(x.errors), error: typeof x.error === 'string' ? x.error.slice(0, 300) : null,
-        // No batch: nothing to tag when nothing was copied; otherwise automatic metadata is off.
-        metadata: batchId ? (_batchMeta.get(batchId) || { state: 'writing' }) : (_n(x.copied) > 0 ? { state: 'not-run' } : null), batchId };
-    });
-    const state = final.state !== 'completed' ? final.state
-      : events.every(e => e.status === 'completed') ? 'completed'
-      : events.every(e => e.status === 'completed' || e.status === 'completed-with-errors') ? 'completed-with-errors'
-      : events.some(e => e.status === 'completed' || e.status === 'completed-with-errors') ? 'partial' : 'failed';
-    const batchIds = _active.batchIds;
-    _active = null;
-    _record(sourceId, { state, reason: final.reason || r.reason || null, detail: r.detail || null, events, batchIds: [...batchIds] });
-    _journal({ id: journalId, at: new Date().toISOString(), state, events: events.map(e => ({ event: e.eventId, photographer: e.photographer, status: e.status, copied: e.copied, skipped: e.skipped, errors: e.errors })) });
-    log(`[event-divide] plan import ${state}: ${events.map(e => e.status).join(',')}`);
+    if (final.state === 'refused') return refuse(final.reason || 'refused');
+    const v = deps.importService.view(sourceId);
+    _journal({ id: journalId, at: new Date().toISOString(), state: final.state,
+      events: (v ? v.events : []).map(e => ({ event: e.eventId, photographer: e.photographer, status: e.status, copied: e.bytes.copied, skipped: e.bytes.skipped, errors: e.bytes.failed, metadata: e.metadata && e.metadata.state })) });
+    log(`[event-divide] plan import ${final.state}`);
+    s.rev++;
     deps.showPopup({ inactive: true });
-    return { state, reason: final.reason || null };
+    return final;
   }
 
-  const _n = (v) => (Number.isFinite(Number(v)) ? Math.max(0, Math.floor(Number(v))) : 0);
-  const _status = (st) => (['completed', 'completed-with-errors', 'failed', 'not-started'].includes(st) ? st : 'failed');
   const _journal = (rec) => { try { if (deps.journal) deps.journal(rec); } catch { /* best effort */ } };
 
-  /** Per-event start/end from the main window while the plan runs (counts only). */
-  function onPlanEvent(info) {
-    if (!_active || !info || typeof info !== 'object' || info.requestId !== _active.requestId) return;
-    const op = _ops.get(_active.sourceId);
-    if (!op || op.state !== 'pending') return;
-    const i = Number.isInteger(info.index) ? info.index : -1;
-    if (i < 0 || i >= op.events.length) return;
-    const events = op.events.map((e, j) => {
-      if (j !== i) return e;
-      if (info.phase === 'start') return { ...e, status: 'running' };
-      return { ...e, status: _status(info.status), copied: _n(info.copied), skipped: _n(info.skipped), errors: _n(info.errors), error: typeof info.error === 'string' ? info.error.slice(0, 300) : null };
-    });
-    const doneFiles = events.reduce((n, e) => n + (e.status === 'running' || e.status === 'waiting' ? 0 : e.files), 0);
-    _record(_active.sourceId, { events, progress: { ...op.progress, index: i, done: 0, files: doneFiles } });
-  }
-
-  /** copyFileJobs progress of the running batch (counts only). */
-  function onImportProgress(progress) {
-    if (!_active || !progress) return;
-    const op = _ops.get(_active.sourceId);
-    if (!op || op.state !== 'pending') return;
-    const done = Number.isFinite(progress.completedCount) ? progress.completedCount : progress.index;
-    _record(_active.sourceId, { progress: { ...op.progress, done: _n(done) } });
-  }
-
-  /** Metadata batch outcome (batch_complete) for an event of the last plan. */
-  function onMetadataBatch(pl) {
-    if (!pl || pl.event !== 'batch_complete' || !pl.batchId) return;
-    const failed = _n(pl.failed);
-    const partial = _n(pl.partial) + _n(pl.ambiguous);
-    const outcome = { state: failed > 0 ? 'some-failed' : partial > 0 ? 'needs-review' : 'complete', failed };
-    _batchMeta.set(pl.batchId, outcome);
-    while (_batchMeta.size > 50) _batchMeta.delete(_batchMeta.keys().next().value);
-    for (const [sourceId, op] of _ops) {
-      const idx = (op.events || []).findIndex(e => e.batchId === pl.batchId);
-      if (idx >= 0) { _record(sourceId, { events: op.events.map((e, j) => (j === idx ? { ...e, metadata: outcome } : e)) }); break; }
-    }
-  }
-
-  function isRunning(sourceId) { return _busy(sourceId); }
+  function isRunning(sourceId) { return !!deps.importService && deps.importService.runningSourceId() === sourceId; }
   function forget(sourceId) { _sessions.delete(sourceId); _ops.delete(sourceId); }
   function has(sourceId) { return _sessions.has(sourceId); }
 
-  return { open, has, view, command, events, assetsOf, thumbs, review, startImport, onActiveEvent, onPlanEvent, onImportProgress, onMetadataBatch, isRunning, forget };
+  return { open, has, view, command, events, assetsOf, thumbs, review, startImport, onActiveEvent, isRunning, forget };
 }
 
 module.exports = { createDivideController };

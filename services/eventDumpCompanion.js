@@ -1,21 +1,22 @@
 /**
- * eventDumpCompanion.js — the menu-bar companion's Event Dump Quick Import (AI-FEAT-064 EQI-1).
- * Main process only; wired by companionService. Pure logic over injected dependencies.
+ * eventDumpCompanion.js — the menu-bar companion's Event Dump Quick Import (AI-FEAT-064 EQI-1,
+ * EQI-2.1). Main process only; wired by companionService. Pure logic over injected dependencies.
  *
- * Default and only EQI-1 behaviour: every NEW photo of the chosen shoot date (plus, when the
- * operator ticks it, NEW photos from earlier dates) → ONE event — the workspace's active event —
- * into Event/Dump/<photographer>/. Nothing is split between events and no time entry is needed.
+ * Default behaviour: every NEW photo of the chosen shoot date (plus, when the operator ticks it, NEW
+ * photos from earlier dates) → ONE event → Event/Dump/<photographer>/. Nothing is split between
+ * events and no time entry is needed (EQI-2's division is a separate, optional view).
  *
- *   - "New" is file-level: the existing global import index (filename + size) — never the time of
- *     the last import, so older unimported photos stay eligible after a newer batch was imported.
- *     Already-imported files are never re-selected; files with no reliable capture date stay on
- *     the card. RAW/JPEG pairs share a capture date, so they travel together.
- *   - The photographer is always the operator's explicit choice from the photographer list; the
- *     last photographer used this session is offered as a one-tap suggestion, never preselected.
- *   - The import itself runs in the main window's existing import machinery (eventDumpImport.js
- *     via workspaceHandoff.request), so routing, Local First / Direct Archive, locks, event.json,
- *     metadata and sync are the same validated paths as every other event import.
- *   - The popup only ever receives names and counts — never paths.
+ *   - "New" is file-level: the existing global import index (filename + size). Already-imported files
+ *     are never re-selected; files with no reliable capture date stay on the card. RAW/JPEG pairs
+ *     share a capture date, so they travel together.
+ *   - The photographer is always the operator's explicit choice; the last photographer used this
+ *     session is offered as a one-tap suggestion, never preselected.
+ *   - EQI-2.1: the import runs in the MAIN PROCESS through companionImportService (the same router,
+ *     runner and import transaction as every other event import) — the main application window is
+ *     neither needed nor shown. The destination event is the companion's own: it follows the main
+ *     window's active event when that changes, and the companion's Change Event / Create New Event
+ *     (its own Event Creator window) never open or disturb the main window.
+ *   - The popup only ever receives names, counts and sizes — never paths.
  */
 
 'use strict';
@@ -28,42 +29,37 @@ const MAX_PHOTOGRAPHER_LEN = 120;
 
 /**
  * @param {object} deps
- * @param {{ request: Function, getActive: Function }} deps.handoff        workspaceHandoff instance
  * @param {(sourceId: string) => object|null} deps.getCard               attached card { mountpoint, label } or null
  * @param {(sourceId: string) => Promise<object|null>} deps.verifyJob    completed, still-valid assessment job
- * @param {(sourceId: string) => object|null} deps.peekJob               current assessment job (no verification)
  * @param {(record: object, selection: object) => string} deps.classify  dateAssessmentModel.classify
  * @param {(sourceId: string) => object} deps.selectionFor               the card's normalized date selection
  * @param {(name: string, size: number) => boolean} deps.isImported      global import index lookup
  * @param {() => string[]} deps.listPhotographers                        the app's photographer list
  * @param {() => boolean} deps.isBusy                                    an import/sync/transfer/checksum is running
  * @param {(collectionPath: string) => Promise<object[]>} [deps.scanEvents]  the Event Creator's own event scan
- *                                                                       (master:scanEvents) of one collection
+ * @param {object} deps.importService                                    companionImportService
+ * @param {(ref: object) => Promise<object|null>} deps.resolveEvent       { eventPath, eventName, collectionName, componentCount, pendingSync, types, places }
+ * @param {(ev: object) => Promise<void>} [deps.persistLastEvent]        remember the event as AutoIngest's last event
+ * @param {() => { opened: boolean, done: Promise<object> }} [deps.openEventCreator]  the companion's Event Creator window
  * @param {() => void} deps.pushSnapshot
  * @param {(opts?: object) => void} deps.showPopup
  * @param {() => void} deps.hidePopup
  * @param {(msg: string) => void} [deps.log]
  * @param {(event: object|null, pickerClosed: boolean) => void} [deps.onActiveEvent]
- *        EQI-2: the active event changed or the operator left the event picker / Event Creator
+ *        EQI-2: the event changed, or the Event Creator closed (pickerClosed)
  */
 function createEventDumpController(deps) {
   const log = deps.log || (() => {});
-  /** sourceId → { photographer: string|null, includeEarlier: boolean } */
+  /** sourceId → { mode, photographer, includeEarlier } */
   const _options = new Map();
-  /** sourceId → latest Dump operation view { state, reason, result, progress, metadata, at } */
-  const _ops = new Map();
-  /** The workspace's active event as last reported by the main window (path stays here). */
+  /** sourceId → a refusal that happened before the import service ran { state, reason, at } */
+  const _refusals = new Map();
+  /** The companion's destination event (path stays here). */
   let _event = null;
   let _lastPhotographer = null;
-  let _activeSourceId = null;      // card whose Dump import is running
-  /** batchId → metadata outcome; a batch can finish before the import's result reaches main. */
-  const _batches = new Map();
-  let _pickerPending = false;      // the operator was sent to the event picker / Event Creator
-  let _pickerSeenOpen = false;     // …and the main window has reported it open since
-  let _lastPickerOpen = false;     // the main window's latest report: is Event Management open?
+  let _creatorOpen = false;
   /** The card mode last chosen this session; new cards start in it ('review' = the Q2 actions). */
   let _lastMode = 'review';
-
   /** The last event listing sent to the popup: chooseEvent accepts only one of these folders. */
   let _listed = null;
 
@@ -76,23 +72,33 @@ function createEventDumpController(deps) {
     } catch { return []; }
   }
 
-  /** New/imported split for one card's records under its current selection. */
+  /** New/imported split for one card's records under its current selection (files with sizes). */
   function _plan(job, sourceId) {
     const sel = deps.selectionFor(sourceId);
     const opts = _optionsFor(sourceId);
-    const out = { selectedNew: 0, selectedImported: 0, earlierNew: 0, earlierImported: 0, uncertain: 0, newByDate: {}, files: [] };
+    const out = { selectedNew: 0, selectedImported: 0, earlierNew: 0, earlierImported: 0, uncertain: 0, newByDate: {}, files: [], bytes: 0 };
+    const take = (r) => { out.files.push({ path: r.path, size: Number(r.size) || 0 }); out.bytes += Number(r.size) || 0; };
     for (const r of (job && job.records) || []) {
       const imported = !!deps.isImported(r.name, r.size);
       const bucket = deps.classify(r.evidence, sel);
       if (r.evidence && r.evidence.status === 'dated' && !imported) out.newByDate[r.evidence.date] = (out.newByDate[r.evidence.date] || 0) + 1;
       if (bucket === 'selected') {
-        if (imported) out.selectedImported++; else { out.selectedNew++; out.files.push(r.path); }
+        if (imported) out.selectedImported++; else { out.selectedNew++; take(r); }
       } else if (bucket === 'earlier') {
         if (imported) out.earlierImported++;
-        else { out.earlierNew++; if (opts.includeEarlier) out.files.push(r.path); }
+        else { out.earlierNew++; if (opts.includeEarlier) take(r); }
       } else if (bucket === 'uncertain') out.uncertain++;
     }
     return out;
+  }
+
+  /** The card's latest single-event import (service) or a refusal — names, counts and bytes only. */
+  function _opView(sourceId) {
+    const svc = deps.importService.view(sourceId);
+    const ref = _refusals.get(sourceId);
+    if (ref && (!svc || ref.at >= svc.startedAt)) return Date.now() - ref.at < NOTICE_TTL_MS ? { kind: 'single', state: 'refused', reason: ref.reason, detail: ref.detail || null } : null;
+    if (!svc || svc.kind !== 'single') return null;
+    return svc.state === 'pending' || Date.now() - (svc.finishedAt || 0) < NOTICE_TTL_MS ? svc : null;
   }
 
   /** Path-free per-card view (null until the card's capture dates are known). */
@@ -100,8 +106,6 @@ function createEventDumpController(deps) {
     if (!job || !job.datesReady) return null;
     const plan = _plan(job, sourceId);
     const opts = _optionsFor(sourceId);
-    const op = _ops.get(sourceId);
-    const showOp = op && (op.state === 'pending' || Date.now() - op.at < NOTICE_TTL_MS);
     return {
       mode: opts.mode,
       photographer: opts.photographer,
@@ -111,8 +115,9 @@ function createEventDumpController(deps) {
         earlierNew: plan.earlierNew, earlierImported: plan.earlierImported, uncertain: plan.uncertain,
         toImport: plan.files.length,
       },
+      bytesToImport: plan.bytes,
       newByDate: plan.newByDate,
-      op: showOp ? { state: op.state, reason: op.reason, result: op.result, progress: op.progress, metadata: op.metadata, at: op.at } : null,
+      op: _opView(sourceId),
       ready: job.state === 'complete',
     };
   }
@@ -127,46 +132,51 @@ function createEventDumpController(deps) {
       } : null,
       photographers: _photographers(),
       lastPhotographer: _lastPhotographer,
-      busy: !!(deps.handoff && deps.handoff.getActive()),
+      busy: deps.importService.isRunning(),
+      creatorOpen: _creatorOpen,
     };
   }
 
-  /** The main window's active-event report (untrusted shape; only from the main window). */
   /** EQI-1.2: display labels (event types, location/city) — bounded plain strings only. */
   const _labels = (v) => (Array.isArray(v) ? v.filter(x => typeof x === 'string' && x.trim()).slice(0, 12).map(x => x.trim().slice(0, 80)) : []);
 
-  function onWorkspaceEvent(info) {
-    let next = null;
-    if (info && typeof info === 'object' && typeof info.eventPath === 'string' && info.eventPath) {
-      next = {
-        eventPath: info.eventPath,
-        eventName: typeof info.eventName === 'string' ? info.eventName.slice(0, 200) : '',
-        collectionName: typeof info.collectionName === 'string' ? info.collectionName.slice(0, 200) : '',
-        componentCount: Number.isInteger(info.componentCount) ? info.componentCount : 0,
-        pendingSync: info.pendingSync === true,
-        // EQI-2: the event was started in / adopted from Local Staging (Local First import rule).
-        localFirst: info.localFirst === true,
-        types: _labels(info.types),
-        places: _labels(info.places),
-      };
-    }
-    const pickerOpen = !!(info && typeof info === 'object' && info.pickerOpen === true);
-    _lastPickerOpen = pickerOpen;
+  function _setEvent(next, why) {
     const changed = JSON.stringify(next) !== JSON.stringify(_event);
     _event = next;
-    if (changed) deps.pushSnapshot();
-    // Back to the menu bar once the operator has left the event picker / Event Creator in the
-    // main window — after creating or choosing an event (the companion now shows it) or after
-    // cancelling (the previous event and every card choice are unchanged).
-    if (_pickerPending && _pickerSeenOpen && !pickerOpen) {
-      _pickerPending = false; _pickerSeenOpen = false;
-      log(`[event-dump] event picker closed (event ${changed ? 'changed' : 'unchanged'}) — back to the menu bar`);
-      if (deps.onActiveEvent) { try { deps.onActiveEvent(_event, true); } catch { /* the division keeps its state */ } }
-      deps.showPopup({ inactive: true });
-    } else if (_pickerPending && pickerOpen && !_pickerSeenOpen) {
-      _pickerSeenOpen = true;
-      log('[event-dump] event picker open in the main window');
-    }
+    if (changed) { log(`[event-dump] destination event set (${why})`); deps.pushSnapshot(); }
+    return changed;
+  }
+
+  /**
+   * The main window's active-event report (untrusted shape; only from the main window). When the
+   * operator changes the event in AutoIngest, the companion follows; it never pushes back.
+   */
+  let _lastReport = null;
+  function onWorkspaceEvent(info) {
+    if (!info || typeof info !== 'object' || typeof info.eventPath !== 'string' || !info.eventPath) return;
+    const next = {
+      eventPath: info.eventPath,
+      eventName: typeof info.eventName === 'string' ? info.eventName.slice(0, 200) : '',
+      collectionName: typeof info.collectionName === 'string' ? info.collectionName.slice(0, 200) : '',
+      componentCount: Number.isInteger(info.componentCount) ? info.componentCount : 0,
+      pendingSync: info.pendingSync === true,
+      localFirst: info.localFirst === true,
+      types: _labels(info.types),
+      places: _labels(info.places),
+    };
+    const json = JSON.stringify(next);
+    if (json === _lastReport) return;   // only a CHANGE in the main window moves the companion
+    _lastReport = json;
+    if (_setEvent(next, 'main window') && deps.onActiveEvent) { try { deps.onActiveEvent(_event, false); } catch { /* division keeps its state */ } }
+  }
+
+  /** At launch with no main window: the last event AutoIngest remembers (resolved from disk). */
+  async function seed(ref) {
+    if (_event || !ref) return;
+    try {
+      const ev = await deps.resolveEvent(ref);
+      if (ev && !_event) _setEvent(ev, 'last event');
+    } catch { /* no event yet: the operator chooses one */ }
   }
 
   /** @param {unknown} payload  { sourceId, mode?, photographer?, includeEarlier? } from the popup */
@@ -194,13 +204,16 @@ function createEventDumpController(deps) {
     return { ok: true };
   }
 
-  function _record(sourceId, patch) {
-    _ops.set(sourceId, { ...(_ops.get(sourceId) || {}), ...patch, at: Date.now() });
+  const _refuse = (sourceId, reason, detail = null) => {
+    _refusals.set(sourceId, { state: 'refused', reason, detail, at: Date.now() });
     deps.pushSnapshot();
-  }
+    return { state: 'refused', reason };
+  };
 
   /**
-   * Starts the Dump import of one card. Resolves with the operation's terminal state.
+   * Imports the card's selected new photos into the destination event's Dump — in the main
+   * process, without the main window. Resolves when the import has FINISHED (copy, verification,
+   * event.json and metadata), with its terminal state.
    * @param {unknown} payload  { sourceId } from the popup
    */
   async function startImport(payload) {
@@ -209,78 +222,70 @@ function createEventDumpController(deps) {
       return { state: 'refused', reason: 'invalid' };
     }
     const { sourceId } = p;
-    if (deps.handoff.getActive() || _activeSourceId) return { state: 'refused', reason: 'busy' };
-    const refuse = (reason) => { _record(sourceId, { state: 'refused', reason, result: null, progress: null, metadata: null }); return { state: 'refused', reason }; };
+    if (deps.importService.isRunning()) return { state: 'refused', reason: 'busy' };
+    _refusals.delete(sourceId);
     const card = deps.getCard(sourceId);
-    if (!card) return refuse('source-detached');
-    if (deps.isBusy()) return refuse('busy');
-    if (!_event) return refuse('no-event');
+    if (!card) return _refuse(sourceId, 'source-detached');
+    if (deps.isBusy()) return _refuse(sourceId, 'busy');
+    if (!_event) return _refuse(sourceId, 'no-event');
     const opts = _optionsFor(sourceId);
-    if (!opts.photographer || !_photographers().includes(opts.photographer)) return refuse('no-photographer');
+    if (!opts.photographer || !_photographers().includes(opts.photographer)) return _refuse(sourceId, 'no-photographer');
     const job = await deps.verifyJob(sourceId);          // complete and still the same card (dev/ino)
-    if (!job || !deps.getCard(sourceId)) return refuse('assessment-unavailable');
+    if (!job || !deps.getCard(sourceId)) return _refuse(sourceId, 'assessment-unavailable');
     const plan = _plan(job, sourceId);
-    if (plan.files.length === 0) return refuse('nothing-new');
+    if (plan.files.length === 0) return _refuse(sourceId, 'nothing-new');
 
-    const eventPath = _event.eventPath;
+    const ev = _event;
     const photographer = opts.photographer;
-    _activeSourceId = sourceId;
-    _record(sourceId, { state: 'pending', reason: null, result: null, progress: { done: 0, total: plan.files.length }, metadata: null });
-    log(`[event-dump] import started: ${plan.files.length} file(s) → event Dump`);
-    // EQI-1.1: the main window's renderer runs the import where it is (hidden, minimized or behind
-    // other apps) — AutoIngest is not brought forward for an ordinary Dump import.
-    const started = deps.handoff.request('dump-import', {
-      sourceId,
-      foreground: false,
-      channel: 'companion:dumpImport',
-      payload: (requestId) => ({ requestId, eventPath, photographer, files: plan.files, source: { label: card.label, path: card.mountpoint } }),
+    log(`[event-dump] import started: ${plan.files.length} file(s) → event Dump (no main window)`);
+    const final = await deps.importService.run({
+      sourceId, kind: 'single', source: { label: card.label, path: card.mountpoint },
+      localFirstEvent: !!(ev.pendingSync || ev.localFirst), collectionName: ev.collectionName,
+      batches: [{ eventId: path.basename(ev.eventPath), eventPath: ev.eventPath, photographer, files: plan.files }],
     });
-    if (!started.started) { _activeSourceId = null; return refuse('busy'); }
-    const final = await started.done;
-    _activeSourceId = null;
-    const r = final.result || {};
-    const state = final.state === 'completed' ? (r.errors > 0 ? 'completed-with-errors' : 'completed') : final.state;
-    if (final.state === 'completed') _lastPhotographer = photographer;
-    const prev = _ops.get(sourceId) || {};
-    const batchId = r.metadataBatchId || null;
-    _record(sourceId, {
-      state, reason: final.reason || r.reason || null, batchId,
-      result: { requested: r.requested || plan.files.length, copied: r.copied || 0, skipped: r.skipped || 0, errors: r.errors || 0, importMode: r.importMode || null, detail: r.detail || null },
-      progress: prev.progress || null,
-      metadata: batchId ? (_batches.get(batchId) || { state: 'writing' }) : { state: 'not-run' },
-    });
-    log(`[event-dump] import ${state}: copied=${r.copied || 0} skipped=${r.skipped || 0} errors=${r.errors || 0}`);
+    if (final.state === 'completed' || final.state === 'completed-with-errors') _lastPhotographer = photographer;
+    if (final.state === 'refused') return _refuse(sourceId, final.reason || 'refused');
+    log(`[event-dump] import ${final.state}`);
     deps.showPopup({ inactive: true });
-    return { state, reason: final.reason || null };
-  }
-
-  /** Opens the main window's existing event picker ('choose') or Event Creator ('new'). */
-  async function openPicker(payload) {
-    const p = payload && typeof payload === 'object' ? payload : {};
-    if (Object.keys(p).some(k => k !== 'mode') || !['choose', 'new'].includes(p.mode)) return { state: 'refused', reason: 'invalid' };
-    if (deps.handoff.getActive() || _activeSourceId) return { state: 'refused', reason: 'busy' };
-    deps.hidePopup();
-    _pickerPending = true;
-    // Reports are sent on change only: if Event Management is already open, no "opened" report follows.
-    _pickerSeenOpen = _lastPickerOpen;
-    log(`[event-dump] event picker requested (${p.mode}; already open: ${_lastPickerOpen})`);
-    const started = deps.handoff.request('event-picker', {
-      channel: 'companion:openEventPicker',
-      payload: (requestId) => ({ requestId, mode: p.mode }),
-    });
-    const final = await started.done;
-    if (final.state !== 'completed') { _pickerPending = false; _pickerSeenOpen = false; deps.showPopup({ inactive: true }); }
-    // The workspace answers only after Event Management has opened (and its messages arrive in
-    // order), so a completed request IS the "opened" signal — the open/close may both fall
-    // between two periodic reports when the operator is quick.
-    else if (_pickerPending) _pickerSeenOpen = true;
-    return { state: final.state, reason: final.reason || null };
+    return final;
   }
 
   /**
-   * EQI-1.1 one-click Change Event: the events of the active event's collection, from the Event
-   * Creator's own scan (only events with a valid event.json — a Dump needs one). Names only.
+   * Create New Event: the companion's own Event Creator window (the existing Event Creator, never the
+   * main application). On success the new event becomes the destination; on cancel nothing changes.
    */
+  async function openEventCreator() {
+    if (deps.importService.isRunning()) return { state: 'refused', reason: 'busy' };
+    if (typeof deps.openEventCreator !== 'function') return { state: 'refused', reason: 'unavailable' };
+    // The creator opens in the companion's collection: AutoIngest's last event is the companion's.
+    if (_event && deps.persistLastEvent) { try { await deps.persistLastEvent(_event); } catch { /* opens at the last remembered event */ } }
+    const before = _event;
+    const started = deps.openEventCreator();
+    if (!started.opened) return { state: 'refused', reason: 'already-open' };
+    _creatorOpen = true;
+    deps.pushSnapshot();
+    const res = await started.done;
+    _creatorOpen = false;
+    let state = 'cancelled';
+    if (res && res.ok && typeof res.eventPath === 'string') {
+      const ev = await deps.resolveEvent({ eventPath: res.eventPath, pendingSync: res.pendingSync === true, localFirst: res.localFirst === true }).catch(() => null);
+      if (ev) { _setEvent(ev, 'new event'); state = 'completed'; if (deps.persistLastEvent) deps.persistLastEvent(ev).catch(() => {}); }
+    }
+    log(`[event-dump] Event Creator closed: ${state}`);
+    if (deps.onActiveEvent) { try { deps.onActiveEvent(state === 'completed' ? _event : before, true); } catch { /* division keeps its state */ } }
+    deps.pushSnapshot();
+    deps.showPopup();
+    return { state, reason: state === 'completed' ? null : (res && res.reason) || 'cancelled' };
+  }
+
+  /** Kept for the popup's API: 'new' opens the companion's Event Creator window. */
+  async function openPicker(payload) {
+    const p = payload && typeof payload === 'object' ? payload : {};
+    if (Object.keys(p).some(k => k !== 'mode') || p.mode !== 'new') return { state: 'refused', reason: 'invalid' };
+    return openEventCreator();
+  }
+
+  /** One-click Change Event: the events of the destination's collection (Event Creator's own scan). */
   async function listEvents() {
     if (!_event) return { ok: false, reason: 'no-event' };
     if (typeof deps.scanEvents !== 'function') return { ok: false, reason: 'unavailable' };
@@ -296,63 +301,31 @@ function createEventDumpController(deps) {
   }
 
   /**
-   * Selects one of the listed events in the main window WITHOUT bringing it forward (the
-   * renderer adopts it through the same path it uses at startup). If an Import workspace is open
-   * there, its assignments must not be disturbed: the existing event picker opens instead.
+   * Selects one of the listed events as the companion's destination. The main window is never
+   * opened, focused or changed — an open Import workspace keeps all its assignments.
    * @param {unknown} payload  { folderName } from the popup
    */
   async function chooseEvent(payload) {
     const p = payload && typeof payload === 'object' ? payload : {};
     if (Object.keys(p).some(k => k !== 'folderName') || typeof p.folderName !== 'string') return { state: 'refused', reason: 'invalid' };
     if (!_listed || !_listed.names.has(p.folderName)) return { state: 'refused', reason: 'not-listed' };
-    if (deps.handoff.getActive() || _activeSourceId) return { state: 'refused', reason: 'busy' };
-    if (_event && path.basename(_event.eventPath) === p.folderName && path.dirname(_event.eventPath) === _listed.collectionPath) {
-      return { state: 'completed', reason: null };
-    }
-    const started = deps.handoff.request('event-select', {
-      foreground: false,
-      channel: 'companion:selectEvent',
-      payload: (requestId) => ({ requestId, collectionPath: _listed.collectionPath, collectionName: _listed.collectionName, folderName: p.folderName }),
-    });
-    const final = await started.done;
-    if (final.state !== 'completed' && final.reason === 'workspace-open') {
-      log('[event-dump] an Import workspace is open — using the main window\'s event picker');
-      return openPicker({ mode: 'choose' });
-    }
-    log(`[event-dump] event selected from the companion: ${final.state}`);
-    return { state: final.state, reason: final.reason || null };
+    if (deps.importService.isRunning()) return { state: 'refused', reason: 'busy' };
+    const ev = await deps.resolveEvent({ collectionPath: _listed.collectionPath, collectionName: _listed.collectionName, folderName: p.folderName }).catch(() => null);
+    if (!ev) return { state: 'refused', reason: 'event-unavailable' };
+    _setEvent(ev, 'chosen in the companion');
+    if (deps.persistLastEvent) deps.persistLastEvent(ev).catch(() => {});
+    if (deps.onActiveEvent) { try { deps.onActiveEvent(_event, false); } catch { /* division keeps its state */ } }
+    return { state: 'completed', reason: null };
   }
 
-  /** copyFileJobs progress for the running Dump import (counts only). */
-  function onImportProgress(progress) {
-    if (!_activeSourceId || !progress) return;
-    const op = _ops.get(_activeSourceId);
-    if (!op || op.state !== 'pending') return;
-    const done = Number.isFinite(progress.completedCount) ? progress.completedCount : progress.index;
-    _record(_activeSourceId, { progress: { done: Number(done) || 0, total: Number(progress.total) || (op.progress && op.progress.total) || 0 } });
-  }
+  function forget(sourceId) { _options.delete(sourceId); _refusals.delete(sourceId); deps.importService.forget(sourceId); }
 
-  /** Metadata batch outcome for the last Dump import (batch_complete payload). */
-  function onMetadataBatch(p) {
-    if (!p || p.event !== 'batch_complete' || !p.batchId) return;
-    const failed = Number(p.failed) || 0;
-    const partial = (Number(p.partial) || 0) + (Number(p.ambiguous) || 0);
-    const outcome = { state: failed > 0 ? 'some-failed' : partial > 0 ? 'needs-review' : 'complete', done: Number(p.done) || 0, failed, skipped: Number(p.skipped) || 0 };
-    _batches.set(p.batchId, outcome);
-    while (_batches.size > 20) _batches.delete(_batches.keys().next().value);
-    for (const [sourceId, op] of _ops) {
-      if (op && op.batchId === p.batchId) { _record(sourceId, { metadata: outcome }); break; }
-    }
-  }
-
-  function forget(sourceId) { _options.delete(sourceId); _ops.delete(sourceId); }
-
-  /** EQI-2: the active event (main process only — it carries the path). */
+  /** EQI-2: the destination event (main process only — it carries the path). */
   function activeEvent() { return _event ? { ..._event } : null; }
   /** EQI-2: the card's confirmed photographer (the operator's explicit Event Dump choice). */
   function photographerOf(sourceId) { return _optionsFor(sourceId).photographer || null; }
 
-  return { cardView, globalView, onWorkspaceEvent, setOptions, startImport, openPicker, listEvents, chooseEvent, onImportProgress, onMetadataBatch, forget, activeEvent, photographerOf };
+  return { cardView, globalView, onWorkspaceEvent, seed, setOptions, startImport, openPicker, openEventCreator, listEvents, chooseEvent, forget, activeEvent, photographerOf };
 }
 
 module.exports = { createEventDumpController };

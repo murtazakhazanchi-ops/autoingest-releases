@@ -198,7 +198,7 @@ t('static: the suggestion module and the companion never touch secure storage or
 
 // ── Event labels for the selected-event panel ─────────────────────────────
 t('controller: event types and places are kept as bounded plain labels; the event name is unchanged', () => {
-  const c = createEventDumpController({ handoff: { getActive: () => null }, getCard: () => null, verifyJob: async () => null, classify: () => 'selected',
+  const c = createEventDumpController({ importService: { isRunning: () => false, view: () => null, forget: () => {} }, resolveEvent: async () => null, getCard: () => null, verifyJob: async () => null, classify: () => 'selected',
     selectionFor: () => ({}), isImported: () => false, listPhotographers: () => [], isBusy: () => false, pushSnapshot: () => {}, showPopup: () => {}, hidePopup: () => {} });
   const name = '1448-05-14 _01-Urs Mubarak-Majlis-Waaz-Raudat Tahera-Testcity';
   c.onWorkspaceEvent({ eventPath: `/Arc/C/${name}`, eventName: name, collectionName: 'C', types: ['Majlis', 'Waaz', 42, '', 'x'.repeat(200)], places: ['Raudat Tahera, Testcity'] });

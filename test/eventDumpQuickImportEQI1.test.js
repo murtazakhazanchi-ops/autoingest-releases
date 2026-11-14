@@ -167,23 +167,35 @@ const mkdirs = async (root, rels) => { for (const r of rels) await fsp.mkdir(pat
   const records = [rec('A1.CR2', today), rec('A2.CR2', today), rec('A3.CR2', today), rec('B1.CR2', '2026-11-10'), rec('B2.CR2', '2026-11-10'), rec('U1.CR2', null)];
   const imported = new Set(['A3.CR2_100', 'B2.CR2_100']);   // previously imported: one today, one earlier
 
+  // EQI-2.1: the import runs in the main process (companionImportService) — a fake service here.
   function harness(over = {}) {
-    const sent = [];
+    const runs = [];
     let finish = null;
-    const handoff = {
-      active: null,
-      getActive() { return this.active; },
-      request(kind, { payload }) {
-        const msg = payload(7);
-        sent.push({ kind, msg });
-        this.active = { kind };
-        const done = new Promise(r => { finish = (res) => { handoff.active = null; r(res); }; });
-        return { started: true, operation: {}, done };
+    let running = false;
+    let svcView = null;
+    const importService = {
+      isRunning: () => running,
+      runningSourceId: () => (running ? 'src-1' : null),
+      view: (sourceId) => (sourceId === 'src-1' ? svcView : null),
+      forget: () => {},
+      run(plan) {
+        runs.push(plan);
+        running = true;
+        svcView = { kind: plan.kind, state: 'pending', startedAt: Date.now(), finishedAt: null, events: [] };
+        return new Promise(r => { finish = (res) => { running = false; svcView = { ...svcView, state: res.state, finishedAt: Date.now() }; r(res); }; });
       },
     };
+    const creator = { results: [], opened: 0 };
     const pushes = { n: 0 }, popups = { n: 0 };
+    const resolved = (ref) => {
+      const eventPath = ref.eventPath || `${ref.collectionPath}/${ref.folderName || ref.safeEventName || ref.eventName}`;
+      return { eventPath, eventName: eventPath.split('/').pop(), collectionName: 'Coll', componentCount: 1, pendingSync: ref.pendingSync === true, localFirst: false, types: ['Waaz'], places: ['Hall, Surat'] };
+    };
     const c = createEventDumpController({
-      handoff,
+      importService,
+      resolveEvent: async (ref) => resolved(ref),
+      persistLastEvent: async () => {},
+      openEventCreator: () => { creator.opened++; return { opened: true, done: Promise.resolve(creator.results.shift() || { ok: false, reason: 'cancelled' }) }; },
       getCard: (id) => (id === 'src-1' ? { mountpoint: '/Volumes/CARD', label: 'EOS_DIGITAL' } : null),
       verifyJob: async () => ({ state: 'complete', datesReady: true, records }),
       classify,
@@ -191,12 +203,13 @@ const mkdirs = async (root, rels) => { for (const r of rels) await fsp.mkdir(pat
       isImported: (n, s) => imported.has(`${n}_${s}`),
       listPhotographers: () => ['Ali Bhai', 'Husain Bhai', 'Ali Bhai', ''],
       isBusy: () => false,
+      scanEvents: async () => [{ folderName: 'Ev', isFromJson: true }, { folderName: 'Other', isFromJson: true }],
       pushSnapshot: () => { pushes.n++; },
       showPopup: () => { popups.n++; },
       hidePopup: () => {},
       ...over,
     });
-    return { c, sent, handoff, finish: (r) => finish(r), pushes, popups };
+    return { c, runs, finish: (r) => finish(r), pushes, popups, creator };
   }
   const job = { state: 'complete', datesReady: true, records };
 
@@ -204,11 +217,13 @@ const mkdirs = async (root, rels) => { for (const r of rels) await fsp.mkdir(pat
     const { c } = harness();
     let v = c.cardView('src-1', job);
     assert.deepEqual(v.counts, { selectedNew: 2, selectedImported: 1, earlierNew: 1, earlierImported: 1, uncertain: 1, toImport: 2 });
+    assert.equal(v.bytesToImport, 200, 'EQI-2.1: total size of the selected new files, before import');
     assert.equal(v.mode, 'review', 'the established Review behaviour stays the starting mode');
     assert.deepEqual(v.newByDate, { [today]: 2, '2026-11-10': 1 });
     assert.equal(c.setOptions({ sourceId: 'src-1', includeEarlier: true }).ok, true);
     v = c.cardView('src-1', job);
     assert.equal(v.counts.toImport, 3);
+    assert.equal(v.bytesToImport, 300);
   });
 
   await t('photographer: only an exact name from the photographer list; never preselected; list de-duplicated and sorted', () => {
@@ -227,6 +242,7 @@ const mkdirs = async (root, rels) => { for (const r of rels) await fsp.mkdir(pat
     assert.equal((await h.c.startImport({ sourceId: 'src-1' })).reason, 'no-event');
     h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Ev', eventName: 'Ev', collectionName: 'Coll', componentCount: 2, pendingSync: false });
     assert.equal((await h.c.startImport({ sourceId: 'src-1' })).reason, 'no-photographer');
+    assert.equal(h.c.cardView('src-1', job).op.reason, 'no-photographer', 'a refusal is shown on the card');
     assert.equal((await h.c.startImport({ sourceId: 'src-2' })).reason, 'source-detached');
     h = harness({ isBusy: () => true });
     h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Ev', eventName: 'Ev' });
@@ -236,55 +252,42 @@ const mkdirs = async (root, rels) => { for (const r of rels) await fsp.mkdir(pat
     h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Ev', eventName: 'Ev' });
     h.c.setOptions({ sourceId: 'src-1', photographer: 'Ali Bhai' });
     assert.equal((await h.c.startImport({ sourceId: 'src-1' })).reason, 'nothing-new');
-    assert.equal(h.sent.length, 0, 'nothing was ever sent to the workspace');
+    assert.equal(h.runs.length, 0, 'nothing was ever handed to the import service');
   });
 
-  await t('startImport sends exactly the new files, the active event and the confirmed photographer; result, progress and metadata are reported', async () => {
+  await t('EQI-2.1 startImport hands the import service ONE single-event plan: the new files with sizes, the event, the confirmed photographer — no main window', async () => {
     const h = harness();
     h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Ev', eventName: 'Ev', collectionName: 'Coll', componentCount: 2, pendingSync: false });
     h.c.setOptions({ sourceId: 'src-1', photographer: 'Ali Bhai' });
     const pending = h.c.startImport({ sourceId: 'src-1' });
     await new Promise(r => setImmediate(r));
-    assert.equal(h.sent.length, 1);
-    const { kind, msg } = h.sent[0];
-    assert.equal(kind, 'dump-import');
-    assert.deepEqual({ ...msg, files: [...msg.files].sort() }, {
-      requestId: 7, eventPath: '/Arc/Coll/Ev', photographer: 'Ali Bhai',
-      files: ['/Volumes/CARD/DCIM/A1.CR2', '/Volumes/CARD/DCIM/A2.CR2'], source: { label: 'EOS_DIGITAL', path: '/Volumes/CARD' },
+    assert.equal(h.runs.length, 1);
+    const plan = h.runs[0];
+    assert.deepEqual({ ...plan, batches: plan.batches.map(b => ({ ...b, files: [...b.files].sort((x, y) => x.path.localeCompare(y.path)) })) }, {
+      sourceId: 'src-1', kind: 'single', source: { label: 'EOS_DIGITAL', path: '/Volumes/CARD' }, localFirstEvent: false, collectionName: 'Coll',
+      batches: [{ eventId: 'Ev', eventPath: '/Arc/Coll/Ev', photographer: 'Ali Bhai', files: [{ path: '/Volumes/CARD/DCIM/A1.CR2', size: 100 }, { path: '/Volumes/CARD/DCIM/A2.CR2', size: 100 }] }],
     });
-    assert.equal((await h.c.startImport({ sourceId: 'src-1' })).reason, 'busy', 'one Dump import at a time');
-    h.c.onImportProgress({ completedCount: 1, total: 2 });
-    assert.deepEqual(h.c.cardView('src-1', job).op.progress, { done: 1, total: 2 });
-    h.c.onMetadataBatch({ event: 'batch_complete', batchId: 'b-1', done: 2, failed: 0 });   // may arrive before the result
-    h.finish({ state: 'completed', reason: null, result: { ok: true, requested: 2, copied: 2, skipped: 0, errors: 0, metadataBatchId: 'b-1', importMode: 'direct-nas' } });
-    const final = await pending;
-    assert.equal(final.state, 'completed');
-    const op = h.c.cardView('src-1', job).op;
-    assert.deepEqual({ state: op.state, copied: op.result.copied, metadata: op.metadata.state }, { state: 'completed', copied: 2, metadata: 'complete' });
+    assert.equal((await h.c.startImport({ sourceId: 'src-1' })).reason, 'busy', 'one import at a time');
+    assert.equal(h.c.cardView('src-1', job).op.state, 'pending', 'the service progress is the card op');
+    h.finish({ state: 'completed' });
+    assert.equal((await pending).state, 'completed');
     assert.equal(h.c.globalView().lastPhotographer, 'Ali Bhai', 'offered next time as a one-tap suggestion');
   });
 
-  await t('per-file errors are completed-with-errors, never a clean success; a refused workspace answer is shown as refused', async () => {
-    let h = harness();
-    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Ev', eventName: 'Ev' });
+  await t('a Local First (pending-sync) destination is passed on; a refused service run is shown as refused and nothing is remembered', async () => {
+    const h = harness();
+    h.c.onWorkspaceEvent({ eventPath: '/Staging/Coll/Ev', eventName: 'Ev', collectionName: 'Coll', pendingSync: true });
     h.c.setOptions({ sourceId: 'src-1', photographer: 'Ali Bhai' });
-    let p = h.c.startImport({ sourceId: 'src-1' });
+    const p = h.c.startImport({ sourceId: 'src-1' });
     await new Promise(r => setImmediate(r));
-    h.finish({ state: 'completed', result: { ok: true, copied: 1, errors: 1, metadataBatchId: null } });
-    assert.equal((await p).state, 'completed-with-errors');
-    assert.equal(h.c.cardView('src-1', job).op.metadata.state, 'not-run');
-    h = harness();
-    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Ev', eventName: 'Ev' });
-    h.c.setOptions({ sourceId: 'src-1', photographer: 'Ali Bhai' });
-    p = h.c.startImport({ sourceId: 'src-1' });
-    await new Promise(r => setImmediate(r));
-    h.finish({ state: 'refused', reason: 'event-changed', result: { ok: false, reason: 'event-changed' } });
+    assert.equal(h.runs[0].localFirstEvent, true);
+    h.finish({ state: 'refused', reason: 'archive-busy' });
     assert.equal((await p).state, 'refused');
-    assert.equal(h.c.cardView('src-1', job).op.reason, 'event-changed');
+    assert.equal(h.c.cardView('src-1', job).op.reason, 'archive-busy');
     assert.equal(h.c.globalView().lastPhotographer, null);
   });
 
-  await t('popup views carry names and counts only — never a file or event path', async () => {
+  await t('popup views carry names, counts and sizes only — never a file or event path', async () => {
     const h = harness();
     h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Ev', eventName: 'Ev', collectionName: 'Coll', componentCount: 1, pendingSync: false });
     h.c.setOptions({ sourceId: 'src-1', photographer: 'Ali Bhai', includeEarlier: true });
@@ -292,46 +295,41 @@ const mkdirs = async (root, rels) => { for (const r of rels) await fsp.mkdir(pat
     assert.ok(!json.includes('/Volumes') && !json.includes('/Arc'), json);
   });
 
-  await t('the picker returns to the menu bar once the operator chose or created the event; a cancel restores the popup', async () => {
+  await t('EQI-2.1 Create New Event opens the companion\'s own Event Creator window; created → new destination; cancel → nothing changes', async () => {
     const h = harness();
-    let p = h.c.openPicker({ mode: 'new' });
-    await new Promise(r => setImmediate(r));
-    assert.equal(h.sent[0].kind, 'event-picker'); assert.equal(h.sent[0].msg.mode, 'new');
-    h.finish({ state: 'completed' });
-    await p;
-    assert.equal(h.popups.n, 0);
-    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Old', eventName: 'Old', pickerOpen: true });   // Event Creator open
-    assert.equal(h.popups.n, 0, 'the popup stays away while the Event Creator is open');
-    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/New', eventName: 'New', pickerOpen: false }); // created → closed
-    assert.equal(h.popups.n, 1, 'back to the menu bar with the new event selected');
-    assert.equal(h.c.globalView().event.eventName, 'New');
-    // Cancel: picker opens and closes with the event unchanged → back to the menu bar, state intact.
+    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Ev', eventName: 'Ev', collectionName: 'Coll' });
     h.c.setOptions({ sourceId: 'src-1', photographer: 'Ali Bhai', mode: 'dump' });
-    const cp = h.c.openPicker({ mode: 'new' });
-    await new Promise(r => setImmediate(r));
-    h.finish({ state: 'completed' });
-    await cp;
-    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/New', eventName: 'New', pickerOpen: true });
-    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/New', eventName: 'New', pickerOpen: false });
-    assert.equal(h.popups.n, 2, 'cancelled: back to the menu bar');
+    h.creator.results.push({ ok: true, eventPath: '/Arc/Coll/New', pendingSync: false, localFirst: false });
+    const r1 = await h.c.openPicker({ mode: 'new' });
+    assert.equal(r1.state, 'completed');
+    assert.equal(h.creator.opened, 1);
+    assert.equal(h.c.globalView().event.eventName, 'New', 'the new event is the destination');
+    assert.equal(h.popups.n, 1, 'back to the companion');
+    const r2 = await h.c.openPicker({ mode: 'new' });                 // cancelled
+    assert.equal(r2.state, 'cancelled');
     assert.equal(h.c.globalView().event.eventName, 'New', 'cancelled: same event');
     assert.deepEqual([h.c.cardView('src-1', job).photographer, h.c.cardView('src-1', job).mode], ['Ali Bhai', 'dump'], 'cancelled: card choices kept');
-    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Other', eventName: 'Other', pickerOpen: false });
-    assert.equal(h.popups.n, 2, 'a later, unrelated event change does not pop the companion open');
-    // Event Management already open when Create New Event is clicked (reports are sent on change only).
-    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Other', eventName: 'Other', pickerOpen: true });
-    const ap = h.c.openPicker({ mode: 'new' });
-    await new Promise(r => setImmediate(r));
-    h.finish({ state: 'completed' });
-    await ap;
-    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Made', eventName: 'Made', pickerOpen: false });
-    assert.equal(h.popups.n, 3, 'picker already open: still back to the menu bar once it closes');
-    p = h.c.openPicker({ mode: 'choose' });
-    await new Promise(r => setImmediate(r));
-    h.finish({ state: 'refused', reason: 'busy' });
-    await p;
-    assert.equal(h.popups.n, 4, 'a refused picker request returns to the menu bar at once');
-    assert.equal((await h.c.openPicker({ mode: 'other' })).reason, 'invalid');
+    assert.equal((await h.c.openPicker({ mode: 'choose' })).reason, 'invalid', 'choosing is the companion\'s own picker');
+  });
+
+  await t('EQI-2.1 Change Event: only listed events, resolved from disk, without the main window; the main window\'s later change is followed', async () => {
+    const h = harness();
+    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Ev', eventName: 'Ev', collectionName: 'Coll' });
+    assert.equal((await h.c.chooseEvent({ folderName: 'Other' })).reason, 'not-listed', 'list first');
+    await h.c.listEvents();
+    assert.equal((await h.c.chooseEvent({ folderName: '../x' })).reason, 'not-listed');
+    assert.equal((await h.c.chooseEvent({ folderName: 'Other' })).state, 'completed');
+    assert.equal(h.c.activeEvent().eventPath, '/Arc/Coll/Other');
+    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Ev', eventName: 'Ev', collectionName: 'Coll' });   // same report as before: no change
+    assert.equal(h.c.activeEvent().eventPath, '/Arc/Coll/Other', 'an unchanged main-window report never overrides the companion');
+    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Third', eventName: 'Third', collectionName: 'Coll' });
+    assert.equal(h.c.activeEvent().eventPath, '/Arc/Coll/Third', 'a real change in AutoIngest is followed');
+  });
+
+  await t('EQI-2.1 seed: with no main window the destination starts at AutoIngest\'s last event', async () => {
+    const h = harness();
+    await h.c.seed({ collectionPath: '/Arc/Coll', collectionName: 'Coll', eventName: 'Last', safeEventName: 'Last' });
+    assert.equal(h.c.globalView().event.eventName, 'Last');
   });
 
   // ── Generalized handoff ───────────────────────────────────────────────────

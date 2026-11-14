@@ -44,6 +44,8 @@ const { createWorkspaceHandoff } = require('./workspaceHandoff');
 const { createEventDumpController } = require('./eventDumpCompanion');
 const { createDivideController } = require('./eventDumpDivide');
 const divideSupport = require('./eventDumpDivideSupport');
+const { createCompanionImportService } = require('./companionImportService');
+const { createEventCreatorWindow } = require('./eventCreatorWindow');
 const { classify } = require('./dateAssessmentModel');
 
 const MONITOR_CONSUMER = 'companion';
@@ -69,7 +71,7 @@ const IPC_HANDLE_CHANNELS = [
   'companion:setDumpOptions', 'companion:dumpImport', 'companion:openEventPicker',
   'companion:setView', 'companion:listEvents', 'companion:chooseEvent',
   'companion:divideCommand', 'companion:divideEvents', 'companion:divideAssets', 'companion:divideThumbs',
-  'companion:divideReview', 'companion:divideImport',
+  'companion:divideReview', 'companion:divideImport', 'companion:importDecision',
 ];
 
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
@@ -96,6 +98,8 @@ let _assessor = null;
 let _handoff = null;
 let _dump = null;                // EQI-1 Event Dump controller (eventDumpCompanion.js)
 let _divide = null;              // EQI-2 Divide Photos Between Events (eventDumpDivide.js)
+let _imports = null;             // EQI-2.1 imports in the main process, no main window (companionImportService.js)
+let _creator = null;             // EQI-2.1 the companion's own Event Creator window (eventCreatorWindow.js)
 /**
  * EQI-1.1 adaptive popup: 'compact' card overview, or 'expanded' Event Dump for one card. Kept in
  * main, so closing and reopening the popup (or a resize) restores the working context.
@@ -288,7 +292,13 @@ function _registerIpc() {
     if (!_isFromPopup(event) || !_divide) return { state: 'refused', reason: 'invalid' };
     return _divide.startImport(payload);
   });
-  ipcMain.on('companion:dumpPlanEvent', _onPlanEvent);
+  // EQI-2.1: the operator's answer to an import decision (e.g. a busy archive folder) — popup only.
+  ipcMain.handle('companion:importDecision', (event, payload) => {
+    if (!_isFromPopup(event) || !_imports) return { ok: false, reason: 'invalid' };
+    const p = payload && typeof payload === 'object' ? payload : {};
+    if (Object.keys(p).some(k => !['sourceId', 'choice'].includes(k)) || typeof p.sourceId !== 'string' || !SOURCE_ID_RE.test(p.sourceId) || typeof p.choice !== 'string') return { ok: false, reason: 'invalid' };
+    return _imports.decide(p.sourceId, p.choice);
+  });
   ipcMain.handle('companion:quit', (event) => {
     if (!_isFromPopup(event)) return { ok: false };
     hidePopup();
@@ -303,13 +313,6 @@ function _onWorkspaceEvent(event, info) {
   const main = windowRegistry.getMainWindow();
   if (!_dump || !main || main.isDestroyed() || event.sender !== main.webContents) return;
   _dump.onWorkspaceEvent(info);
-}
-
-/** EQI-2: per-event progress of a plan import — accepted only from the main window itself. */
-function _onPlanEvent(event, info) {
-  const main = windowRegistry.getMainWindow();
-  if (!_divide || !main || main.isDestroyed() || event.sender !== main.webContents) return;
-  _divide.onPlanEvent(info);
 }
 
 /**
@@ -351,7 +354,6 @@ function _unregisterIpc() {
   for (const ch of IPC_HANDLE_CHANNELS) ipcMain.removeHandler(ch);
   ipcMain.removeListener('companion:workspaceEvent', _onWorkspaceEvent);
   ipcMain.removeListener('companion:attention', _onAttention);
-  ipcMain.removeListener('companion:dumpPlanEvent', _onPlanEvent);
   _ipcRegistered = false;
 }
 
@@ -578,9 +580,13 @@ function _statMount(mountpoint) {
   return fs.promises.stat(mountpoint).then(st => ({ dev: st.dev, ino: st.ino }), () => null);
 }
 
+/** Every card id seen this session (EQI-2.1: a removed card is cleaned up even if it only ever used Event Dump or Divide). */
+const _seenSourceIds = new Set();
+
 function _onPoll(latest) {
   const ids = new Set(((latest && latest.cards) || []).map(c => c.sourceId));
-  for (const id of new Set([..._selections.keys(), ..._ops.keys()])) {
+  for (const id of ids) _seenSourceIds.add(id);
+  for (const id of new Set([..._selections.keys(), ..._ops.keys(), ..._seenSourceIds])) {
     if (ids.has(id)) continue;
     // A removed card ends any handoff still opening it; its state is forgotten.
     if (_handoff) _handoff.cancelForSource(id, 'source-detached');
@@ -589,6 +595,7 @@ function _onPoll(latest) {
     if (_dump) _dump.forget(id);
     if (_divide) _divide.forget(id);
     if (_view.sourceId === id) { _view = { mode: 'compact', sourceId: null }; _resizePopup(); }
+    _seenSourceIds.delete(id);
   }
   if (_assessor) _assessor.sync(latest && latest.cards);
   _pushSnapshot();
@@ -655,7 +662,12 @@ function _contextMenu() {
  * @param {() => void} opts.openApp  focus/restore the main window or reopen it via splash
  * @param {(msg: string) => void} [opts.log]
  */
-function init({ monitor, openApp, log, isImported = () => false, listPhotographers = () => [], scanEvents = null, registryForSuggestions = null, onRegistryChange = null, archiveStatus = null, journalDir = null }) {
+/**
+ * @param {object} [opts.importDeps]  EQI-2.1 main-process import pieces from main.js: commit, readEventJson,
+ *        ensureLocalMirror, updateEventJson, checkLocks, clearSelfStaleLock, appendSyncJob, activeUser,
+ *        resolveEvent, persistLastEvent, lastEvent
+ */
+function init({ monitor, openApp, log, isImported = () => false, listPhotographers = () => [], scanEvents = null, registryForSuggestions = null, onRegistryChange = null, archiveStatus = null, journalDir = null, importDeps = null }) {
   if (_tray) return;
   _monitor = monitor;
   _listPhotographers = listPhotographers;
@@ -695,8 +707,34 @@ function init({ monitor, openApp, log, isImported = () => false, listPhotographe
     log: _log,
   });
   _handoff.register();
+  const imp = importDeps || {};
+  const statSize = (p) => fs.promises.stat(p).then(st => (st.isFile() ? st.size : null), () => null);
+  _imports = createCompanionImportService({
+    commit: imp.commit,
+    readEventJson: imp.readEventJson,
+    ensureLocalMirror: imp.ensureLocalMirror,
+    updateEventJson: imp.updateEventJson,
+    checkLocks: imp.checkLocks,
+    clearSelfStaleLock: imp.clearSelfStaleLock,
+    archiveStatus: archiveStatus || (async () => ({})),
+    appendSyncJob: imp.appendSyncJob,
+    activeUser: imp.activeUser || (() => null),
+    dirExists: (p) => fs.promises.stat(p).then(st => st.isDirectory(), () => false),
+    statSize,
+    track: (kind, fn) => operatorActivity.wrap(kind, fn),
+    onChange: _pushSnapshot,
+    log: _log,
+  });
+  _creator = createEventCreatorWindow({ BrowserWindow, ipcMain, windowRegistry, log: _log });
+  _creator.register();
   _dump = createEventDumpController({
-    handoff: _handoff,
+    importService: _imports,
+    resolveEvent: imp.resolveEvent || (async () => null),
+    persistLastEvent: imp.persistLastEvent || null,
+    openEventCreator: () => {
+      hidePopup();
+      return _creator.open();
+    },
     getCard: _attachedCard,
     verifyJob: (sourceId) => (_assessor ? _assessor.verify(sourceId) : null),
     classify: (evidence, selection) => classify(evidence, selection),
@@ -712,7 +750,7 @@ function init({ monitor, openApp, log, isImported = () => false, listPhotographe
     onActiveEvent: (ev, pickerClosed) => { if (_divide) _divide.onActiveEvent(ev, pickerClosed); },
   });
   _divide = createDivideController({
-    handoff: _handoff,
+    importService: _imports,
     getCard: _attachedCard,
     peekJob: (sourceId) => (_assessor ? _assessor.get(sourceId) : null),
     verifyJob: (sourceId) => (_assessor ? _assessor.verify(sourceId) : null),
@@ -725,7 +763,7 @@ function init({ monitor, openApp, log, isImported = () => false, listPhotographe
     cardPhotographer: (sourceId) => (_dump ? _dump.photographerOf(sourceId) : null),
     openPicker: (mode) => (_dump ? _dump.openPicker({ mode }) : Promise.resolve({ state: 'refused', reason: 'unavailable' })),
     archiveStatus,
-    statSize: (p) => fs.promises.stat(p).then(st => (st.isFile() ? st.size : null), () => null),
+    statSize,
     makeThumb: divideSupport.thumbnail,
     journal: journalDir ? divideSupport.journalWriter(journalDir, (m) => _log(m)) : null,
     isBusy: () => operatorActivity.isBusy(),
@@ -733,6 +771,8 @@ function init({ monitor, openApp, log, isImported = () => false, listPhotographe
     showPopup: (opts) => { if (_tray) showPopup(opts); },
     log: _log,
   });
+  // EQI-2.1: with no main window yet, the destination starts at AutoIngest's last event.
+  if (imp.lastEvent) { Promise.resolve().then(() => imp.lastEvent()).then((ref) => _dump && _dump.seed(ref)).catch(() => {}); }
   _unsubscribe = _monitor.subscribe(_onPoll);
   _monitor.acquire(MONITOR_CONSUMER);
   // Display added/removed/resized (external monitor, resolution change): keep the open popup
@@ -772,6 +812,8 @@ function shutdown() {
   if (_handoff) { _handoff.unregister(); _handoff = null; }
   _dump = null;
   _divide = null;
+  _imports = null;
+  if (_creator) { _creator.unregister(); _creator = null; }
   _view = { mode: 'compact', sourceId: null };
   for (const ev of ['display-added', 'display-removed', 'display-metrics-changed']) screen.removeListener(ev, _resizePopup);
   _selections.clear();
@@ -805,9 +847,10 @@ function getDiagnostics() {
   };
 }
 
-/** EQI-1: copy progress of the import running for a Dump request (main.js copy-progress tap). */
-function notifyImportProgress(progress) { if (_dump) _dump.onImportProgress(progress); if (_divide) _divide.onImportProgress(progress); }
-/** EQI-1: metadata batch outcome (main.js batch_complete tap). */
-function notifyMetadataBatch(p) { if (_dump) _dump.onMetadataBatch(p); if (_divide) _divide.onMetadataBatch(p); }
+/** EQI-2.1: true while a companion Event Dump import runs (main.js refuses a concurrent workspace import). */
+function isImportRunning() { return !!(_imports && _imports.isRunning()); }
+/** Copy progress tap (main.js importFileJobs). The companion's own imports observe the engine through
+ *  their transaction hooks; this stays as a stable observation point and does nothing itself. */
+function notifyImportProgress(progress) { void progress; }
 
-module.exports = { init, shutdown, showPopup, hidePopup, togglePopup, getDiagnostics, findAssessedRecords, notifyImportProgress, notifyMetadataBatch };
+module.exports = { init, shutdown, showPopup, hidePopup, togglePopup, getDiagnostics, findAssessedRecords, isImportRunning, notifyImportProgress };
