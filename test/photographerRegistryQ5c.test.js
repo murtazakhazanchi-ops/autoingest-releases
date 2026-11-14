@@ -363,8 +363,14 @@ function assertClean(payload, fx, label) {
     "-          workflow:     (typeof importSessionId === 'string' && importSessionId) ? 'multi-event-import' : 'event-import',",
     // EQI-1 re-import guard: a Dump import copies only the jobs not already in its Dump folder.
     '-      result = await importFileJobs(event, fileJobs, _teamImportProgress);',
+    // EQI-2: archive:getOperationsStatus's body became _archiveOperationsStatus() (unchanged), shared
+    // with the companion's multi-event import review.
+    "-ipcMain.handle('archive:getOperationsStatus', async () => {",
+    '-});',
   ];
-  const EQI1_PRELOAD_MEMBERS = ['onCompanionDumpImport', 'onCompanionOpenEventPicker', 'companionWorkspaceEvent', 'onCompanionSelectEvent', 'companionRequestAttention'];
+  const EQI1_PRELOAD_MEMBERS = ['onCompanionDumpImport', 'onCompanionOpenEventPicker', 'companionWorkspaceEvent', 'onCompanionSelectEvent', 'companionRequestAttention',
+    // EQI-2: the multi-event Dump plan handoff and its per-event progress report.
+    'onCompanionDumpPlanImport', 'companionDumpPlanEvent'];
   await t('main.js / preload.js change since Q5b is additions only, confined to the Q5c block', async () => {
     let base;
     try { base = execFileSync('git', ['rev-parse', '--verify', 'aa58eb1^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { console.log('    (Q5b commit not available — skipped)'); return; }
@@ -423,7 +429,12 @@ function assertClean(payload, fx, label) {
       'services/companionPhotographerSuggestion.js', 'test/eqiCompanionHierarchyEQI12.test.js', 'test/eqiCompanionHierarchyLive.test.js',
       // CAM-001: registry opened at launch, macOS Keychain work in a helper process.
       'services/secureStorageHelper.js', 'services/secureStorageHelperProcess.js', 'test/cam001RegistryStartup.test.js', 'test/cam001StartupRecognitionLive.test.js',
-    ]);
+    ,
+      // EQI-2 Multi-Event Quick Assignment (AI-FEAT-064, not Q5): assignment model, divide controller and
+      // support, companion divide view, and their tests.
+      'services/eventDumpAssignmentModel.js', 'services/eventDumpDivide.js', 'services/eventDumpDivideSupport.js',
+      'renderer/companion/companionDivide.js', 'test/eqi2AssignmentModel.test.js', 'test/eqi2DivideController.test.js',
+      'test/eqi2MultiEventAssignmentLive.test.js', 'test/eventPhotographerFoldersQ5e2a.test.js']);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });
 

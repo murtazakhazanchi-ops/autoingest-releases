@@ -345,7 +345,12 @@ const add = (ev, additions, extra = {}) => {
       // CAM-001: immediate photographer recognition — the registry opened at launch with the macOS
       // Keychain work in a helper process (key store awaits an async adapter; no key or format change).
       'services/secureStorageHelper.js', 'services/secureStorageHelperProcess.js', 'services/identityKeyStore.js', 'services/identityRegistryStore.js',
-      'test/cam001RegistryStartup.test.js', 'test/cam001StartupRecognitionLive.test.js', 'test/photographerRegistryQ5d.test.js']);
+      'test/cam001RegistryStartup.test.js', 'test/cam001StartupRecognitionLive.test.js', 'test/photographerRegistryQ5d.test.js',
+      // EQI-2 Multi-Event Quick Assignment (AI-FEAT-064 / AI-RM-016): assignment model, divide controller,
+      // companion divide view, multi-event Dump plan through the existing runner, Local First Dump guard.
+      'services/eventDumpAssignmentModel.js', 'services/eventDumpDivide.js', 'services/eventDumpDivideSupport.js', 'services/eventDumpPaths.js',
+      'renderer/companion/companionDivide.js', 'renderer/eventDumpImport.js', 'main/preload.js', 'main/main.js',
+      'test/eqi2AssignmentModel.test.js', 'test/eqi2DivideController.test.js', 'test/eqi2MultiEventAssignmentLive.test.js', 'test/companionQ1UiFreeze.test.js']);
     assert.deepEqual(changed.filter(f => !allowed.has(f)), []);
   });
 
