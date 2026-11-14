@@ -367,10 +367,34 @@ function assertClean(payload, fx, label) {
     // with the companion's multi-event import review.
     "-ipcMain.handle('archive:getOperationsStatus', async () => {",
     '-});',
+    // EQI-2.1: the import transaction and the IPC handlers the companion now calls directly became
+    // named functions (bodies unchanged); importFileJobs takes optional observer hooks and no sender;
+    // the metadata completion callback runs even with no window open.
+    '-async function importFileJobs(event, fileJobs, onTeamProgress = null) {',
+    '-      if (!event.sender.isDestroyed()) {',
+    '-    });',
+    "-_handleTracked('import:commitTransaction', 'import', async (event, {",
+    '-}) => {',
+    '-      // emitFn is non-null when a window is open OR when locks need deferred release.',
+    '-      const emitFn = (baseEmit || _willWriteNasMetadata)',
+    '-        ? async (p) => {',
+    '-          }',
+    '-        : null;',
+    '-});',
+    "-ipcMain.handle('event:read', async (_event, eventFolderPath) => {",
+    '-});',
+    "-ipcMain.handle('archive:appendSyncJob', async (_event, { localEventPath, job }) => {",
+    '-});',
+    "-ipcMain.handle('archive:checkDirectArchiveLocks', async (_event, { fileJobs } = {}) => {",
+    '-});',
+    "-ipcMain.handle('archive:clearSelfStaleLock', async (_event, { lockPath, force = false } = {}) => {",
+    '-});',
   ];
   const EQI1_PRELOAD_MEMBERS = ['onCompanionDumpImport', 'onCompanionOpenEventPicker', 'companionWorkspaceEvent', 'onCompanionSelectEvent', 'companionRequestAttention',
     // EQI-2: the multi-event Dump plan handoff and its per-event progress report.
-    'onCompanionDumpPlanImport', 'companionDumpPlanEvent'];
+    'onCompanionDumpPlanImport', 'companionDumpPlanEvent',
+    // EQI-2.1: the companion's Event Creator window reports its single outcome.
+    'eventCreatorWindowResult'];
   await t('main.js / preload.js change since Q5b is additions only, confined to the Q5c block', async () => {
     let base;
     try { base = execFileSync('git', ['rev-parse', '--verify', 'aa58eb1^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { console.log('    (Q5b commit not available — skipped)'); return; }
@@ -434,7 +458,12 @@ function assertClean(payload, fx, label) {
       // support, companion divide view, and their tests.
       'services/eventDumpAssignmentModel.js', 'services/eventDumpDivide.js', 'services/eventDumpDivideSupport.js',
       'renderer/companion/companionDivide.js', 'test/eqi2AssignmentModel.test.js', 'test/eqi2DivideController.test.js',
-      'test/eqi2MultiEventAssignmentLive.test.js', 'test/eventPhotographerFoldersQ5e2a.test.js']);
+      'test/eqi2MultiEventAssignmentLive.test.js', 'test/eventPhotographerFoldersQ5e2a.test.js',
+      // EQI-2.1 independent companion (AI-FEAT-064, not Q5): imports in the main process with no main
+      // window, byte-level transfer statistics, and the companion's own Event Creator window.
+      'main/fileManager.js', 'services/companionImportService.js', 'services/eventComponents.js', 'services/transferStats.js',
+      'services/eventCreatorWindow.js', 'renderer/eventCreatorWindow.html', 'renderer/eventCreatorWindow.js', 'renderer/companion/importProgress.js',
+      'test/eqi21CompanionImport.test.js', 'test/eqi21CrashSafeCopy.test.js', 'test/eqi21IndependentCompanionLive.test.js']);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });
 

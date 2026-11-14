@@ -350,7 +350,11 @@ const add = (ev, additions, extra = {}) => {
       // companion divide view, multi-event Dump plan through the existing runner, Local First Dump guard.
       'services/eventDumpAssignmentModel.js', 'services/eventDumpDivide.js', 'services/eventDumpDivideSupport.js', 'services/eventDumpPaths.js',
       'renderer/companion/companionDivide.js', 'renderer/eventDumpImport.js', 'main/preload.js', 'main/main.js',
-      'test/eqi2AssignmentModel.test.js', 'test/eqi2DivideController.test.js', 'test/eqi2MultiEventAssignmentLive.test.js', 'test/companionQ1UiFreeze.test.js']);
+      'test/eqi2AssignmentModel.test.js', 'test/eqi2DivideController.test.js', 'test/eqi2MultiEventAssignmentLive.test.js', 'test/companionQ1UiFreeze.test.js',
+      // EQI-2.1 independent companion: main-process imports, transfer statistics, Event Creator window.
+      'main/fileManager.js', 'services/companionImportService.js', 'services/eventComponents.js', 'services/transferStats.js',
+      'services/eventCreatorWindow.js', 'renderer/eventCreatorWindow.html', 'renderer/eventCreatorWindow.js', 'renderer/companion/importProgress.js',
+      'test/eqi21CompanionImport.test.js', 'test/eqi21CrashSafeCopy.test.js', 'test/eqi21IndependentCompanionLive.test.js']);
     assert.deepEqual(changed.filter(f => !allowed.has(f)), []);
   });
 

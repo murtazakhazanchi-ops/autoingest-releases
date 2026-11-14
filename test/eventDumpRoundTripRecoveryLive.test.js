@@ -121,15 +121,25 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
       await H2.enterDump(page);
       await page.click('#xp-new-event');
     });
-    await clickNewEvent();
-    const formOpen = await main.waitForSelector('#evHijriYear', { timeout: 15000 }).then(() => true, () => false);
-    check(formOpen && await main.evaluate(() => EventMgmt.isOpen() && EventMgmt.getMode() === 'create'), 'Create New Event opens the EXISTING Event Creator form in the main window');
+    // EQI-2.1: the EXISTING Event Creator opens in the companion's own window — never the main window.
+    const ecWin = () => app.windows().find(p => p.url().endsWith('eventCreatorWindow.html')) || null;
+    const openCreator = async () => {
+      await clickNewEvent();
+      const w = await waitFor(async () => ecWin(), 15000);
+      if (w && !w.__dlg) { w.__dlg = true; w.on('dialog', (d) => d.accept().catch(() => {})); }   // the form's own discard confirm
+      if (w) await w.waitForFunction(() => document.body.dataset.ready === 'create' && !!document.getElementById('evHijriYear'), null, { timeout: 20000 }).catch(() => {});
+      return w;
+    };
+    const closeCreator = async () => {
+      for (let i = 0; i < 3 && ecWin(); i++) { await ecWin().click('#emmBackBtn').catch(() => {}); await sleep(300); }
+      await waitFor(async () => !ecWin(), 10000);
+    };
+    let ec = await openCreator();
+    check(!!ec && !(await main.evaluate(() => EventMgmt.isOpen())), 'Create New Event opens the EXISTING Event Creator form in its own window, not the main window');
     check(await waitFor(async () => (await dumpView(app)).popupOpen === false, 5000), 'the menu-bar popup steps aside while the form is open');
 
     // cancel (nothing typed)
-    await main.click('#emmBackBtn'); await sleep(400);
-    if (await main.evaluate(() => EventMgmt.isOpen())) { await main.click('#emmBackBtn'); }
-    await main.waitForFunction(() => !EventMgmt.isOpen(), null, { timeout: 10000 }).catch(() => {});
+    await closeCreator();
     const back1 = await waitFor(async () => (await dumpView(app)).popupOpen === true, 8000);
     const vCancel = await dumpView(app);
     check(!!back1, 'cancelled: the companion comes back by itself');
@@ -137,12 +147,12 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
     check((await fsp.readdir(collDir)).length === 1, 'cancelled: no event folder created');
 
     // create — the real form, real widgets
-    const fillForm = async (day, type, city) => {
-      await main.waitForSelector('#evHijriYear', { timeout: 15000 });
-      await main.fill('#evHijriYear', '1448'); await main.fill('#evHijriMonth', '06'); await main.fill('#evHijriDay', day);
-      const compId = await main.evaluate(() => document.querySelector('.ec-comp-row').dataset.compId);
+    const fillForm = async (w, day, type, city) => {
+      await w.waitForSelector('#evHijriYear', { timeout: 15000 });
+      await w.fill('#evHijriYear', '1448'); await w.fill('#evHijriMonth', '06'); await w.fill('#evHijriDay', day);
+      const compId = await w.evaluate(() => document.querySelector('.ec-comp-row').dataset.compId);
       const tac = async (sel, label) => {
-        const c = main.locator(sel);
+        const c = w.locator(sel);
         await c.locator('input').click(); await c.locator('input').fill(label);
         await c.locator('.tac-item').first().waitFor({ state: 'visible', timeout: 5000 });
         await c.locator('.tac-item').first().click(); await sleep(150);
@@ -151,35 +161,33 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
       await tac('#ecGlobalCityDD', city);
       await sleep(400);
     };
-    await clickNewEvent();
+    ec = await openCreator();
     // invalid details first: date only — no event type, no city
-    await main.waitForSelector('#evHijriYear', { timeout: 15000 });
-    await main.fill('#evHijriYear', '1448'); await main.fill('#evHijriMonth', '06'); await main.fill('#evHijriDay', '03');
+    await ec.fill('#evHijriYear', '1448'); await ec.fill('#evHijriMonth', '06'); await ec.fill('#evHijriDay', '03');
     await sleep(400);
-    check(await main.evaluate(() => document.getElementById('emmCreateBtn').disabled), 'invalid details (no event type / city): Create stays disabled');
-    await fillForm('03', 'Ziyarat', 'Mundra');
-    check(await main.evaluate(() => !document.getElementById('emmCreateBtn').disabled), 'valid details: Create enabled');
-    await main.click('#emmCreateBtn');
-    await main.waitForFunction(() => !EventMgmt.isOpen(), null, { timeout: 20000 });
+    check(await ec.evaluate(() => document.getElementById('emmCreateBtn').disabled), 'invalid details (no event type / city): Create stays disabled');
+    await fillForm(ec, '03', 'Ziyarat', 'Mundra');
+    check(await ec.evaluate(() => !document.getElementById('emmCreateBtn').disabled), 'valid details: Create enabled');
+    await ec.click('#emmCreateBtn');
+    await waitFor(async () => !ecWin(), 20000);
     const created = (await fsp.readdir(collDir)).find(n => n.startsWith('1448-06-03'));
     const ejNew = created ? await readJson(path.join(collDir, created, 'event.json')) : null;
-    // Event sequences are allocated per Hijri date (renderer/eventCreator.js "next sequence number for a
-    // given hijri date"): the first event of 1448-06-03 is _01.
+    // Event sequences are allocated per Hijri date: the first event of 1448-06-03 is _01.
     check(!!created && /^1448-06-03 _01-Ziyarat-Mundra$/.test(created), `event folder created by the normal naming rule (${created})`);
     check(!!ejNew && ejNew.sequence === 1 && ejNew.hijriDate === '1448-06-03' && ejNew.components.length === 1 && ejNew.components[0].city === 'Mundra' && (ejNew.components[0].types || []).includes('Ziyarat'),
       `event.json written by the normal process (${J(ejNew && { sequence: ejNew.sequence, hijriDate: ejNew.hijriDate, comps: ejNew.components.map(c => ({ city: c.city, types: c.types })) })})`);
     const back2 = await waitFor(async () => { const v = await dumpView(app); return v.popupOpen && v.global?.event?.eventName === created ? v : null; }, 10000);
-    check(!!back2, 'Event Creator closed; the companion is back with the NEW event selected');
+    check(!!back2, 'Event Creator window closed; the companion is back with the NEW event selected');
     check(back2 && back2.card.photographer === P1 && back2.card.mode === 'dump' && back2.card.counts.toImport === 3, `card selection and photographer kept (${J(back2 && { ph: back2.card.photographer, toImport: back2.card.counts.toImport })})`);
     const rA = await importViaPopup(app, P1);
-    check(rA.op && rA.op.state === 'completed' && rA.op.result.copied === 3, `imported into the new event (${J(rA.op && rA.op.result)})`);
+    check(rA.op && rA.op.state === 'completed' && rA.op.totals.files.copied === 3, `imported into the new event (${J(rA.op && rA.op.totals)})`);
     check(J(await listFiles(path.join(collDir, created, 'Dump', P1))) === J(['A_0001.JPG', 'A_0002.JPG', 'A_0003.JPG']), 'files in <new event>/Dump/<photographer>');
 
     // repeated creation with identical details
-    await clickNewEvent();
-    await fillForm('03', 'Ziyarat', 'Mundra');
-    const dupAllowed = await main.evaluate(() => !document.getElementById('emmCreateBtn').disabled);
-    if (dupAllowed) { await main.click('#emmCreateBtn'); await main.waitForFunction(() => !EventMgmt.isOpen(), null, { timeout: 20000 }).catch(() => {}); }
+    ec = await openCreator();
+    await fillForm(ec, '03', 'Ziyarat', 'Mundra');
+    const dupAllowed = await ec.evaluate(() => !document.getElementById('emmCreateBtn').disabled);
+    if (dupAllowed) { await ec.click('#emmCreateBtn'); await waitFor(async () => !ecWin(), 20000); }
     await sleep(1000);
     const sameDay = (await fsp.readdir(collDir)).filter(n => n.startsWith('1448-06-03')).sort();
     const ejNewAfter = await readJson(path.join(collDir, created, 'event.json'));
@@ -187,10 +195,10 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
       'repeated creation never touches the first event (its event.json, import record and Dump intact)');
     check(new Set(sameDay).size === sameDay.length && (sameDay.length === 1 || /^1448-06-03 _02-/.test(sameDay[1])), `repeated creation: no folder collision — ${dupAllowed ? 'a distinct next-sequence event' : 'refused by the form'} (${J(sameDay)})`);
     log('repeated-creation behaviour:', dupAllowed ? `allowed → ${sameDay.join(', ')}` : 'Create disabled');
-    if (await main.evaluate(() => EventMgmt.isOpen())) { await main.click('#emmBackBtn'); await sleep(300); if (await main.evaluate(() => EventMgmt.isOpen())) await main.click('#emmBackBtn'); }
+    await closeCreator();
     await waitFor(async () => (await dumpView(app)).popupOpen === true, 8000);
 
-    // choose an EXISTING event from the companion's own picker (EQI-1.1: no main-window form)
+    // choose an EXISTING event from the companion's own picker (no main-window form)
     await withPopup(app, async (page) => {
       await H2.enterDump(page);
       await page.click('#xp-change-event');
@@ -200,8 +208,7 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
     });
     check(!(await main.evaluate(() => EventMgmt.isOpen())), 'Change Event (no workspace): chosen in the companion — the main-window Event Creator never opens');
     const back3 = await waitFor(async () => { const v = await dumpView(app); return v.popupOpen && v.global?.event?.eventName === E0 ? v : null; }, 10000);
-    const v3 = await dumpView(app);
-    check(!!back3, `Change event → existing event chosen → companion back with it selected (${J({ popup: v3.popupOpen, ev: v3.global?.event?.eventName, active: await main.evaluate(() => EventCreator.getActiveEventData()?.event?.name || null) })})`);
+    check(!!back3, 'Change event → existing event chosen → companion back with it selected');
 
     // change events while an Import workspace is open (Review in AutoIngest → workspace)
     await withPopup(app, async (page) => {
@@ -211,7 +218,7 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
     });
     const wsOpen = await main.waitForFunction(() => document.getElementById('workspace').classList.contains('visible') && typeof activeSource !== 'undefined' && !!activeSource, null, { timeout: 30000 }).then(() => true, () => false);
     check(wsOpen, 'Review in AutoIngest opens the card in the Import workspace (Q2 handoff unchanged)');
-    await main.evaluate(() => { window.__eqiTiles = tileMap; });
+    await main.evaluate(() => { window.__eqiTiles = tileMap; window.__eqiEvent = EventCreator.getActiveEventData()?.event?.name || null; });
     await withPopup(app, async (page) => {
       await H2.enterDump(page);
       await page.click('#xp-change-event');
@@ -219,18 +226,15 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
       await page.click(`#xp-picker-list [data-folder="${created}"]`);
       await page.click('#xp-picker-use');
     });
-    await main.waitForSelector(`.ec-evl-item[data-folder="${created}"]`, { timeout: 15000 });
-    await main.click(`.ec-evl-item[data-folder="${created}"]`);
-    await main.waitForFunction(() => !document.getElementById('emmContinueBtn').disabled, null, { timeout: 5000 });
-    await main.click('#emmContinueBtn');
-    await main.waitForFunction(() => !EventMgmt.isOpen(), null, { timeout: 15000 });
+    check(await waitFor(async () => (await evNow()) === created, 8000), 'with an Import workspace open: the companion selects the event itself');
     await sleep(800);
-    check(await main.evaluate(() => document.getElementById('workspace').classList.contains('visible') && tileMap === window.__eqiTiles), 'with an Import workspace open: the event changes and the SAME workspace stays (source not rescanned)');
-    check(await waitFor(async () => (await evNow()) === created, 8000), 'the companion follows the event changed from the workspace');
+    check(await main.evaluate(() => document.getElementById('workspace').classList.contains('visible') && tileMap === window.__eqiTiles && !EventMgmt.isOpen()
+      && (EventCreator.getActiveEventData()?.event?.name || null) === window.__eqiEvent), 'the open Import workspace is not disturbed: same source, same event, no picker (EQI-2.1)');
 
     // ═══ B. crash during COPY ═══
-    await setActiveEvent(main, collDir, COLL, E0);
-    await waitFor(async () => (await evNow()) === E0, 10000);
+    // EQI-2.1: the companion owns its destination — choose E0 in the companion itself.
+    await withPopup(app, (page) => page.evaluate(async (f) => { await window.companion.listEvents(); return window.companion.chooseEvent(f); }, E0));
+    check(!!(await waitFor(async () => (await evNow()) === E0, 10000)), 'E0 chosen in the companion');
     const b0 = await insert('CARD_B');
     check(b0 && b0.counts.selectedNew === 30, `card B: 30 new (${J(b0 && b0.counts)})`);
     // Crash injection at a precise point: the main process kills itself right after the 5th file is copied.
@@ -248,16 +252,16 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
     await waitFor(async () => (await evNow()) === E0, 20000);
     const b1 = await insert('CARD_B');
     check(b1 && b1.counts.selectedNew === 30, `after restart: the card's photos are still NEW (an uncommitted copy is not "imported") (${J(b1 && b1.counts)})`);
-    // This computer's own lock from the crashed import: the EXISTING busy-archive dialog appears in
-    // the main window; the operator chooses Clear & Continue.
+    // This computer's own lock from the crashed import: since EQI-2.1 the same decision is asked in the
+    // companion (no main window needed); the operator chooses Clear Lock & Continue.
     await importViaPopup(app, P2, { wait: false });
-    const dlg = await main.waitForSelector('.dab-clear-btn', { timeout: 20000 }).then(() => true, () => false);
-    check(dlg, 'retry: the existing busy-archive dialog offers Clear & Continue for this computer\'s stale lock');
-    if (dlg) await main.click('.dab-clear-btn');
+    const dlg = !!(await waitFor(async () => { const o = (await dumpView(app)).card?.op; return o && o.decision && o.decision.sameDevice ? o : null; }, 20000));
+    check(dlg, 'retry: the companion offers Clear Lock & Continue for this computer\'s stale lock');
+    if (dlg) await withPopup(app, async (page) => { await H2.enterDump(page); await page.click('#xp-ip .ip-decision button:has-text("Clear Lock & Continue")'); });
     const rB = { op: await waitFor(async () => { const v = await dumpView(app); return v.card?.op && v.card.op.state !== 'pending' ? v.card.op : null; }, 120000) };
     check(rB.op && rB.op.state === 'completed' && rB.op.result.errors === 0 && rB.op.result.copied + rB.op.result.skipped === 30,
       `retry completed: ${J(rB.op && rB.op.result)}`);
-    const filesB = await listFiles(dumpB);
+    const filesB = (await listFiles(dumpB)).filter(f => !/\.xmp$/i.test(f));
     const extrasB = filesB.filter(f => !/^B_\d{4}\.JPG$/.test(f));
     check(filesB.length === 30 && extrasB.length === 0, `retry: exactly 30 files, no duplicates or renamed copies (${filesB.length}; extras: ${extrasB.join(',') || 'none'})`);
     await waitFor(async () => (await dumpView(app)).card?.op?.metadata?.state === 'complete', 90000);
@@ -273,8 +277,11 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
     // ═══ C. crash during METADATA writing ═══
     const c0 = await insert('CARD_C');
     check(c0 && c0.counts.selectedNew === 40, `card C: 40 new (${J(c0 && c0.counts)})`);
-    const rC = await importViaPopup(app, P1);
-    check(rC.op && rC.op.state === 'completed' && rC.op.result.copied === 40, `card C committed (${J(rC.op && rC.op.result)})`);
+    // EQI-2.1: the companion's import is complete only after metadata — so start it and wait for the
+    // metadata stage (the transaction is committed by then) instead of the end.
+    await importViaPopup(app, P1, { wait: false });
+    const rC = { op: await waitFor(async () => { const o = (await dumpView(app)).card?.op; return o && (o.stage === 'metadata' || o.state !== 'pending') ? o : null; }, 120000) };
+    check(rC.op && rC.op.events[0].status === 'completed' && rC.op.result.copied === 40, `card C committed (${J(rC.op && rC.op.result)})`);
     const qdir = path.join(ud, 'metadata-queue');
     const journal = async () => { const f = (await fsp.readdir(qdir).catch(() => [])).find(n => n.endsWith('.journal.jsonl')); if (!f) return { f: null, done: 0 }; const txt = await fsp.readFile(path.join(qdir, f), 'utf8').catch(() => ''); return { f, done: txt.split('\n').filter(l => l.includes('"complete"')).length }; };
     const mid = await waitFor(async () => { const j = await journal(); return j.f && j.done >= 3 && j.done < 40 ? j : null; }, 60000, 50);
@@ -305,10 +312,20 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
     const rawFiles = ['R_0001.CR2', 'R_0001.JPG', 'R_0002.CR3', 'R_0003.MP4'].map(n => path.join(rawDir, n));
     const rawBefore = await hashTree(path.join(work, 'CARD_RAW'));
     const evPathE0 = await main.evaluate(() => EventCreator.getActiveEventData().eventPath);
-    const rD = await main.evaluate((req) => EventDumpImport.run(req), { eventPath: evPathE0, photographer: P2, files: rawFiles, source: { label: 'CARD_RAW', path: path.join(work, 'CARD_RAW') } });
+    // EQI-2.1: the companion's import runs in main over this same transaction; tiny synthetic RAW/video
+    // files are below the card scanner's size floor, so the Dump transaction is called directly here.
+    const rD = await main.evaluate(async (req) => {
+      const ed = EventCreator.getActiveEventData();
+      const { fileJobs } = ImportRouter.buildDumpFileJobs({ eventData: ed, photographer: req.photographer, files: req.files });
+      const s = await window.api.commitImportTransaction(fileJobs, ed.eventPath, { collName: ed.coll && ed.coll.name, photographer: req.photographer, subEventNames: [], liveComps: ed.event.components,
+        groups: [{ id: 0, subEventId: null, metadataTags: null, files: req.files, fileTagRefinements: null }], source: { type: 'memory-card', ...req.source }, importedBy: null, importMode: 'direct-nas', destination: 'dump' });
+      return { ok: true, copied: s.copied, errors: s.errors };
+    }, { eventPath: evPathE0, photographer: P2, files: rawFiles, source: { label: 'CARD_RAW', path: path.join(work, 'CARD_RAW') } }).catch(e => ({ ok: false, error: String(e) }));
     check(rD.ok && rD.copied === 4 && rD.errors === 0, `RAW/JPEG/CR3/video Dump import (${J(rD)})`);
     await waitFor(async () => !(await fsp.readdir(qdir)).some(n => n.endsWith('.manifest.json')), 60000, 500);
     const dumpD = path.join(collDir, E0, 'Dump', P2);
+    // the queue can look empty before this import's manifest is written: wait for the sidecars themselves
+    await waitFor(async () => ['R_0001.xmp', 'R_0002.xmp'].every(x => fs.existsSync(path.join(dumpD, x))) || null, 60000, 500).catch(() => null);
     const filesD = await listFiles(dumpD);
     check(['R_0001.CR2', 'R_0001.JPG', 'R_0002.CR3', 'VIDEO/R_0003.MP4'].every(f => filesD.includes(f)), `RAW+JPEG pair side by side, CR3, video in VIDEO/ (${J(filesD.filter(f => f.startsWith('R_') || f.startsWith('VIDEO')))})`);
     check(sha(await fsp.readFile(path.join(dumpD, 'R_0001.CR2'))) === sha(raws['R_0001.CR2']) && sha(await fsp.readFile(path.join(dumpD, 'R_0002.CR3'))) === sha(raws['R_0002.CR3']), 'RAW bytes unchanged (hash equal)');
@@ -347,7 +364,7 @@ const readJson = async (p) => JSON.parse(await fsp.readFile(p, 'utf8'));
     await fsp.writeFile(idxPath, J(idx));
     await launch();
     await main.evaluate(async () => { await window.api.setDefaultImportMode('direct-nas'); });   // E left Local First on
-    await setActiveEvent(main, collDir, COLL, created);
+    await withPopup(app, (page) => page.evaluate(async (f) => { await window.companion.listEvents(); return window.companion.chooseEvent(f); }, created));
     await waitFor(async () => (await evNow()) === created, 20000);
     const f0 = await insert('CARD_A');
     check(f0 && f0.counts.selectedNew === 3, `forgotten by the index: card A's photos look new again (${J(f0 && f0.counts)})`);

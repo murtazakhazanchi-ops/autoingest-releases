@@ -223,9 +223,9 @@ const mainWin = async (app) => (await windows(app)).find(w => w.page === 'index.
     });
     const mw5 = await mainWin(app);
     check(!mw5.visible && !mw5.focused, `Change Event did not bring the main window forward (${J({ visible: mw5.visible, focused: mw5.focused })})`);
-    check(await main.evaluate(() => EventCreator.getActiveEventData()?.event?.name) === LONG_B && !(await main.evaluate(() => EventMgmt.isOpen())), 'the workspace adopted the chosen event without opening the Event Creator');
+    // EQI-2.1: the companion owns its destination — the main window (and any open workspace) is not changed.
+    check((await dumpView(app)).global?.event?.eventName === LONG_B && !(await main.evaluate(() => EventMgmt.isOpen())), 'the companion selected the event without opening the Event Creator');
     check((await dumpView(app)).card?.photographer === P1, 'photographer kept across the event change');
-    check(await main.evaluate((n) => (document.querySelector('.hero-body')?.textContent || '').replace(/\s+/g, ' ').includes(n), LONG_B), 'the main window\'s home card shows the event chosen in the companion (no stale event)');
 
     // ═══ 6. Import to Dump — main window stays in the background ═══
     let sawProgress = false;
@@ -233,11 +233,11 @@ const mainWin = async (app) => (await windows(app)).find(w => w.page === 'index.
       await enterDump(page);
       await page.waitForFunction(() => !document.getElementById('xp-import').disabled, null, { timeout: 10000 });
       await page.click('#xp-import');
-      sawProgress = !!(await page.waitForSelector('#xp-progress:not([hidden])', { timeout: 10000 }).catch(() => null));
+      sawProgress = !!(await page.waitForSelector('#xp-ip:not([hidden])', { timeout: 10000 }).catch(() => null));
       if (sawProgress) await shoot(page, shots, '5-importing');
     });
     const op = await waitFor(async () => { const v = await dumpView(app); return v.card?.op && v.card.op.state !== 'pending' ? v.card.op : null; }, 120000);
-    check(op && op.state === 'completed' && op.result.copied === 24 && op.result.errors === 0, `import completed (${J(op && op.result)})`);
+    check(op && op.state === 'completed' && op.totals.files.copied === 24 && op.totals.files.failed === 0, `import completed (${J(op && op.totals)})`);
     check(sawProgress, 'progress was shown in the companion while importing');
     const mw6 = await mainWin(app);
     check(!mw6.visible && !mw6.focused, `Import to Dump did not bring the main window forward (${J({ visible: mw6.visible, focused: mw6.focused })})`);
@@ -246,8 +246,8 @@ const mainWin = async (app) => (await windows(app)).find(w => w.page === 'index.
     check(J(await listFiles(cardA)) === J(cardBefore), 'source card unchanged');
     await withPopup(app, async (page) => {
       await enterDump(page);
-      await page.waitForSelector('#xp-result:not([hidden])', { timeout: 10000 });
-      const res = await page.textContent('#xp-result');
+      await page.waitForSelector('#xp-ip .ip-summary', { timeout: 10000 });
+      const res = await page.textContent('#xp-ip .ip-summary');
       check(/24/.test(res), `completion shown in the companion ("${res.trim().slice(0, 120)}")`);
       await shoot(page, shots, '6-complete');
     });
@@ -257,7 +257,8 @@ const mainWin = async (app) => (await windows(app)).find(w => w.page === 'index.
     const lockPath = await mainRequire(app, '../services/archiveLockService', 'return m.getLockPath(arg.root, arg.scope);', { root: archiveRoot, scope: { collection: COLL, eventFolderName: LONG_A, photographerFolderName: P2 } });
     await fsp.mkdir(path.dirname(lockPath), { recursive: true });
     await fsp.writeFile(lockPath, J({ lockType: 'photographer-archive-write', collection: COLL, eventFolderName: LONG_A, photographerFolderName: P2, deviceName: 'EQI11-OTHER-MAC', operation: 'background-archive-sync', jobId: 'eqi11', createdAt: Date.now(), lastHeartbeatAt: Date.now(), expiresAt: Date.now() + 3600e3, status: 'active' }));
-    await setActiveEvent(main, collDir, COLL, LONG_A);
+    // EQI-2.1: the companion owns its destination — choose the locked event in the companion itself.
+    await withPopup(app, (page) => page.evaluate(async (f) => { await window.companion.listEvents(); return window.companion.chooseEvent(f); }, LONG_A));
     await waitFor(async () => (await dumpView(app)).global?.event?.eventName === LONG_A, 10000);
     fs.writeFileSync(iso.drivesFile, J([]));
     await waitFor(async () => !(await dumpView(app)).card, 15000);
@@ -272,12 +273,14 @@ const mainWin = async (app) => (await windows(app)).find(w => w.page === 'index.
       await page.waitForFunction(() => !document.getElementById('xp-import').disabled, null, { timeout: 10000 });
       await page.click('#xp-import');
     });
-    const dlg = await main.waitForSelector('.ec-modal-overlay .dab-cancel-btn', { timeout: 20000 }).then(() => true, () => false);
+    // EQI-2.1: the decision is asked in the companion itself — the main window is not needed.
+    let dlg = false;
+    await withPopup(app, async (page) => {
+      dlg = !!(await page.waitForSelector('#xp-ip .ip-decision', { timeout: 20000 }).catch(() => null));
+      if (dlg) { await shoot(page, shots, '7-busy-decision'); await page.click('#xp-ip .ip-decision button:has-text("Cancel Import")'); }
+    });
     const mw7 = await mainWin(app);
-    check(dlg && mw7.visible, `busy-archive dialog appears and the main window comes forward for it (${J({ dialog: dlg, visible: mw7.visible })})`);
-    await main.waitForTimeout(600);   // the modal's fade-in
-    await main.screenshot({ path: path.join(shots, '7-busy-dialog.png') });
-    if (dlg) await main.click('.ec-modal-overlay .dab-cancel-btn');
+    check(dlg && !mw7.visible, `busy-archive decision appears in the companion; the main window stays in the background (${J({ decision: dlg, visible: mw7.visible })})`);
     const op7 = await waitFor(async () => { const v = await dumpView(app); return v.card?.op && v.card.op.state !== 'pending' ? v.card.op : null; }, 20000);
     check(op7 && op7.state !== 'completed' && op7.reason === 'archive-busy', `cancelled: nothing imported, reason shown (${J(op7 && { state: op7.state, reason: op7.reason })})`);
     check(fs.existsSync(lockPath) && JSON.parse(fs.readFileSync(lockPath, 'utf8')).deviceName === 'EQI11-OTHER-MAC', 'the other computer\'s lock was NOT cleared');

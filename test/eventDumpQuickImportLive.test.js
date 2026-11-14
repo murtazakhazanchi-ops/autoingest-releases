@@ -100,7 +100,7 @@ const setActiveEvent = (main, archiveRoot, folder) => _setActive(main, path.join
 
     // 1) Default: today's new files → E1/Dump/P1, through the real popup.
     const r1 = await importViaPopup(app, P1);
-    check(/Import 3 files to Dump/.test(r1.label || ''), `popup button names what it will do ("${r1.label}")`);
+    check(/Import 3 Files to Dump/.test(r1.label || ''), `popup button names what it will do ("${r1.label}")`);
     check(r1.op && r1.op.state === 'completed' && r1.op.result.copied === 3 && r1.op.result.errors === 0 && r1.op.result.importMode === 'direct-nas', `import 1 completed: ${J(r1.op && r1.op.result)}`);
     const dump1 = path.join(evDir(E1), 'Dump', P1);
     check(J(await listFiles(dump1)) === J(['IMG_0001.JPG', 'IMG_0002.JPG', 'IMG_0003.JPG']), `exactly today's files in Event/Dump/${'<photographer>'} (${J(await listFiles(dump1))})`);
@@ -190,17 +190,22 @@ const setActiveEvent = (main, archiveRoot, folder) => _setActive(main, path.join
     const q = await waitFor(async () => { const sq = await main.evaluate(() => window.api.getSyncQueue()); return (sq.jobs || []).find(j => (j.event || '') === E3) || null; }, 30000, 500);
     check(!!q, `Local First: a sync job is registered for the event (${J(q && { event: q.event, status: q.status })})`);
 
-    // 9) Create New Event: the EXISTING Event Creator opens in the main window; cancel leaves the companion as it was.
+    // 9) Create New Event (EQI-2.1): the EXISTING Event Creator opens in the companion's own Event
+    //    Creator window — never in the main window; cancel leaves the companion as it was.
     await main.evaluate(async () => { await window.api.setDefaultImportMode('direct-nas'); });
     const before = (await dumpView(app)).global.event;
     await withPopup(app, async (page) => {
       await H2.enterDump(page);
       await page.click('#xp-new-event');
     });
-    const opened = await main.waitForFunction(() => EventMgmt.isOpen() && EventMgmt.getMode() === 'create', null, { timeout: 15000 }).then(() => true, () => false);
-    check(opened, 'Create New Event opens the existing Event Creator form (Event Management in create mode) in the main window');
-    await main.evaluate(() => { EventMgmt.close(); });
-    await sleep(1500);
+    const ec = await waitFor(async () => app.windows().find(p => p.url().endsWith('eventCreatorWindow.html')) || null, 15000);
+    if (ec) ec.on('dialog', (d) => d.accept().catch(() => {}));   // the form's own discard confirm
+    const opened = !!ec && await ec.waitForFunction(() => document.body.dataset.ready === 'create' && !!document.getElementById('evHijriYear'), null, { timeout: 20000 }).then(() => true, () => false);
+    check(opened, 'Create New Event opens the existing Event Creator form in its own window');
+    check(!(await main.evaluate(() => EventMgmt.isOpen())), 'the main window\'s Event Management is not opened');
+    if (ec) { await ec.click('#emmBackBtn').catch(() => {}); await sleep(300); const still = app.windows().find(p => p.url().endsWith('eventCreatorWindow.html')); if (still) await still.click('#emmBackBtn').catch(() => {}); }
+    await waitFor(async () => !app.windows().some(p => p.url().endsWith('eventCreatorWindow.html')), 10000);
+    await sleep(500);
     check(J((await dumpView(app)).global.event) === J(before), 'cancelled: the companion keeps the previous event');
 
     // ── isolation / guard ──

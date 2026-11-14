@@ -68,7 +68,9 @@ const EQI1_PRELOAD_CHANNELS = ['companion:dumpImport', 'companion:openEventPicke
   // EQI-1.1: one-click event selection without foregrounding, and the attention request for safety dialogs.
   'companion:selectEvent', 'companion:attention',
   // EQI-2: the multi-event Dump plan handoff and its per-event progress (no main-window UI).
-  'companion:dumpPlanImport', 'companion:dumpPlanEvent'];
+  'companion:dumpPlanImport', 'companion:dumpPlanEvent',
+  // EQI-2.1: the companion's Event Creator window reports its outcome (sender-checked in main).
+  'eventCreatorWindow:result'];
 const EQI1_RENDERER_LINES = [
   '+  // AI-FEAT-064 EQI-1: Event Dump imports / event picker requests from the companion, and the',
   '+  // active-event report it shows.',
@@ -78,7 +80,10 @@ const diffLines = (file) => git('diff', '-U0', mergeBase, '--', file).split('\n'
   .filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
 
 t('no existing renderer file changed except the approved handoff listener (main window, splash, shared modules)', () => {
-  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE, Q5E_MODULE, EQI1_MODULE, EQI1_ROUTER, EQI1_SESSION_UI].includes(f));
+  // EQI-2.1: the companion's own Event Creator window — a separate page (the main window's
+  // index.html is untouched; its styles are injected at runtime, not copied).
+  const EQI21_WINDOW = ['renderer/eventCreatorWindow.html', 'renderer/eventCreatorWindow.js'];
+  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE, Q5E_MODULE, EQI1_MODULE, EQI1_ROUTER, EQI1_SESSION_UI, ...EQI21_WINDOW].includes(f));
   assert.deepEqual(offending, []);
 });
 
@@ -143,8 +148,11 @@ t('eventDumpImport.js (EQI-1): non-visual — draws nothing, only clicks the exi
   assert.ok(!/innerHTML|outerHTML|insertAdjacent|createElement|appendChild|replaceChildren|\.style\.|classList\.(add|remove|toggle)|document\.write/.test(code), 'no DOM, markup or style created');
   assert.ok(!/ipcRenderer|require\(/.test(code), 'no direct IPC or module access');
   const ids = [...code.matchAll(/getElementById\('([^']+)'\)/g)].map(m => m[1]);
-  assert.deepEqual([...new Set(ids)].sort(), ['ecNewEventFromList', 'workspace'], 'reads the workspace state; clicks only the existing New Event button');
-  assert.ok(/destination: 'dump'/.test(code) && /ImportRouter\.buildDumpFileJobs/.test(code) && /ImportSessionRunner\.run/.test(code) && /_sessPrepareEvent/.test(code), 'runs the existing import machinery');
+  // EQI-2.1: imports and event creation moved out of the main window (companionImportService /
+  // the companion's Event Creator window); what remains only reports the active event.
+  assert.deepEqual([...new Set(ids)].sort(), [], 'reads no element and clicks nothing');
+  assert.ok(!/commitImportTransaction|ImportSessionRunner|ecNewEventFromList/.test(code), 'runs no import and opens no picker');
+  assert.ok(/companionWorkspaceEvent/.test(code), 'reports the active event to the companion');
 });
 
 t('importRouter.js (EQI-1): additions only — buildDumpFileJobs, never consults photographerSequences', () => {

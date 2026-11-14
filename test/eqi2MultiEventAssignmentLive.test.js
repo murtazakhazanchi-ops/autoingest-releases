@@ -158,8 +158,8 @@ async function dview(app) {
       await page.waitForFunction(() => !document.getElementById('xp-import').disabled, null, { timeout: 10000 });
       const importBtn = await page.$eval('#xp-import', b => ({ text: b.textContent, w: b.getBoundingClientRect().width, cls: b.className }));
       const divBtn = await page.$eval('#xp-divide', b => ({ text: b.textContent, cls: b.className, disabled: b.disabled }));
-      check(/Import 11 files to Dump/.test(importBtn.text) && /btn-primary/.test(importBtn.cls) && importBtn.w > 400, `the one-step Import stays the prominent primary action (${J(importBtn)})`);
-      check(divBtn.text === 'Divide Photos Between Events' && /link-btn/.test(divBtn.cls) && !divBtn.disabled, 'Divide Photos Between Events is offered as a secondary action');
+      check(/Import 11 Files to Dump/.test(importBtn.text) && /btn-primary/.test(importBtn.cls) && importBtn.w > 400, `the one-step Import stays the prominent primary action (${J(importBtn)})`);
+      check(divBtn.text === 'Divide Between Events' && /btn-outline/.test(divBtn.cls) && !divBtn.disabled, 'Divide Between Events is offered as an outlined secondary action (EQI-2.1)');
       await shoot(page, shots, '1-expanded-with-divide'); shotsTaken.push('1-expanded-with-divide');
       await page.click('#xp-divide');
       await page.waitForSelector('#dv:not([hidden])', { timeout: 10000 });
@@ -270,19 +270,21 @@ async function dview(app) {
       await shoot(page, shots, '4-event-chooser'); shotsTaken.push('4-event-chooser');
       await page.click('#dv-chooser-new');
     });
-    const opened = await main.waitForFunction(() => EventMgmt.isOpen() && EventMgmt.getMode() === 'create', null, { timeout: 20000 }).then(() => true, () => false);
-    check(opened, 'Create New Event opens the existing Event Creator form in the main window');
+    // EQI-2.1: the existing Event Creator in the companion's own window (never the main window).
+    const ecw = await waitFor(async () => app.windows().find(p => p.url().endsWith('eventCreatorWindow.html')) || null, 20000);
+    const opened = !!ecw && await ecw.waitForFunction(() => document.body.dataset.ready === 'create', null, { timeout: 20000 }).then(() => true, () => false);
+    check(opened && !(await main.evaluate(() => EventMgmt.isOpen())), 'Create New Event opens the existing Event Creator form in its own window');
     if (opened) {
-      await main.waitForSelector('#evHijriYear', { timeout: 10000 });
-      await main.fill('#evHijriYear', '1448'); await main.fill('#evHijriMonth', '05'); await main.fill('#evHijriDay', '01');
-      const compId = await main.evaluate(() => document.querySelector('.ec-comp-row').dataset.compId);
-      const t1 = main.locator(`#ecET-${compId}`); await t1.locator('input').click(); await t1.locator('input').fill('Ziyarat');
+      ecw.on('dialog', (d) => d.accept().catch(() => {}));
+      await ecw.fill('#evHijriYear', '1448'); await ecw.fill('#evHijriMonth', '05'); await ecw.fill('#evHijriDay', '01');
+      const compId = await ecw.evaluate(() => document.querySelector('.ec-comp-row').dataset.compId);
+      const t1 = ecw.locator(`#ecET-${compId}`); await t1.locator('input').click(); await t1.locator('input').fill('Ziyarat');
       await t1.locator('.tac-item').first().waitFor({ state: 'visible', timeout: 5000 }); await t1.locator('.tac-item').first().click();
-      const c1 = main.locator('#ecGlobalCityDD'); await c1.locator('input').click(); await c1.locator('input').fill('Mundra');
+      const c1 = ecw.locator('#ecGlobalCityDD'); await c1.locator('input').click(); await c1.locator('input').fill('Mundra');
       await c1.locator('.tac-item').first().waitFor({ state: 'visible', timeout: 5000 }); await c1.locator('.tac-item').first().click();
-      await main.waitForTimeout(400);
-      await main.click('#emmCreateBtn');
-      await main.waitForFunction(() => !EventMgmt.isOpen(), null, { timeout: 20000 });
+      await ecw.waitForFunction(() => !document.getElementById('emmCreateBtn').disabled, null, { timeout: 5000 });
+      await ecw.click('#emmCreateBtn');
+      await waitFor(async () => !app.windows().some(p => p.url().endsWith('eventCreatorWindow.html')), 20000);
     }
     const afterNew = await waitFor(async () => { const v = await dview(app); const r = v.dv && v.dv.ranges.find(x => x.id === R.f); return r && r.eventId ? v : null; }, 20000);
     NEW = afterNew && afterNew.dv.ranges.find(x => x.id === R.f).eventId;
@@ -328,9 +330,9 @@ async function dview(app) {
     const done1 = async () => { const v = await dview(app); return v.dv && v.dv.op && v.dv.op.state !== 'pending'; };
     /** Review → Import in the real popup, then wait for THIS import's outcome (never a previous one). */
     const reviewAndImport = async (ms = 90000) => {
-      const before = (await dview(app)).dv?.op?.at || 0;
+      const before = (await dview(app)).dv?.op?.id || null;   // EQI-2.1: each import has its own id
       await withPopup(app, async (page) => { await page.click('#dv-review'); await page.waitForSelector('#dv-review-panel:not([hidden]) .dv-review-event'); await page.click('#dv-review-import'); });
-      return waitFor(async () => { const v = await dview(app); const o = v.dv && v.dv.op; return o && o.at !== before && o.state !== 'pending' ? o : null; }, ms);
+      return waitFor(async () => { const v = await dview(app); const o = v.dv && v.dv.op; return o && o.id && o.id !== before && o.state !== 'pending' ? o : null; }, ms);
     };
     const rtt = await sampleRtt(app, done1);
     const op1 = (await dview(app)).dv.op;
@@ -338,7 +340,7 @@ async function dview(app) {
     check(op1.state === 'completed' && op1.events.length === 4 && op1.events.every(e => e.status === 'completed'),
       `ONE plan, four event transactions, each completed (${J(op1.events.map(e => [e.eventId.slice(0, 14), e.status, e.copied]))})`);
     const dumpOf = (f, ph = P1) => path.join(evDir(f), 'Dump', ph);
-    const e1Files = await listFiles(dumpOf(E1));
+    const e1Files = (await listFiles(dumpOf(E1))).filter(f => !/\.xmp$/i.test(f));   // RAW sidecars are metadata, not media
     check(e1Files.length === 6 && e1Files.includes('IMG_0002.CR3') && e1Files.includes('IMG_0002.JPG') && e1Files.filter(f => /^IMG_0001/.test(f)).length === 2,
       `E1/Dump/${P1}: pair together, boundary photo, both IMG_0001 (second renamed, not overwritten) (${J(e1Files)})`);
     check(J(await listFiles(dumpOf(E2))) === J(['IMG_0003.JPG', 'IMG_0004.JPG', 'IMG_0011.JPG']), `E2/Dump/${P1}: 11:45, 12:10 and the earlier-date photo`);
@@ -365,7 +367,7 @@ async function dview(app) {
     }
     check(J(await hashTree(cardA)) === J(cardABefore), 'card A untouched: nothing deleted, renamed or modified on the source');
     await withPopup(app, async (page) => {
-      await page.waitForSelector('#dv-results:not([hidden]) .dv-result', { timeout: 5000 });
+      await page.waitForSelector('#dv-ip:not([hidden]) .ip-summary', { timeout: 15000 });
       await shoot(page, shots, '7-results'); shotsTaken.push('7-results');
     });
     dv = (await dview(app)).dv;
@@ -464,12 +466,15 @@ async function dview(app) {
     fs.writeFileSync(iso.drivesFile, J([fakeDrive(cardD, 'CARD_D')]));
     await waitFor(async () => { const v = await dview(app); return v.src && v.src.label === 'CARD_D' && v.src.assessment?.state === 'complete'; }, 90000);
     await setupD();
+    // On a single APFS volume the copy can finish before the card was pulled: then nothing is left to retry.
+    const leftD = (await dview(app)).dv.review.totalFiles;
+    log(`files left to import after the removal: ${leftD}`);
     let probing = true;
     const probe = (async () => { const r = await sampleRtt(app, async () => !probing); return r; })();
-    const op4r = await reviewAndImport();
+    const op4r = leftD ? await reviewAndImport() : { state: 'completed' };
     probing = false;
     const rtt4 = await probe;
-    check(rtt4.n >= 3 && rtt4.max < 500, `main process responsive throughout an 80-file, two-event import (${rtt4.n} round trips, max ${rtt4.max} ms, median ${rtt4.p50} ms)`);
+    if (leftD) check(rtt4.n >= 3 && rtt4.max < 500, `main process responsive throughout an 80-file, two-event import (${rtt4.n} round trips, max ${rtt4.max} ms, median ${rtt4.p50} ms)`);
     const d1 = (await listFiles(dumpOf(E2))).filter(f => /^D1_/.test(f)), d2 = (await listFiles(dumpOf(E3))).filter(f => /^D2_/.test(f));
     check(op4r?.state === 'completed' && d1.length === 40 && d2.length === 40 && [...d1, ...d2].every(f => /^D[12]_\d\d\.JPG$/.test(f)),
       `retry after removal: every photo imported exactly once (${d1.length} + ${d2.length}, no "_1" copies)`);
@@ -499,12 +504,17 @@ async function dview(app) {
     // history rolled off) must not be staged — and so synced — a second time.
     for (const [st, f] of [[st1, E1], [st2, E2]]) { const dest = path.join(dumpOf(f, P2), path.basename(st)); await fsp.mkdir(path.dirname(dest), { recursive: true }); await fsp.copyFile(st, dest); await fsp.rm(st); }
     const dumpsBefore = J([await hashTree(dumpOf(E1, P2)), await hashTree(dumpOf(E2, P2))]);
-    const g = await main.evaluate((req) => EventDumpImport.runPlan(req), { collectionPath: path.join(archiveRoot, COLL), batches: [
-      { folderName: E1, eventPath: path.join(archiveRoot, COLL, E1), photographer: P2, files: [path.join(e100, 'LF_0001.JPG')] },
-      { folderName: E2, eventPath: path.join(archiveRoot, COLL, E2), photographer: P2, files: [path.join(e100, 'LF_0002.JPG')] },
-    ], source: { label: 'CARD_E', path: cardE } }).catch(e => ({ ok: false, error: String(e) }));
-    check(g && g.ok && g.e0_copied === 0 && g.e0_skipped === 1 && g.e1_copied === 0 && g.e1_skipped === 1 && !fs.existsSync(st1) && !fs.existsSync(st2),
-      `Local First duplicate guard: already in the archive Dump → skipped, not staged again (${J(g).slice(0, 220)})`);
+    // The re-import guard lives in the import transaction itself (EQI-2.1: the companion calls the same
+    // transaction from the main process); called here exactly as a Local First Dump transaction is.
+    const guard = async (f, file) => main.evaluate(async (a) => {
+      const mirror = await window.api.ensureLocalMirror({ collectionName: a.coll, eventName: a.f, eventPath: a.archEvent, eventJsonPath: a.archEvent + '/event.json' });
+      return window.api.commitImportTransaction([{ src: a.src, dest: `${mirror.localEventPath}/Dump/${a.ph}/${a.name}` }], mirror.localEventPath, {
+        collName: a.coll, photographer: a.ph, subEventNames: [], liveComps: [], groups: [{ id: 0, subEventId: null, metadataTags: null, files: [a.src], fileTagRefinements: null }],
+        source: { type: 'memory-card', label: 'CARD_E', path: a.card }, importedBy: null, importMode: 'local-first', destination: 'dump', archiveEventPath: a.archEvent });
+    }, { coll: COLL, f, archEvent: path.join(archiveRoot, COLL, f), src: path.join(e100, file), name: file, ph: P2, card: cardE }).catch(e => ({ error: String(e) }));
+    const g1 = await guard(E1, 'LF_0001.JPG'), g2 = await guard(E2, 'LF_0002.JPG');
+    check(g1 && g1.copied === 0 && g1.skipped === 1 && g2 && g2.copied === 0 && g2.skipped === 1 && !fs.existsSync(st1) && !fs.existsSync(st2),
+      `Local First duplicate guard: already in the archive Dump → skipped, not staged again (${J([g1 && { c: g1.copied, s: g1.skipped, e: g1.error }, g2 && { c: g2.copied, s: g2.skipped }])})`);
     check(J([await hashTree(dumpOf(E1, P2)), await hashTree(dumpOf(E2, P2))]) === dumpsBefore, 'the archive Dump folders were only read by the guard (byte-identical)');
     await main.evaluate(async () => { await window.api.setDefaultImportMode('direct-nas'); });
 
