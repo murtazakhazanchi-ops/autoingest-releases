@@ -42,6 +42,8 @@ const { summarize, filesForSelection, normalizeSelection } = require('./dateAsse
 const { summarizeCameras } = require('./cameraAssessmentModel');
 const { createWorkspaceHandoff } = require('./workspaceHandoff');
 const { createEventDumpController } = require('./eventDumpCompanion');
+const { createDivideController } = require('./eventDumpDivide');
+const divideSupport = require('./eventDumpDivideSupport');
 const { classify } = require('./dateAssessmentModel');
 
 const MONITOR_CONSUMER = 'companion';
@@ -66,6 +68,8 @@ const IPC_HANDLE_CHANNELS = [
   'companion:selectDate', 'companion:reviewSelected', 'companion:reviewEarlier',
   'companion:setDumpOptions', 'companion:dumpImport', 'companion:openEventPicker',
   'companion:setView', 'companion:listEvents', 'companion:chooseEvent',
+  'companion:divideCommand', 'companion:divideEvents', 'companion:divideAssets', 'companion:divideThumbs',
+  'companion:divideReview', 'companion:divideImport',
 ];
 
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
@@ -91,6 +95,7 @@ let _autoOpenSuppressedCount = 0;
 let _assessor = null;
 let _handoff = null;
 let _dump = null;                // EQI-1 Event Dump controller (eventDumpCompanion.js)
+let _divide = null;              // EQI-2 Divide Photos Between Events (eventDumpDivide.js)
 /**
  * EQI-1.1 adaptive popup: 'compact' card overview, or 'expanded' Event Dump for one card. Kept in
  * main, so closing and reopening the popup (or a resize) restores the working context.
@@ -161,6 +166,9 @@ function _assessmentView(sourceId) {
   }
   view.dump = _dump ? _dump.cardView(sourceId, job) : null;   // EQI-1: names and counts only
   if (view.dump) view.dump.suggestion = _photographerSuggestion(job);   // EQI-1.2: names only
+  // EQI-2: the division of THIS card's photos, only while it is the card on screen (names/times/counts).
+  view.divide = _divide && _view.mode === 'divide' && _view.sourceId === sourceId ? _divide.view(sourceId) : null;
+  view.divideRunning = !!(_divide && _divide.isRunning(sourceId));
   return view;
 }
 
@@ -255,6 +263,32 @@ function _registerIpc() {
     if (!_isFromPopup(event) || !_dump) return { state: 'refused', reason: 'invalid' };
     return _dump.chooseEvent(payload);
   });
+  // EQI-2 Divide Photos Between Events (every payload validated by eventDumpDivide.js).
+  ipcMain.handle('companion:divideCommand', (event, payload) => {
+    if (!_isFromPopup(event) || !_divide) return { ok: false, reason: 'invalid' };
+    return _divide.command(payload);
+  });
+  ipcMain.handle('companion:divideEvents', (event, payload) => {
+    if (!_isFromPopup(event) || !_divide) return { ok: false, reason: 'invalid' };
+    return _divide.events(payload);
+  });
+  ipcMain.handle('companion:divideAssets', (event, payload) => {
+    if (!_isFromPopup(event) || !_divide) return { ok: false, reason: 'invalid' };
+    return _divide.assetsOf(payload);
+  });
+  ipcMain.handle('companion:divideThumbs', (event, payload) => {
+    if (!_isFromPopup(event) || !_divide) return { ok: false, reason: 'invalid' };
+    return _divide.thumbs(payload);
+  });
+  ipcMain.handle('companion:divideReview', (event, payload) => {
+    if (!_isFromPopup(event) || !_divide) return { ok: false, reason: 'invalid' };
+    return _divide.review(payload);
+  });
+  ipcMain.handle('companion:divideImport', (event, payload) => {
+    if (!_isFromPopup(event) || !_divide) return { state: 'refused', reason: 'invalid' };
+    return _divide.startImport(payload);
+  });
+  ipcMain.on('companion:dumpPlanEvent', _onPlanEvent);
   ipcMain.handle('companion:quit', (event) => {
     if (!_isFromPopup(event)) return { ok: false };
     hidePopup();
@@ -269,6 +303,13 @@ function _onWorkspaceEvent(event, info) {
   const main = windowRegistry.getMainWindow();
   if (!_dump || !main || main.isDestroyed() || event.sender !== main.webContents) return;
   _dump.onWorkspaceEvent(info);
+}
+
+/** EQI-2: per-event progress of a plan import — accepted only from the main window itself. */
+function _onPlanEvent(event, info) {
+  const main = windowRegistry.getMainWindow();
+  if (!_divide || !main || main.isDestroyed() || event.sender !== main.webContents) return;
+  _divide.onPlanEvent(info);
 }
 
 /**
@@ -292,6 +333,11 @@ function _setView(payload) {
   } else if (p.mode === 'expanded' && typeof p.sourceId === 'string' && SOURCE_ID_RE.test(p.sourceId) && _attachedCard(p.sourceId)) {
     _view = { mode: 'expanded', sourceId: p.sourceId };
     if (_dump) _dump.setOptions({ sourceId: p.sourceId, mode: 'dump' });
+  } else if (p.mode === 'divide' && typeof p.sourceId === 'string' && SOURCE_ID_RE.test(p.sourceId) && _attachedCard(p.sourceId) && _divide) {
+    // EQI-2: only on the operator's explicit "Divide Photos Between Events" (never automatic).
+    const opened = _divide.open(p.sourceId);
+    if (!opened.ok) return opened;
+    _view = { mode: 'divide', sourceId: p.sourceId };
   } else {
     return { ok: false, reason: 'invalid' };
   }
@@ -305,6 +351,7 @@ function _unregisterIpc() {
   for (const ch of IPC_HANDLE_CHANNELS) ipcMain.removeHandler(ch);
   ipcMain.removeListener('companion:workspaceEvent', _onWorkspaceEvent);
   ipcMain.removeListener('companion:attention', _onAttention);
+  ipcMain.removeListener('companion:dumpPlanEvent', _onPlanEvent);
   _ipcRegistered = false;
 }
 
@@ -540,6 +587,7 @@ function _onPoll(latest) {
     _selections.delete(id);
     _ops.delete(id);
     if (_dump) _dump.forget(id);
+    if (_divide) _divide.forget(id);
     if (_view.sourceId === id) { _view = { mode: 'compact', sourceId: null }; _resizePopup(); }
   }
   if (_assessor) _assessor.sync(latest && latest.cards);
@@ -607,7 +655,7 @@ function _contextMenu() {
  * @param {() => void} opts.openApp  focus/restore the main window or reopen it via splash
  * @param {(msg: string) => void} [opts.log]
  */
-function init({ monitor, openApp, log, isImported = () => false, listPhotographers = () => [], scanEvents = null, registryForSuggestions = null, onRegistryChange = null }) {
+function init({ monitor, openApp, log, isImported = () => false, listPhotographers = () => [], scanEvents = null, registryForSuggestions = null, onRegistryChange = null, archiveStatus = null, journalDir = null }) {
   if (_tray) return;
   _monitor = monitor;
   _listPhotographers = listPhotographers;
@@ -661,6 +709,29 @@ function init({ monitor, openApp, log, isImported = () => false, listPhotographe
     showPopup: (opts) => { if (_tray) showPopup(opts); },
     hidePopup: () => hidePopup(),
     log: _log,
+    onActiveEvent: (ev, pickerClosed) => { if (_divide) _divide.onActiveEvent(ev, pickerClosed); },
+  });
+  _divide = createDivideController({
+    handoff: _handoff,
+    getCard: _attachedCard,
+    peekJob: (sourceId) => (_assessor ? _assessor.get(sourceId) : null),
+    verifyJob: (sourceId) => (_assessor ? _assessor.verify(sourceId) : null),
+    isImported,
+    listPhotographers,
+    scanEvents: scanEvents || (async () => []),
+    cameras: (job) => divideSupport.cameraGrouping(job, _cameraKey),
+    selectedDate: (sourceId) => normalizeSelection(_selections.get(sourceId), localDateString(new Date())).date,
+    getActiveEvent: () => (_dump ? _dump.activeEvent() : null),
+    cardPhotographer: (sourceId) => (_dump ? _dump.photographerOf(sourceId) : null),
+    openPicker: (mode) => (_dump ? _dump.openPicker({ mode }) : Promise.resolve({ state: 'refused', reason: 'unavailable' })),
+    archiveStatus,
+    statSize: (p) => fs.promises.stat(p).then(st => (st.isFile() ? st.size : null), () => null),
+    makeThumb: divideSupport.thumbnail,
+    journal: journalDir ? divideSupport.journalWriter(journalDir, (m) => _log(m)) : null,
+    isBusy: () => operatorActivity.isBusy(),
+    pushSnapshot: _pushSnapshot,
+    showPopup: (opts) => { if (_tray) showPopup(opts); },
+    log: _log,
   });
   _unsubscribe = _monitor.subscribe(_onPoll);
   _monitor.acquire(MONITOR_CONSUMER);
@@ -700,6 +771,7 @@ function shutdown() {
   if (_assessor) { _assessor.shutdown(); _assessor = null; }
   if (_handoff) { _handoff.unregister(); _handoff = null; }
   _dump = null;
+  _divide = null;
   _view = { mode: 'compact', sourceId: null };
   for (const ev of ['display-added', 'display-removed', 'display-metrics-changed']) screen.removeListener(ev, _resizePopup);
   _selections.clear();
@@ -734,8 +806,8 @@ function getDiagnostics() {
 }
 
 /** EQI-1: copy progress of the import running for a Dump request (main.js copy-progress tap). */
-function notifyImportProgress(progress) { if (_dump) _dump.onImportProgress(progress); }
+function notifyImportProgress(progress) { if (_dump) _dump.onImportProgress(progress); if (_divide) _divide.onImportProgress(progress); }
 /** EQI-1: metadata batch outcome (main.js batch_complete tap). */
-function notifyMetadataBatch(p) { if (_dump) _dump.onMetadataBatch(p); }
+function notifyMetadataBatch(p) { if (_dump) _dump.onMetadataBatch(p); if (_divide) _divide.onMetadataBatch(p); }
 
 module.exports = { init, shutdown, showPopup, hidePopup, togglePopup, getDiagnostics, findAssessedRecords, notifyImportProgress, notifyMetadataBatch };

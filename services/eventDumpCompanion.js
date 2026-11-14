@@ -43,6 +43,8 @@ const MAX_PHOTOGRAPHER_LEN = 120;
  * @param {(opts?: object) => void} deps.showPopup
  * @param {() => void} deps.hidePopup
  * @param {(msg: string) => void} [deps.log]
+ * @param {(event: object|null, pickerClosed: boolean) => void} [deps.onActiveEvent]
+ *        EQI-2: the active event changed or the operator left the event picker / Event Creator
  */
 function createEventDumpController(deps) {
   const log = deps.log || (() => {});
@@ -142,6 +144,8 @@ function createEventDumpController(deps) {
         collectionName: typeof info.collectionName === 'string' ? info.collectionName.slice(0, 200) : '',
         componentCount: Number.isInteger(info.componentCount) ? info.componentCount : 0,
         pendingSync: info.pendingSync === true,
+        // EQI-2: the event was started in / adopted from Local Staging (Local First import rule).
+        localFirst: info.localFirst === true,
         types: _labels(info.types),
         places: _labels(info.places),
       };
@@ -157,6 +161,7 @@ function createEventDumpController(deps) {
     if (_pickerPending && _pickerSeenOpen && !pickerOpen) {
       _pickerPending = false; _pickerSeenOpen = false;
       log(`[event-dump] event picker closed (event ${changed ? 'changed' : 'unchanged'}) — back to the menu bar`);
+      if (deps.onActiveEvent) { try { deps.onActiveEvent(_event, true); } catch { /* the division keeps its state */ } }
       deps.showPopup({ inactive: true });
     } else if (_pickerPending && pickerOpen && !_pickerSeenOpen) {
       _pickerSeenOpen = true;
@@ -342,7 +347,12 @@ function createEventDumpController(deps) {
 
   function forget(sourceId) { _options.delete(sourceId); _ops.delete(sourceId); }
 
-  return { cardView, globalView, onWorkspaceEvent, setOptions, startImport, openPicker, listEvents, chooseEvent, onImportProgress, onMetadataBatch, forget };
+  /** EQI-2: the active event (main process only — it carries the path). */
+  function activeEvent() { return _event ? { ..._event } : null; }
+  /** EQI-2: the card's confirmed photographer (the operator's explicit Event Dump choice). */
+  function photographerOf(sourceId) { return _optionsFor(sourceId).photographer || null; }
+
+  return { cardView, globalView, onWorkspaceEvent, setOptions, startImport, openPicker, listEvents, chooseEvent, onImportProgress, onMetadataBatch, forget, activeEvent, photographerOf };
 }
 
 module.exports = { createEventDumpController };

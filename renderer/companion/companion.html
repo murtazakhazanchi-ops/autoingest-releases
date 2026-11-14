@@ -123,6 +123,105 @@
         </div>
         <p class="dump-result" id="xp-result" role="status" aria-live="polite" hidden></p>
         <button type="button" class="btn btn-primary xp-import" id="xp-import">Import to Dump</button>
+        <!-- EQI-2: optional — the default import above stays the one-step action. -->
+        <p class="xp-divide-row"><span class="xp-divide-hint">Photos from more than one event?</span>
+          <button type="button" class="link-btn" id="xp-divide">Divide Photos Between Events</button></p>
+      </div>
+    </section>
+
+    <!-- ── Divide Photos Between Events (EQI-2, optional) ───────────────────── -->
+    <!-- Time ranges (left) beside the card's photos in capture order (right). Every count and
+         assignment comes from main; this view only sends the operator's choices back. -->
+    <section class="dv view-divide" id="dv" hidden aria-label="Divide photos between events">
+      <div class="dv-head">
+        <div class="dv-head-text">
+          <h2 class="dv-title">Divide Photos Between Events</h2>
+          <p class="dv-sub" id="dv-sub"></p>
+        </div>
+        <dl class="dv-stats" id="dv-stats" aria-live="polite"></dl>
+      </div>
+      <p class="dv-notice" id="dv-notice" role="status" hidden></p>
+      <div class="dv-body">
+        <section class="dv-ranges" aria-labelledby="dv-ranges-title">
+          <div class="dv-col-head">
+            <h3 class="xp-title" id="dv-ranges-title">Time ranges</h3>
+            <button type="button" class="btn btn-secondary btn-small" id="dv-add-range">+ Add Time Range</button>
+          </div>
+          <div class="dv-range-scroll scroll-area">
+            <p class="dv-hint" id="dv-hint">Add a time range for each event. Times are the camera's clock; a photo exactly on a boundary belongs to the later range.</p>
+            <ol class="dv-range-list" id="dv-range-list"></ol>
+            <section class="dv-gaps" aria-labelledby="dv-gaps-title">
+              <label class="dv-gap-row"><span id="dv-gaps-title">Suggest boundaries at pauses of</span>
+                <select id="dv-gap-min" aria-label="Pause length for boundary suggestions">
+                  <option value="">Off</option><option value="30">30 min</option><option value="60">1 hour</option><option value="90">1 h 30</option><option value="120">2 hours</option>
+                </select></label>
+              <ul class="dv-gap-list" id="dv-gap-list"></ul>
+            </section>
+            <section class="dv-ph" aria-labelledby="dv-ph-title">
+              <h3 class="xp-title" id="dv-ph-title">Photographer</h3>
+              <div id="dv-ph-body"></div>
+            </section>
+          </div>
+        </section>
+        <section class="dv-photos" aria-labelledby="dv-photos-title">
+          <div class="dv-col-head">
+            <h3 class="xp-title" id="dv-photos-title">Photos</h3>
+            <select id="dv-date" aria-label="Capture date shown"></select>
+          </div>
+          <div class="dv-strip scroll-area" id="dv-strip" role="listbox" aria-label="Photos in capture order" aria-multiselectable="true" tabindex="0">
+            <div class="dv-strip-inner" id="dv-strip-inner"></div>
+          </div>
+          <div class="dv-photo-actions">
+            <span class="dv-sel" id="dv-sel">Select a photo to split or assign it.</span>
+            <button type="button" class="btn btn-secondary btn-small" id="dv-split" disabled title="Start a new range at the selected photo">Split Here</button>
+            <button type="button" class="btn btn-secondary btn-small" id="dv-assign" disabled>Assign to Event…</button>
+            <button type="button" class="link-btn" id="dv-clear" disabled>Use time ranges</button>
+          </div>
+        </section>
+      </div>
+      <div class="dv-action">
+        <p class="dv-ready" id="dv-ready"></p>
+        <div class="dv-progress" id="dv-progress" role="status" hidden>
+          <span id="dv-progress-text"></span>
+          <div class="progress-track" aria-hidden="true"><div class="progress-bar" id="dv-bar"></div></div>
+        </div>
+        <ul class="dv-results" id="dv-results" aria-label="Results per event" hidden></ul>
+        <div class="dv-buttons">
+          <button type="button" class="btn btn-secondary" id="dv-back">← Event Dump</button>
+          <button type="button" class="btn btn-primary" id="dv-review">Review Import</button>
+        </div>
+      </div>
+
+      <!-- Event chooser: the Event Creator's own scan of this collection; Create New Event uses
+           the existing Event Creator in AutoIngest's window and returns here. -->
+      <div class="dv-overlay" id="dv-chooser" hidden role="dialog" aria-modal="true" aria-labelledby="dv-chooser-title">
+        <div class="dv-sheet">
+          <h3 class="xp-title" id="dv-chooser-title">Choose the event</h3>
+          <input type="search" id="dv-chooser-search" class="text-input" placeholder="Search events" aria-label="Search events" autocomplete="off" spellcheck="false">
+          <ul class="picker-list scroll-area" id="dv-chooser-list" role="listbox" aria-label="Events"></ul>
+          <p class="picker-note" id="dv-chooser-note" hidden></p>
+          <div class="picker-actions">
+            <button type="button" class="btn btn-secondary" id="dv-chooser-new">Create New Event</button>
+            <span class="spacer"></span>
+            <button type="button" class="btn btn-quiet" id="dv-chooser-cancel">Cancel</button>
+            <button type="button" class="btn btn-primary" id="dv-chooser-use" disabled>Use This Event</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Import review: only for this optional workflow. -->
+      <div class="dv-overlay" id="dv-review-panel" hidden role="dialog" aria-modal="true" aria-labelledby="dv-review-title">
+        <div class="dv-sheet dv-sheet-wide">
+          <h3 class="dv-review-title" id="dv-review-title">Import to Selected Events</h3>
+          <dl class="dv-review-meta" id="dv-review-meta"></dl>
+          <ul class="dv-review-events" id="dv-review-events"></ul>
+          <p class="dv-review-note" id="dv-review-note"></p>
+          <p class="dv-review-block" id="dv-review-block" role="alert" hidden></p>
+          <div class="picker-actions">
+            <button type="button" class="btn btn-quiet" id="dv-review-cancel">Back</button>
+            <button type="button" class="btn btn-primary" id="dv-review-import">Import to Selected Events</button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -201,6 +300,7 @@
   </template>
 
   <script src="photographerMatch.js"></script>
+  <script src="companionDivide.js"></script>
   <script src="companion.js"></script>
 </body>
 </html>

@@ -20,9 +20,12 @@ const POPUP_MARGIN = 6;
 // EQI-1.1 adaptive companion: the same popup window in two presentations.
 //   compact  — card overview (default): what is on the card, and what to do with it
 //   expanded — Event Dump: event, photographer, destination, import and progress
+//   divide   — EQI-2: the operator divides the card's photos between events (optional)
 const POPUP_SIZES = Object.freeze({
   compact:  { width: 360, height: 600, minHeight: 360 },
   expanded: { width: 620, height: 720, minHeight: 440 },
+  // EQI-2 Divide Photos Between Events: time ranges beside the chronological photo strip.
+  divide:   { width: 1000, height: 800, minHeight: 520 },
 });
 /** Space kept free around the popup inside the display's work area. */
 const POPUP_EDGE_GAP = 12;
@@ -30,7 +33,7 @@ const POPUP_EDGE_GAP = 12;
 /**
  * Popup size for a presentation, fitted to the display it opens on (small laptop screens,
  * scaled displays): never wider or taller than the work area minus a small gap.
- * @param {'compact'|'expanded'} view
+ * @param {'compact'|'expanded'|'divide'} view
  * @param {{width:number,height:number}} workArea
  * @returns {{ width: number, height: number }}
  */

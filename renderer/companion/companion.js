@@ -393,7 +393,7 @@
 
   function currentSource() {
     const v = snap && snap.view;
-    if (!v || v.mode !== 'expanded') return null;
+    if (!v || (v.mode !== 'expanded' && v.mode !== 'divide')) return null;
     return (snap.sources || []).find(s => s.sourceId === v.sourceId) || null;
   }
 
@@ -683,6 +683,14 @@
     btn.textContent = d && d.counts.toImport > 0 ? `Import ${plural(d.counts.toImport, 'file')} to Dump` : 'Import to Dump';
     btn.title = !g.event ? DUMP_REASONS['no-event'] : !(d && d.photographer) ? DUMP_REASONS['no-photographer'] : '';
     btn.onclick = () => { api.dumpImport(src.sourceId); };
+    // EQI-2: the optional division — secondary to the one-step import above.
+    const divide = $('xp-divide');
+    divide.disabled = lock || !(d && d.ready) || !g.event;
+    divide.title = !g.event ? 'Choose an event first — its collection holds the events you divide into' : 'Assign time ranges of this card to several events';
+    divide.onclick = async () => {
+      const r = await api.setView('divide', src.sourceId);
+      if (r && r.ok === false) { const res = $('xp-result'); res.hidden = false; res.dataset.state = 'refused'; res.textContent = DUMP_REASONS[r.reason] || 'The division could not be opened.'; }
+    };
     const readyLine = $('xp-ready');
     readyLine.dataset.ready = ready ? 'yes' : '';
     readyLine.replaceChildren(...(ready
@@ -707,12 +715,15 @@
     if (!snapshot || !Array.isArray(snapshot.sources)) return;
     snap = snapshot;
     const src = currentSource();
-    const view = src ? 'expanded' : 'compact';
+    const view = src ? snapshot.view.mode : 'compact';
     popup.dataset.view = view;
     for (const el of document.querySelectorAll('.view-compact')) el.hidden = view !== 'compact';
     for (const el of document.querySelectorAll('.view-expanded')) el.hidden = view !== 'expanded';
+    for (const el of document.querySelectorAll('.view-divide')) el.hidden = view !== 'divide';
     renderCompact(snapshot.sources);
-    if (src) renderExpanded(src);
+    if (view !== 'divide') window.CompanionDivide.hide();
+    if (src && view === 'expanded') renderExpanded(src);
+    else if (src && view === 'divide') { closeEventPicker(); closePhotographerList(); window.CompanionDivide.render(src, snapshot); }
     else { $('brand-sub').textContent = 'Card companion'; closeEventPicker(); closePhotographerList(); }
   }
 

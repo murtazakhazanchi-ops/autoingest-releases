@@ -26,9 +26,16 @@ contextBridge.exposeInMainWorld('companion', {
   dumpImport:      (sourceId) => ipcRenderer.invoke('companion:dumpImport', { sourceId }),
   openEventPicker: (mode) => ipcRenderer.invoke('companion:openEventPicker', { mode }),
   // EQI-1.1 — adaptive popup (compact card overview ↔ expanded Event Dump) and one-click event change
-  setView:         (mode, sourceId = null) => ipcRenderer.invoke('companion:setView', mode === 'expanded' ? { mode, sourceId } : { mode }),
+  setView:         (mode, sourceId = null) => ipcRenderer.invoke('companion:setView', mode === 'expanded' || mode === 'divide' ? { mode, sourceId } : { mode }),
   listEvents:      () => ipcRenderer.invoke('companion:listEvents'),
   chooseEvent:     (folderName) => ipcRenderer.invoke('companion:chooseEvent', { folderName }),
+  // EQI-2 — Divide Photos Between Events (opaque ids, names, dates and times only)
+  divide:          (sourceId, cmd, args = {}) => ipcRenderer.invoke('companion:divideCommand', { ...args, sourceId, cmd }),
+  divideEvents:    (sourceId) => ipcRenderer.invoke('companion:divideEvents', { sourceId }),
+  divideAssets:    (sourceId, date) => ipcRenderer.invoke('companion:divideAssets', { sourceId, date }),
+  divideThumbs:    (sourceId, ids) => ipcRenderer.invoke('companion:divideThumbs', { sourceId, ids }),
+  divideReview:    (sourceId) => ipcRenderer.invoke('companion:divideReview', { sourceId }),
+  divideImport:    (sourceId) => ipcRenderer.invoke('companion:divideImport', { sourceId }),
   /** @param {(snapshot: object) => void} cb @returns {() => void} unsubscribe */
   onSnapshot: (cb) => {
     const listener = (_e, snapshot) => cb(snapshot);
