@@ -511,14 +511,14 @@ window.CompanionDivide = (function () {
       ['Capture dates', res.dates.map(formatDate).join(', ') || '—'],
       ['Photographer', [...new Set(res.batches.map(b => b.photographer))].join(', ') || 'Not chosen'],
       ['Archive', `${MODE_TEXT[res.archive.mode] || res.archive.mode}${res.archive.problem ? ` — ${reasonText(res.archive.problem)}` : ''}`],
-      ['Files to copy', res.totalFiles.toLocaleString()],
+      ['To copy', `${plural(res.totalFiles, 'file')} · ${window.ImportProgress.bytes(res.totalBytes || 0)}`],
     ];
     meta.replaceChildren(...pairs.map(([k, v]) => { const d = el('div', 'dv-meta'); d.append(el('dt', null, k), el('dd', null, v)); return d; }));
     $('dv-review-events').replaceChildren(...res.events.map(e => {
       const li = el('li', 'dv-review-event');
       li.dataset.color = String(colorOf(e.eventId));
       li.append(el('span', 'dv-review-name', e.eventId),
-        el('span', 'dv-review-count', `${plural(e.assets, 'photo')} · ${plural(e.files, 'file')}`),
+        el('span', 'dv-review-count', `${plural(e.assets, 'photo')} · ${plural(e.files, 'file')} · ${window.ImportProgress.bytes(e.bytes || 0)}`),
         el('span', 'dv-review-dest', `Dump / ${e.photographers.map(p => p.name).join(', ')}`));
       return li;
     }));
@@ -534,7 +534,7 @@ window.CompanionDivide = (function () {
     block.textContent = blockers.map(reasonText).join(' ');
     const btn = $('dv-review-import');
     btn.disabled = blockers.length > 0 || res.totalFiles === 0;
-    btn.textContent = res.totalFiles ? `Import to Selected Events (${plural(res.totalFiles, 'file')})` : 'Import to Selected Events';
+    btn.textContent = res.totalFiles ? `Import to Selected Events (${plural(res.totalFiles, 'file')}, ${window.ImportProgress.bytes(res.totalBytes || 0)})` : 'Import to Selected Events';
     $('dv-review-panel').hidden = false;
     (btn.disabled ? $('dv-review-cancel') : btn).focus();
   }
@@ -558,9 +558,6 @@ window.CompanionDivide = (function () {
     });
   }
 
-  const STATUS_TEXT = { waiting: 'Waiting', running: 'Importing…', completed: 'Done', 'completed-with-errors': 'Done with errors', failed: 'Failed', 'not-started': 'Not started' };
-  const META_TEXT = { writing: 'writing metadata…', complete: 'metadata written', 'needs-review': 'metadata needs review', 'some-failed': 'metadata failed for some files', 'not-run': 'metadata not written (automatic metadata is off)' };
-
   function renderAction() {
     const op = dv.op;
     const pending = !!(op && op.state === 'pending');
@@ -570,38 +567,17 @@ window.CompanionDivide = (function () {
     ready.dataset.ready = !blockers.length ? 'yes' : '';
     ready.textContent = !dv.ready ? 'Waiting for the card check to finish…'
       : blockers.length ? reasonText(blockers[0])
-      : `Ready: ${plural(dv.review.totalFiles, 'file')} → ${plural(dv.events.length, 'event')}${dv.unassigned.assets ? ` · ${plural(dv.unassigned.assets, 'photo')} unassigned (left on the card)` : ''}`;
-    const prog = $('dv-progress');
-    prog.hidden = !pending;
-    if (pending) {
-      const p = op.progress || { index: 0, total: 0, done: 0, files: 0, totalFiles: 0 };
-      const cur = op.events[p.index] || {};
-      const doneFiles = Math.min(p.totalFiles, p.files + (cur.status === 'running' ? p.done : 0));
-      $('dv-progress-text').textContent = `Event ${Math.min(p.index + 1, p.total)} of ${p.total} — ${eventLabel(cur.eventId)} · ${doneFiles.toLocaleString()} of ${p.totalFiles.toLocaleString()} files`;
-      $('dv-bar').style.width = `${p.totalFiles ? Math.round((doneFiles / p.totalFiles) * 100) : 0}%`;
-    }
-    const results = $('dv-results');
-    const showResults = !!(op && op.events && op.events.length);
-    results.hidden = !showResults;
-    if (showResults) {
-      results.replaceChildren(...op.events.map(e => {
-        const li = el('li', 'dv-result');
-        li.dataset.status = e.status;
-        li.dataset.color = String(colorOf(e.eventId));
-        li.append(el('span', 'dv-result-name', `${eventLabel(e.eventId)} · ${e.photographer}`));
-        const counts = e.status === 'waiting' || e.status === 'running' ? `${plural(e.files, 'file')}`
-          : `${e.copied.toLocaleString()} copied${e.skipped ? ` · ${e.skipped.toLocaleString()} skipped` : ''}${e.errors ? ` · ${e.errors.toLocaleString()} failed` : ''}`;
-        li.append(el('span', 'dv-result-status', `${STATUS_TEXT[e.status] || e.status} · ${counts}${e.metadata && META_TEXT[e.metadata.state] ? ` · ${META_TEXT[e.metadata.state]}` : ''}`));
-        if (e.error && (e.status === 'failed' || e.status === 'not-started')) li.append(el('span', 'dv-result-error', e.error === 'source-disconnected' ? 'The card was removed — nothing more was copied.' : e.error));
-        return li;
-      }));
-    }
+      : `Ready: ${plural(dv.review.totalFiles, 'file')} · ${window.ImportProgress.bytes(dv.review.totalBytes || 0)} → ${plural(dv.events.length, 'event')}${dv.unassigned.assets ? ` · ${plural(dv.unassigned.assets, 'photo')} unassigned (left on the card)` : ''}`;
+    // EQI-2.1: the same structured progress as Event Dump, with one row per event.
+    window.ImportProgress.render($('dv-ip'), op && op.state !== 'refused' ? op : null, {
+      showEvents: true, onDecide: (choice) => api.importDecision(src.sourceId, choice),
+    });
     if (op && op.state === 'refused' && op.reason) { ready.hidden = false; ready.textContent = reasonText(op.reason); ready.dataset.ready = ''; }
     if (op && !pending && op.state !== 'refused') {
-      const head = op.state === 'completed' ? 'All events imported.' : op.state === 'completed-with-errors' ? 'Imported — some files failed and are still on the card. Review Import again to retry them.'
-        : op.state === 'partial' ? 'Some events were not imported. Review Import again to retry them — nothing already copied is copied twice.'
-        : 'The import did not complete. Nothing already copied is copied twice when you retry.';
-      if (blockers.includes('nothing-assigned') && op.state === 'completed') { ready.textContent = head; ready.dataset.ready = 'yes'; } else ready.textContent = `${head} ${ready.textContent}`;
+      const head = op.state === 'completed' ? '' : op.state === 'completed-with-errors' ? 'Failed files are still on the card — Review Import again to retry them.'
+        : op.state === 'partial' ? 'Review Import again to retry the events that did not finish — nothing already copied is copied twice.'
+        : 'Nothing already copied is copied twice when you retry.';
+      if (op.state === 'completed' && blockers.includes('nothing-assigned')) ready.hidden = true; else if (head) ready.textContent = `${head} ${ready.textContent}`;
     }
     const lock = pending || !!(src.assessment && src.assessment.handoffPending);
     $('dv-review').disabled = lock || !dv.ready;
@@ -615,7 +591,7 @@ window.CompanionDivide = (function () {
 
   function renderDates() {
     const sel = $('dv-date');
-    const items = dv.dates.map(d => [d.date, `${formatDate(d.date)} — ${d.assets.toLocaleString()} new${d.assigned ? ` · ${d.assigned.toLocaleString()} assigned` : ''}`]);
+    const items = dv.dates.map(d => [d.date, `${formatDate(d.date)} — ${d.assets ? `${d.assets.toLocaleString()} new` : 'all imported'}${d.assigned ? ` · ${d.assigned.toLocaleString()} assigned` : ''}`]);
     const sig = JSON.stringify(items);
     if (sel.dataset.sig !== sig && document.activeElement !== sel) {
       sel.replaceChildren(...items.map(([v, t]) => { const o = el('option', null, t); o.value = v; return o; }));

@@ -186,22 +186,13 @@
     'keychain-helper-failed': 'Camera key unavailable — retrying',
   };
 
+  /** One line for the card overview (the expanded view shows the full progress). */
   function dumpResultText(op) {
-    const r = op.result || {};
-    if (op.state === 'refused' || op.state === 'cancelled' || op.state === 'failed') {
-      return DUMP_REASONS[op.reason] || (r.detail ? `Import failed: ${r.detail}` : 'The import did not run.');
-    }
-    const head = `${plural(r.copied || 0, 'file')} copied and size-verified`;
-    const rest = [];
-    if (r.skipped) rest.push(`${r.skipped.toLocaleString()} already there (skipped)`);
-    if (r.errors) rest.push(`${r.errors.toLocaleString()} failed — still on the card`);
-    const m = op.metadata || {};
-    const meta = m.state === 'writing' ? 'Writing metadata…'
-      : m.state === 'complete' ? 'Metadata written.'
-      : m.state === 'needs-review' ? 'Metadata written; some files need review in Metadata Audit.'
-      : m.state === 'some-failed' ? `Metadata failed for ${plural(m.failed || 0, 'file')} — see Metadata Audit.`
-      : m.state === 'not-run' ? 'Metadata not written (automatic metadata is off).' : '';
-    return [head + (rest.length ? ` · ${rest.join(' · ')}` : '') + '.', meta].filter(Boolean).join(' ');
+    if (op.state === 'refused' || op.state === 'cancelled') return DUMP_REASONS[op.reason] || 'The import did not run.';
+    if (op.state === 'pending') return 'Event Dump import in progress…';
+    const t = op.totals || { files: {} };
+    const head = op.state === 'completed' ? 'Imported' : op.state === 'failed' ? 'Import failed' : 'Imported with issues';
+    return `${head}: ${plural(t.files.copied || 0, 'file')} (${window.ImportProgress.bytes(t.copiedBytes || 0)})${t.files.skipped ? ` · ${t.files.skipped.toLocaleString()} skipped` : ''}${t.files.failed ? ` · ${t.files.failed.toLocaleString()} failed` : ''}.`;
   }
 
   // ── Compact: card rows ────────────────────────────────────────────────────
@@ -265,7 +256,7 @@
     const last = row.querySelector('.dump-last');
     const op = d && d.op;
     last.hidden = !op;
-    last.textContent = op ? (op.state === 'pending' ? 'Event Dump import in progress…' : `Last Event Dump: ${dumpResultText(op)}`) : '';
+    last.textContent = op ? (op.state === 'pending' ? dumpResultText(op) : `Last Event Dump — ${dumpResultText(op)}`) : '';
     last.dataset.state = op ? op.state : '';
   }
 
@@ -636,7 +627,7 @@
       if (s.counts.uncertain) sub.push(`${s.counts.uncertain.toLocaleString()} without a reliable date stay on the card`);
       $('xp-counts-sub').textContent = sub.join(' · ');
     }
-    const lock = !!(a.handoffPending || (d && d.op && d.op.state === 'pending'));
+    const lock = !!(a.handoffPending || (d && d.op && d.op.state === 'pending') || g.busy || g.creatorOpen);
     $('xp-earlier-row').hidden = !d || d.counts.earlierNew === 0;
     if (d) {
       const earlier = $('xp-earlier');
@@ -676,17 +667,22 @@
 
     renderDestination(g.event, chosen);
 
-    // Pinned action.
+    // Pinned action. EQI-2.1: while an import runs, the structured progress replaces the button.
+    const op = d && d.op;
+    const pending = !!(op && op.state === 'pending');
     const btn = $('xp-import');
     const ready = !!(d && d.ready && g.event && d.photographer && d.counts.toImport > 0);
-    btn.disabled = lock || !ready;
-    btn.textContent = d && d.counts.toImport > 0 ? `Import ${plural(d.counts.toImport, 'file')} to Dump` : 'Import to Dump';
+    btn.hidden = pending;
+    btn.disabled = lock || !ready || !!g.busy;
+    btn.textContent = d && d.counts.toImport > 0 ? `Import ${plural(d.counts.toImport, 'File', 'Files')} to Dump` : 'Import to Dump';
     btn.title = !g.event ? DUMP_REASONS['no-event'] : !(d && d.photographer) ? DUMP_REASONS['no-photographer'] : '';
     btn.onclick = () => { api.dumpImport(src.sourceId); };
-    // EQI-2: the optional division — secondary to the one-step import above.
+    // EQI-2: the optional division — an outlined secondary action under the one-step import.
+    const divideRow = $('xp-divide-row');
+    divideRow.hidden = pending;
     const divide = $('xp-divide');
-    divide.disabled = lock || !(d && d.ready) || !g.event;
-    divide.title = !g.event ? 'Choose an event first — its collection holds the events you divide into' : 'Assign time ranges of this card to several events';
+    divide.disabled = lock || !(d && d.ready) || !g.event || !!g.busy;
+    divide.title = !g.event ? 'Choose an event first — its collection holds the events you divide into' : 'Assign time ranges or selected photos of this card to several events';
     divide.onclick = async () => {
       const r = await api.setView('divide', src.sourceId);
       if (r && r.ok === false) { const res = $('xp-result'); res.hidden = false; res.dataset.state = 'refused'; res.textContent = DUMP_REASONS[r.reason] || 'The division could not be opened.'; }
@@ -694,21 +690,17 @@
     const readyLine = $('xp-ready');
     readyLine.dataset.ready = ready ? 'yes' : '';
     readyLine.replaceChildren(...(ready
-      ? [txt('Ready: '), strong(plural(d.counts.toImport, 'file')), txt(' as '), strong(d.photographer), txt(` → event ${shortEvent(g.event)}`)]
+      ? [txt('Ready: '), strong(plural(d.counts.toImport, 'file')), txt(' · '), strong(window.ImportProgress.bytes(d.bytesToImport || 0)), txt(' as '), strong(d.photographer), txt(` → ${shortEvent(g.event)} / Dump`)]
       : [txt(!g.event ? 'Choose the event to import into.' : !(d && d.photographer) ? 'Choose and confirm the photographer.' : 'No new files to import for this date.')]));
-    const op = d && d.op;
-    const pending = !!(op && op.state === 'pending');
-    readyLine.hidden = pending || (!ready && !!op && op.state === 'completed');
-    $('xp-progress').hidden = !pending;
-    if (pending) {
-      const p = op.progress || { done: 0, total: 0 };
-      $('xp-progress-text').textContent = `Importing to ${g.event ? g.event.eventName : 'the event'} as ${d.photographer}… ${p.done.toLocaleString()} of ${p.total.toLocaleString()}`;
-      $('xp-bar').style.width = `${p.total ? Math.round((p.done / p.total) * 100) : 0}%`;
-    }
+    readyLine.hidden = pending;
+    window.ImportProgress.render($('xp-ip'), op && op.state !== 'refused' ? op : null, {
+      onDecide: (choice) => api.importDecision(src.sourceId, choice),
+    });
     const res = $('xp-result');
-    res.hidden = !op || pending;
-    res.textContent = op && !pending ? dumpResultText(op) : '';
-    res.dataset.state = op ? op.state : '';
+    const refused = !!(op && op.state === 'refused');
+    res.hidden = !refused;
+    res.textContent = refused ? dumpResultText(op) : '';
+    res.dataset.state = refused ? 'refused' : '';
   }
 
   function render(snapshot) {

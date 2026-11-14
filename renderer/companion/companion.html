@@ -116,16 +116,16 @@
 
       <!-- Pinned: readiness, the import action and its progress stay reachable while content scrolls. -->
       <div class="xp-action">
-        <p class="xp-ready" id="xp-ready"></p>
-        <div class="dump-progress" id="xp-progress" role="status" hidden>
-          <span id="xp-progress-text"></span>
-          <div class="progress-track" aria-hidden="true"><div class="progress-bar" id="xp-bar"></div></div>
-        </div>
+        <!-- EQI-2.1: structured progress (stage, bytes, files, speed, time left) and the final summary. -->
+        <div class="ip" id="xp-ip" role="status" aria-live="polite" hidden></div>
         <p class="dump-result" id="xp-result" role="status" aria-live="polite" hidden></p>
+        <p class="xp-ready" id="xp-ready"></p>
         <button type="button" class="btn btn-primary xp-import" id="xp-import">Import to Dump</button>
-        <!-- EQI-2: optional — the default import above stays the one-step action. -->
-        <p class="xp-divide-row"><span class="xp-divide-hint">Photos from more than one event?</span>
-          <button type="button" class="link-btn" id="xp-divide">Divide Photos Between Events</button></p>
+        <!-- EQI-2: optional — the default import above stays the one-step primary action. -->
+        <div class="xp-divide-row" id="xp-divide-row">
+          <button type="button" class="btn btn-outline" id="xp-divide" aria-describedby="xp-divide-hint">Divide Between Events</button>
+          <span class="xp-divide-hint" id="xp-divide-hint">Assign photographs by time or visual selection.</span>
+        </div>
       </div>
     </section>
 
@@ -181,11 +181,8 @@
       </div>
       <div class="dv-action">
         <p class="dv-ready" id="dv-ready"></p>
-        <div class="dv-progress" id="dv-progress" role="status" hidden>
-          <span id="dv-progress-text"></span>
-          <div class="progress-track" aria-hidden="true"><div class="progress-bar" id="dv-bar"></div></div>
-        </div>
-        <ul class="dv-results" id="dv-results" aria-label="Results per event" hidden></ul>
+        <!-- EQI-2.1: the same structured progress as Event Dump, with a row per event. -->
+        <div class="ip ip-multi" id="dv-ip" role="status" aria-live="polite" hidden></div>
         <div class="dv-buttons">
           <button type="button" class="btn btn-secondary" id="dv-back">← Event Dump</button>
           <button type="button" class="btn btn-primary" id="dv-review">Review Import</button>
@@ -300,6 +297,7 @@
   </template>
 
   <script src="photographerMatch.js"></script>
+  <script src="importProgress.js"></script>
   <script src="companionDivide.js"></script>
   <script src="companion.js"></script>
 </body>
