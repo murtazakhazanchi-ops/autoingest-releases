@@ -66,7 +66,9 @@ const EQI1_SESSION_UI = 'renderer/importSessionUI.js';
 const EQI1_SCRIPT = '<script src="eventDumpImport.js"></script>';
 const EQI1_PRELOAD_CHANNELS = ['companion:dumpImport', 'companion:openEventPicker', 'companion:workspaceEvent',
   // EQI-1.1: one-click event selection without foregrounding, and the attention request for safety dialogs.
-  'companion:selectEvent', 'companion:attention'];
+  'companion:selectEvent', 'companion:attention',
+  // EQI-2: the multi-event Dump plan handoff and its per-event progress (no main-window UI).
+  'companion:dumpPlanImport', 'companion:dumpPlanEvent'];
 const EQI1_RENDERER_LINES = [
   '+  // AI-FEAT-064 EQI-1: Event Dump imports / event picker requests from the companion, and the',
   '+  // active-event report it shows.',

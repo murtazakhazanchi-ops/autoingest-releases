@@ -480,5 +480,9 @@ contextBridge.exposeInMainWorld('api', {
   // and a request to bring AutoIngest forward when a Dump import needs an operator decision.
   onCompanionSelectEvent:     (cb)                 => _register('companion:selectEvent', (_e, req) => cb(req)),
   companionRequestAttention:  ()                   => ipcRenderer.send('companion:attention'),
+  // EQI-2: a multi-event Dump plan from the companion (same acknowledge → heartbeat → result
+  // protocol), and its per-event start/end counts for the companion's progress view.
+  onCompanionDumpPlanImport:  (cb)                 => _register('companion:dumpPlanImport', (_e, req) => cb(req)),
+  companionDumpPlanEvent:     (info)               => ipcRenderer.send('companion:dumpPlanEvent', info),
 
 });

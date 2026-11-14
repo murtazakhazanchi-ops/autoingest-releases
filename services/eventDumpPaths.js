@@ -48,19 +48,30 @@ function dumpJobsRefusal(fileJobs, eventJsonPath, photographer) {
  * only, metadata excluded) of source and destination is equal. Different, unreadable or
  * unsupported → the job proceeds unchanged (a genuinely different photo with the same name is
  * still imported, and renamed by the existing conflict rule). Never deletes or overwrites.
+ *
+ * EQI-2 (Local First): the job's destination is the event's Local Staging copy, which may have been
+ * cleared after an earlier sync. `alternateOf(job)` then names the same file in the archive's own
+ * Dump folder, which is checked by the same rule — read-only — so a photo that is already in the
+ * archive is not staged again and synced as a duplicate.
  * @param {Array<{src: string, dest: string}>} fileJobs
- * @param {{ exists: (p: string) => Promise<boolean>, hashOf: (p: string) => Promise<string|null> }} io
+ * @param {{ exists: (p: string) => Promise<boolean>, hashOf: (p: string) => Promise<string|null>, alternateOf?: (job: object) => string|null }} io
  * @returns {Promise<{ copy: object[], alreadyInDump: object[] }>}
  */
-async function partitionAlreadyInDump(fileJobs, { exists, hashOf }) {
+async function partitionAlreadyInDump(fileJobs, { exists, hashOf, alternateOf = null }) {
   const copy = [];
   const alreadyInDump = [];
   for (const job of fileJobs) {
     let same = false;
     try {
-      if (await exists(job.dest)) {
-        const [a, b] = await Promise.all([hashOf(job.src), hashOf(job.dest)]);
-        same = typeof a === 'string' && a.length > 0 && a === b;
+      const candidates = [job.dest];
+      const alt = alternateOf ? alternateOf(job) : null;
+      if (alt && alt !== job.dest) candidates.push(alt);
+      let srcHash;
+      for (const p of candidates) {
+        if (!(await exists(p))) continue;
+        if (srcHash === undefined) srcHash = await hashOf(job.src);
+        const other = await hashOf(p);
+        if (typeof srcHash === 'string' && srcHash.length > 0 && srcHash === other) { same = true; break; }
       }
     } catch { same = false; }
     (same ? alreadyInDump : copy).push(job);
@@ -68,4 +79,16 @@ async function partitionAlreadyInDump(fileJobs, { exists, hashOf }) {
   return { copy, alreadyInDump };
 }
 
-module.exports = { dumpJobsRefusal, partitionAlreadyInDump };
+/**
+ * EQI-2: the archive counterpart of a Local First Dump job — the same path below the archive event
+ * folder as below the staging event folder. Only for a job inside <staging event>/Dump/.
+ * @returns {string|null}
+ */
+function archiveCounterpart(job, stagingEventPath, archiveEventPath) {
+  if (!job || typeof job.dest !== 'string' || !stagingEventPath || !archiveEventPath) return null;
+  const rel = path.relative(path.resolve(stagingEventPath), path.resolve(job.dest));
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel) || rel.split(path.sep)[0] !== DUMP_DIR) return null;
+  return path.join(path.resolve(archiveEventPath), rel);
+}
+
+module.exports = { dumpJobsRefusal, partitionAlreadyInDump, archiveCounterpart };

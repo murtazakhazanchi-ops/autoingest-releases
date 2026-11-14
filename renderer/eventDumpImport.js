@@ -40,6 +40,8 @@ const EventDumpImport = (() => {
       collectionName: (ed.coll && ed.coll.name) || '',
       componentCount: Array.isArray(ed.event.components) ? ed.event.components.length : 0,
       pendingSync: EventCreator.isPendingSync(),
+      // EQI-2: the Local First rule of _importModeFor, so the companion's review can state the mode.
+      localFirst: EventCreator.wasLocalStagingEvent(),
       // EQI-1.2: labels only, so the companion can set the event's types and place apart from
       // its name (the canonical name itself is shown unchanged).
       ..._eventLabels(ed.event.components),
@@ -113,63 +115,10 @@ const EventDumpImport = (() => {
       }
     }
 
-    const isMulti = Array.isArray(ed.event.components) && ed.event.components.length > 1;
-    // Dump media belongs to no component yet: single-component events keep the event's own
-    // component keywords (group 0, as a normal import); multi-component events get an explicit
-    // "no component keyword" ([]) until Sort Dump assigns the component.
-    const group = { id: isMulti ? -1 : 0, subEventId: null, metadataTags: isMulti ? [] : null, files: [...req.files], fileTagRefinements: null };
-    const item = {
-      eventKey: ed.eventPath, ordinal: 1, name: ed.event.name,
-      eventPath: ed.eventPath, collectionPath: ed.collectionPath, routingEventData: ed, fileJobs,
-    };
     const sourceMeta = { type: 'memory-card', label: (req.source && req.source.label) || 'Memory card', path: (req.source && req.source.path) || '' };
-    const importedBy = _activeUser ? { id: _activeUser.id, name: _activeUser.name } : null;
-
-    _running = true;
-    importRunning = true;
-    let result;
-    try {
-      result = await ImportSessionRunner.run({ events: [item], hasBlocking: false }, {
-        shouldStop: async () => {
-          if (!sourceMeta.path) return null;
-          let alive = true;
-          try { alive = await window.api.dirExists(sourceMeta.path); } catch { alive = false; }
-          return alive ? null : 'source-disconnected';
-        },
-        isSourceAlive: async () => (sourceMeta.path ? !!(await window.api.dirExists(sourceMeta.path)) : true),
-        prepareEvent: (it) => _sessPrepareEvent(it, importMode, archSt),
-        markInProgress: async (it, prepared) => { await window.api.updateEventJson(prepared.txEventPath, { status: 'in-progress' }); },
-        onEventFailed: async (it, prepared) => { if (prepared) await window.api.updateEventJson(prepared.txEventPath, { status: 'created' }); },
-        commit: async (it, prepared) => {
-          const summary = await window.api.commitImportTransaction(prepared.txFileJobs, prepared.txEventPath, {
-            collName: ed.coll && ed.coll.name,
-            photographer,
-            subEventNames: [],
-            liveComps: ed.event.components,
-            groups: [group],
-            source: sourceMeta,
-            importedBy,
-            importMode,
-            destination: 'dump',
-          });
-          if (importMode === 'local-first') {
-            try { _sessRegisterLocalFirst(it, prepared, summary, photographer); }
-            catch (err) { console.error('[EventDump] sync manifest registration failed (event already committed):', err); }
-          }
-          return summary;
-        },
-      });
-    } catch (err) {
-      return _refuse('error', ImportSessionRunner.cleanMessage(err));
-    } finally {
-      importRunning = false;
-      _running = false;
-    }
-
-    try {
-      EventCreator.invalidateScannedEvents();
-      globalImportIndex = await window.api.getImportIndex() || {};
-    } catch { /* non-critical */ }
+    const item = _dumpItem(ed, ed.event.components, photographer, fileJobs, req.files);
+    const result = await _runItems([item], { importMode, archSt, sourceMeta });
+    if (result.error) return _refuse('error', result.error);
 
     const entry = result.events[0] || {};
     const s = entry.summary || {};
@@ -185,6 +134,169 @@ const EventDumpImport = (() => {
       errors: Number(s.errors) || 0,
       metadataBatchId: s.metadataBatchId || null,
     };
+  }
+
+  /**
+   * One Dump transaction of a plan: an event's routing data, its file jobs and its group. Dump
+   * media belongs to no component yet: single-component events keep the event's own component
+   * keywords (group 0, as a normal import); multi-component events get an explicit "no component
+   * keyword" ([]) until Sort Dump assigns the component.
+   */
+  function _dumpItem(routingEventData, components, photographer, fileJobs, files) {
+    const isMulti = Array.isArray(components) && components.length > 1;
+    return {
+      eventKey: routingEventData.eventPath, ordinal: 1, name: routingEventData.event.name,
+      eventPath: routingEventData.eventPath, collectionPath: routingEventData.collectionPath, routingEventData, fileJobs,
+      photographer,
+      group: { id: isMulti ? -1 : 0, subEventId: null, metadataTags: isMulti ? [] : null, files: [...files], fileTagRefinements: null },
+    };
+  }
+
+  /**
+   * Runs Dump items with the existing multi-event runner (failure isolation per event, source-wide
+   * stop) and the existing transaction. Shared by the single-event Event Dump (EQI-1) and the
+   * multi-event plan (EQI-2), so both route, lock, commit and sync-register the same way.
+   * @returns {Promise<object>} ImportSessionRunner result, or { error } when the runner itself threw
+   */
+  async function _runItems(items, { importMode, archSt, sourceMeta, onEventStart, onEventEnd }) {
+    const importedBy = _activeUser ? { id: _activeUser.id, name: _activeUser.name } : null;
+    const stagingNorm = (archSt.localStagingRoot || '').replace(/\\/g, '/').replace(/\/$/, '');
+    _running = true;
+    importRunning = true;
+    try {
+      return await ImportSessionRunner.run({ events: items, hasBlocking: false }, {
+        shouldStop: async () => {
+          if (!sourceMeta.path) return null;
+          let alive = true;
+          try { alive = await window.api.dirExists(sourceMeta.path); } catch { alive = false; }
+          return alive ? null : 'source-disconnected';
+        },
+        isSourceAlive: async () => (sourceMeta.path ? !!(await window.api.dirExists(sourceMeta.path)) : true),
+        prepareEvent: (it) => _sessPrepareEvent(it, importMode, archSt),
+        markInProgress: async (it, prepared) => { await window.api.updateEventJson(prepared.txEventPath, { status: 'in-progress' }); },
+        onEventFailed: async (it, prepared) => { if (prepared) await window.api.updateEventJson(prepared.txEventPath, { status: 'created' }); },
+        onEventStart,
+        onEventEnd,
+        commit: async (it, prepared, ctx) => {
+          const ed = it.routingEventData;
+          // Local First: the staging copy may have been cleared after an earlier sync; the archive's
+          // own Dump folder is then checked too, so an identical photo is never synced twice.
+          const archiveEventPath = importMode === 'local-first' && stagingNorm
+            && !it.eventPath.replace(/\\/g, '/').startsWith(stagingNorm + '/') ? it.eventPath : null;
+          const summary = await window.api.commitImportTransaction(prepared.txFileJobs, prepared.txEventPath, {
+            collName: ed.coll && ed.coll.name,
+            photographer: it.photographer,
+            subEventNames: [],
+            liveComps: ed.event.components,
+            groups: [it.group],
+            source: sourceMeta,
+            importedBy,
+            importMode,
+            destination: 'dump',
+            ...(items.length > 1 ? { progressEventPath: it.eventPath, importSessionId: ctx.importSessionId } : {}),
+            ...(archiveEventPath ? { archiveEventPath } : {}),
+          });
+          if (importMode === 'local-first') {
+            try { _sessRegisterLocalFirst(it, prepared, summary, it.photographer); }
+            catch (err) { console.error('[EventDump] sync manifest registration failed (event already committed):', err); }
+          }
+          return summary;
+        },
+      });
+    } catch (err) {
+      return { error: ImportSessionRunner.cleanMessage(err) };
+    } finally {
+      importRunning = false;
+      _running = false;
+      try {
+        EventCreator.invalidateScannedEvents();
+        globalImportIndex = await window.api.getImportIndex() || {};
+      } catch { /* non-critical */ }
+    }
+  }
+
+  /**
+   * AI-FEAT-064 EQI-2: ONE plan with several event destinations (the companion's Divide Photos
+   * Between Events). Every batch is (event, photographer, files) in the ACTIVE event's collection;
+   * each event is read from its own event.json (never the active event's data), routed to
+   * <event>/Dump/<photographer>/ and committed as its own transaction. A failed event never undoes
+   * a committed one; nothing is retried automatically.
+   * @param {{ collectionPath: string, batches: Array<{ folderName: string, eventPath: string, photographer: string, files: string[] }>, source: object }} req
+   * @param {(info: object) => void} [report]  per-event start/end counts for the companion
+   */
+  async function runPlan(req, report = () => {}) {
+    if (_running || importRunning || _sessionRunBusy) return _refuse('busy');
+    const ed = EventCreator.getActiveEventData();
+    if (!ed || !ed.eventPath || !ed.collectionPath) return _refuse('no-event');
+    const norm = (p) => (typeof p === 'string' ? p.replace(/\\/g, '/').replace(/\/+$/, '') : '');
+    const coll = norm(ed.collectionPath);
+    if (!req || norm(req.collectionPath) !== coll) return _refuse('collection-changed');
+    const batches = Array.isArray(req.batches) ? req.batches : [];
+    if (!batches.length) return _refuse('nothing-selected');
+    const seen = new Set();
+    for (const b of batches) {
+      const okName = b && typeof b.folderName === 'string' && b.folderName && !/[\\/]/.test(b.folderName) && b.folderName !== '.' && b.folderName !== '..';
+      if (!okName || norm(b.eventPath) !== `${coll}/${b.folderName}`) return _refuse('invalid');
+      if (typeof b.photographer !== 'string' || !b.photographer.trim() || b.photographer !== b.photographer.trim()) return _refuse('no-photographer');
+      if (!Array.isArray(b.files) || !b.files.length) return _refuse('nothing-selected');
+      for (const f of b.files) { if (typeof f !== 'string' || seen.has(f)) return _refuse('invalid'); seen.add(f); }
+    }
+
+    let archSt = {};
+    try { archSt = await window.api.getArchiveOperationsStatus(); } catch { /* non-critical */ }
+    const importMode = _importModeFor(archSt);
+    if (importMode === 'local-first' && !archSt.localStagingRoot) return _refuse('staging-not-configured');
+    if (importMode === 'direct-nas' && (archSt.status === 'nas-disconnected' || archSt.status === 'invalid-nas')) return _refuse('archive-offline');
+
+    // event.json is the source of truth: every destination must exist and be readable right now.
+    const items = [];
+    for (const b of batches) {
+      const eventPath = `${coll}/${b.folderName}`;
+      let snap = null;
+      try { snap = await EventCreator.loadEventSnapshot(eventPath); } catch { snap = null; }
+      if (!snap) return _refuse('event-unreadable', b.folderName);
+      const routing = { coll: ed.coll, event: { name: b.folderName, components: snap.components }, idx: null, collectionPath: ed.collectionPath, eventPath };
+      const { fileJobs } = ImportRouter.buildDumpFileJobs({ eventData: routing, photographer: b.photographer, files: b.files });
+      if (fileJobs.length !== b.files.length) return _refuse('routing-failed');
+      items.push({ ..._dumpItem(routing, snap.components, b.photographer, fileJobs, b.files), eventKey: `${eventPath}\u0000${b.photographer}`, ordinal: items.length + 1 });
+    }
+    if (importMode === 'direct-nas' && archSt.nasRoot) {
+      for (;;) {
+        const lockCheck = await window.api.checkDirectArchiveLocks({ fileJobs: items.flatMap(i => i.fileJobs) });
+        if (!lockCheck || !lockCheck.blocked || !lockCheck.blocked.length) break;
+        try { window.api.companionRequestAttention(); } catch { /* companion disabled */ }
+        const pick = await _showDirectArchiveBusyDialog(lockCheck.blocked, lockCheck.currentDeviceName ?? null);
+        if (pick === 'refresh' || pick === 'clear') continue;
+        return _refuse('archive-busy');
+      }
+    }
+
+    const sourceMeta = { type: 'memory-card', label: (req.source && req.source.label) || 'Memory card', path: (req.source && req.source.path) || '' };
+    const indexOf = (it) => items.indexOf(it);
+    const result = await _runItems(items, {
+      importMode, archSt, sourceMeta,
+      onEventStart: (it) => report({ phase: 'start', index: indexOf(it) }),
+      onEventEnd: (e) => {
+        const i = items.findIndex(it => it.eventKey === e.eventKey);
+        const s = e.summary || {};
+        report({ phase: 'end', index: i, status: e.status, copied: Number(s.copied) || 0, skipped: Number(s.skipped) || 0, errors: Number(s.errors) || 0, error: e.error || (e.status === 'not-started' ? e.reason : null) || null });
+      },
+    });
+    if (result.error) return _refuse('error', result.error);
+
+    // The handoff carries flat scalar fields only: one e<i>_* group per batch, in plan order.
+    const out = { ok: result.events.some(e => e.status === 'completed' || e.status === 'completed-with-errors'), status: result.status, importMode, events: items.length };
+    if (!out.ok) out.reason = 'import-failed';
+    items.forEach((it, i) => {
+      const e = result.events.find(x => x.eventKey === it.eventKey) || { status: 'not-started' };
+      const s = e.summary || {};
+      Object.assign(out, {
+        [`e${i}_status`]: e.status, [`e${i}_copied`]: Number(s.copied) || 0, [`e${i}_skipped`]: Number(s.skipped) || 0,
+        [`e${i}_errors`]: Number(s.errors) || 0, [`e${i}_batch`]: s.metadataBatchId || null,
+        [`e${i}_error`]: e.error ? String(e.error).slice(0, 200) : (e.status === 'not-started' ? (e.reason || 'not-started') : null),
+      });
+    });
+    return out;
   }
 
   /**
@@ -261,6 +373,19 @@ const EventDumpImport = (() => {
       window.api.companionOpenSourceResult(requestId, res);
       _report();
     });
+    if (typeof window.api.onCompanionDumpPlanImport === 'function') {
+      window.api.onCompanionDumpPlanImport(async (req) => {
+        const requestId = req && req.requestId;
+        window.api.companionOpenSourceProgress(requestId);            // acknowledge at once
+        const beat = setInterval(() => window.api.companionOpenSourceProgress(requestId), HEARTBEAT_MS);
+        let res;
+        try { res = await runPlan(req || {}, (info) => { try { window.api.companionDumpPlanEvent({ ...info, requestId }); } catch { /* companion disabled */ } }); }
+        catch (err) { res = _refuse('error', (err && err.message) || String(err)); }
+        finally { clearInterval(beat); }
+        window.api.companionOpenSourceResult(requestId, res);
+        _report();
+      });
+    }
     window.api.onCompanionOpenEventPicker((req) => {
       const res = openPicker(req && req.mode === 'new' ? 'new' : 'choose');
       window.api.companionOpenSourceResult(req && req.requestId, res);
@@ -269,7 +394,7 @@ const EventDumpImport = (() => {
     _report();
   }
 
-  return { init, run, openPicker, selectEvent, _activeEventInfo };
+  return { init, run, runPlan, openPicker, selectEvent, _activeEventInfo };
 })();
 
 if (typeof module !== 'undefined') module.exports = EventDumpImport;

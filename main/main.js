@@ -388,6 +388,10 @@ function _startCompanion() {
       // launch (startRegistryForSuggestions, Keychain work in a helper process) — never from the menu bar.
       registryForSuggestions: () => require('../services/photographerLearningRuntime').peekOpenRegistry(),
       onRegistryChange: (fn) => require('../services/photographerLearningRuntime').onRegistryChange(fn),
+      // EQI-2 Divide Photos Between Events: the import review's archive mode/validity, and the
+      // durable record of each division plan in this profile.
+      archiveStatus: () => _archiveOperationsStatus(),
+      journalDir: path.join(app.getPath('userData'), 'event-dump-plans'),
     });
   } catch (err) {
     log(`[main] companion failed to start: ${err.message}`);
@@ -1155,6 +1159,8 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
   importSessionId = null,     // shared by every event transaction of ONE multi-event source import: Deep Verify
                               // then covers the whole session instead of only the last event's files
   destination = null,         // 'dump' (EQI-1 Event Dump import) | null — every job then targets Event/Dump/<photographer>/
+  archiveEventPath = null,    // EQI-2 Local First Dump only: the archive event folder, read (never written) by the
+                              // re-import guard when the staging copy was cleared after an earlier sync
 }) => {
   let originalEventJson = null;
   if (destination !== null && destination !== 'dump') throw new Error(`Unknown import destination: ${destination}`);
@@ -1274,9 +1280,19 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
     let _alreadyInDump = [];
     if (destination === 'dump') {
       const captureDateReader = require('../services/captureDateReader');
+      // The archive counterpart is consulted only for a Local First transaction whose given archive
+      // event folder is a real managed event of the same name as the staging copy being committed.
+      let _archiveEvent = null;
+      if (importMode === 'local-first' && typeof archiveEventPath === 'string' && archiveEventPath && eventJsonPath
+          && path.basename(path.resolve(archiveEventPath)) === path.basename(path.resolve(eventJsonPath))
+          && path.resolve(archiveEventPath) !== path.resolve(eventJsonPath)) {
+        const managed = await fsp.stat(path.join(archiveEventPath, 'event.json')).then(st => st.isFile(), () => false);
+        if (managed) _archiveEvent = archiveEventPath;
+      }
       ({ copy: _jobsToCopy, alreadyInDump: _alreadyInDump } = await eventDumpPaths.partitionAlreadyInDump(fileJobs, {
         exists: (p) => fsp.stat(p).then(st => st.isFile(), () => false),
         hashOf: (p) => captureDateReader.readImageDataHash(p),
+        alternateOf: _archiveEvent ? (job) => eventDumpPaths.archiveCounterpart(job, eventJsonPath, _archiveEvent) : null,
       }));
       if (_alreadyInDump.length) {
         log(`[event-dump] ${_alreadyInDump.length} file(s) already in the Dump (identical image data) — not copied again`);
@@ -3109,7 +3125,10 @@ ipcMain.handle('archive:countEventsThisWeek', async () => {
   return { ok: true, count };
 });
 
-ipcMain.handle('archive:getOperationsStatus', async () => {
+ipcMain.handle('archive:getOperationsStatus', async () => _archiveOperationsStatus());
+
+/** Shared by archive:getOperationsStatus and the companion's EQI-2 import review. */
+async function _archiveOperationsStatus() {
   const localStagingRoot  = settings.getLocalStagingRoot();
   const defaultImportMode = settings.getDefaultImportMode();
   const mainArchiveRoot   = settings.getMainArchiveRoot();
@@ -3160,7 +3179,7 @@ ipcMain.handle('archive:getOperationsStatus', async () => {
   }
 
   return { ...base, status: 'ready' };
-});
+}
 
 // ── Archive — NAS Event List ──────────────────────────────────────────────────
 
