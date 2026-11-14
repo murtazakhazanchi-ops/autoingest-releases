@@ -516,6 +516,21 @@ Validation:
 - Confirm any flow that depends on `status === 'in-progress'` persisting across a scan is aware of the reset behavior.
 - Confirm the crash-recovery reset is intentional in the context of the change being reviewed.
 
+### Photographer Registry Startup Open Is Read-Only
+
+Context:
+- Applies to opening the encrypted Photographer Registry (Q5) outside an explicit user action, e.g. at app startup. Source: learning-log 2026-11-14 (CAM-001).
+
+Rule:
+- A startup open must only open an existing registry. It must not create, reset, migrate, repair or quarantine it; missing key, corrupt registry and locked states are reported as states and left byte-identical.
+- Recognition uses only the existing Q3–Q5 identity and association evidence. Do not add a second registry, a plaintext association cache or a duplicate learning store.
+
+Avoid:
+- "Self-healing" a corrupt or keyless registry on open; caching decrypted associations on disk.
+
+Validation:
+- Hash `identity-registry/registry.json` and `keys.json` before and after missing-key, corrupt and locked startup scenarios; they must match.
+
 ### Documentation Follow-Up
 
 Context:

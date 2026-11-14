@@ -2470,6 +2470,53 @@ Status:
 
 ---
 
+### 2026-11-14 — AI-RM-016 CAM-001: Startup Photographer Recognition and Keychain Isolation
+
+Task type:
+- Architecture / Security / Persistence / Performance / Testing
+
+What happened:
+- Camera-to-photographer suggestions only appeared after the first import of a session: the Q5 registry was opened only by post-import learning or a Q5d decision, and the companion reused an already-open store (`peekOpenRegistry`).
+- Opening it earlier exposed a freeze risk: Electron `safeStorage` makes a synchronous Keychain call on the main process, which blocks the whole app while macOS holds it behind a SecurityAgent prompt (e.g. after a new ad-hoc-signed build) or a locked Keychain.
+- Fix (`491e7fe` + tests `0a95901`, RC Preview `v0.9.18-rc.4`): on macOS the key read runs in a same-binary helper process (`--autoingest-key-helper`, same app name, so same Keychain item and ACL; code-only errors over a private pipe); startup opens the existing registry only, publishes readiness phases (starting / waiting-keychain / ready / unavailable), and attached cards refresh when it becomes ready.
+- Packaged cold-start verification: card inserted during initialization confirmed 5.6 s after launch; four-card cold start assessed before any import; 39 main-process round trips (max 3 ms) during a 20 s helper stall; refusal and crash shown honestly.
+- Two existing Q5a/Q5c live tests assumed the registry stays closed until the user opens it; they now set up locked/corrupt states before launch. A packaged test conversion pointed Keychain cleanup at the dev harness item name and left a test-only item behind, failing every later suite's "absent after run" check.
+
+Reusable lessons:
+1. On macOS, never run synchronous `safeStorage`/Keychain operations on the Electron main process where access may block behind SecurityAgent or a locked Keychain.
+2. Reuse the established key-helper process (`services/secureStorageHelper*.js`) for any future potentially blocking registry-key operation; preserve the encryption format, Keychain item, app identity and user profile — no migration or key regeneration to make it work.
+3. Opening an existing Photographer Registry at startup must not create, reset, migrate or repair it; missing, corrupt and locked states are reported, not fixed.
+4. Camera-to-photographer recognition must work before the first import, using only the existing Q3–Q5 identity and association evidence (no second registry, plaintext cache or duplicate learning store).
+5. Recognized photographers are suggestions requiring operator confirmation; shared/ambiguous, unknown and make/model-only cameras are never assigned automatically, and last-used stays separate from recognition.
+6. Registry loading or failure must never block card discovery, photographer search or the import workflow; readiness is a published state, not a gate.
+7. Discard stale recognition results when cards change (removal, swap, disconnect during lookup).
+8. Cold-start packaged tests must cover cards attached before startup, cards inserted during initialization, a stalled helper, Keychain refusal, and a main-process responsiveness probe that is proven to catch a deliberate block.
+9. Test-only Keychain items must be cleaned up by their exact test identity name (re-derived after any packaged conversion) and verified absent, without ever touching production items.
+
+Common failure mode:
+- Calling `safeStorage` from main-process startup code; "fixing" a missing/corrupt registry on open; auto-selecting a recognized photographer; tests that assume the registry stays closed or clean up a different Keychain item name than the one the build actually used.
+
+Preferred pattern:
+- Helper-process key read with timeouts and background retry, read-only startup open with readiness phases, suggestion-only UI with one-click confirm, card-generation checks to drop stale results, packaged cold-start tests with seams for stall/refusal/crash.
+
+Limitations (honest record):
+- A genuinely locked macOS Keychain was not independently exercised (simulated via stall and refusal seams).
+- Windows runtime remains unverified (in-process DPAPI path unchanged).
+- One of three packaged CAM-001 runs hit an intermittent 60 s window-wait timeout after all recognition checks passed.
+- Existing unrelated QMZ regression failures remain open.
+
+Promote to agents:
+- `autoingest-architect.md` — lessons 1, 2, 6
+- `event-data-guardian.md` — lessons 3, 4
+- `code-reviewer.md` — lessons 1, 5, 7 (review checks) and 8, 9 (validation)
+- `performance-auditor.md` — lessons 1, 6 (responsiveness measurement)
+- Not promoted: contract-debugger, ui-system-specialist, metadata/ingestion/group specialists (no new rule beyond the above); release and packaging tooling details (kept in project memory)
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

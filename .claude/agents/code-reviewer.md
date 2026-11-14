@@ -326,6 +326,23 @@ Avoid:
 Validation:
 - Grep new `ipcMain.handle` for sender checks; confirm poller acquire/release parity with the old lifecycle points.
 
+### Photographer Suggestion Safety and Keychain Calls
+
+Context:
+- Applies to diffs touching camera-to-photographer recognition, the companion suggestion UI, or registry key access. Source: learning-log 2026-11-14 (CAM-001).
+
+Rule:
+- Block any main-process `safeStorage` call on macOS; key work goes through the existing helper process.
+- A recognized photographer is a suggestion with one-click confirm. Shared/ambiguous cameras list candidates with none selected; unknown says so; make/model-only never names anyone; last-used stays separate. Nothing is auto-selected.
+- Results must be dropped when cards change (removal, swap, disconnect during lookup); check that each async result is matched to the current card generation.
+
+Avoid:
+- Approving auto-selection, a pre-highlighted candidate, or a lookup result applied without a staleness check.
+
+Validation:
+- Cold-start packaged tests cover cards attached before startup, cards inserted during initialization, a stalled helper, Keychain refusal and a main-process responsiveness probe shown to catch a deliberate block.
+- Test-only Keychain items are deleted by the exact test-identity item name (re-checked after any packaged test conversion) and verified absent; production items are checked for presence only and never touched.
+
 ## Validation Checklist
 
 Before giving a verdict, review:

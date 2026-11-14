@@ -7,6 +7,15 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-11-14 — AI-FEAT-064 CAM-001 completed at RC Preview; Agent Learning Update
+
+- **Task type**: roadmap status + agent learning (documentation only, on `docs/roadmap-quick-ingest-priority`; no code change)
+- **What changed**: CAM-001 marked completed at the RC Preview stage (`v0.9.18-rc.4`, `0a95901`, owner-accepted) in AI-FEAT-064 stage state and stage table, roadmap current position, AI-RM-016 status and next action, and registry status text; EQI-2 marked as the next active stage (not started). Agent learning: new `.claude/learning-log.md` entry and promoted rules in `autoingest-architect.md`, `event-data-guardian.md`, `code-reviewer.md`, `performance-auditor.md`.
+- **Affected feature(s)**: AI-FEAT-064
+- **Affected roadmap milestone(s)**: AI-RM-016
+- **Unresolved gaps**: genuinely locked macOS Keychain not independently exercised; Windows runtime unverified; one intermittent packaged window-wait timeout; existing unrelated QMZ regression failures open; dashboard (04) not regenerated
+- **Evidence confidence**: owner acceptance of CAM-001 (2026-11-14); evidence as recorded in the previous entry
+
 ## 2026-11-14 — AI-FEAT-064 CAM-001 startup photographer recognition recorded; RC Preview v0.9.18-rc.4
 
 - **Task type**: feature journal + roadmap status (documentation only, on `docs/roadmap-quick-ingest-priority`; code on `fix/cam-001-startup-recognition` — `491e7fe`, `0a95901`)

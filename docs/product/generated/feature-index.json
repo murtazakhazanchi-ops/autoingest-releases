@@ -4071,6 +4071,18 @@
       "related_changelog_entries": [
         {
           "date": "2026-11-14",
+          "excerpt": "## 2026-11-14 — AI-FEAT-064 CAM-001 completed at RC Preview; Agent Learning Update"
+        },
+        {
+          "date": "2026-11-14",
+          "excerpt": "**What changed**: CAM-001 marked completed at the RC Preview stage (`v0.9.18-rc.4`, `0a95901`, owner-accepted) in AI-FEAT-064 stage state and stage table, roadmap current position, AI-RM-016 status an"
+        },
+        {
+          "date": "2026-11-14",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-064"
+        },
+        {
+          "date": "2026-11-14",
           "excerpt": "## 2026-11-14 — AI-FEAT-064 CAM-001 startup photographer recognition recorded; RC Preview v0.9.18-rc.4"
         },
         {

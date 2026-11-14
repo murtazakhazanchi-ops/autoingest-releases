@@ -852,6 +852,23 @@ Avoid:
 Validation:
 - Live-test with the popup open that progress events reach the main window; confirm app quits when the main window closes.
 
+### Keychain Work Off the Main Process
+
+Context:
+- Applies to any code that reads or writes the Photographer Registry key or otherwise calls Electron `safeStorage`. Source: learning-log 2026-11-14 (CAM-001).
+
+Rule:
+- On macOS, never call `safeStorage`/Keychain synchronously on the main process; it blocks the whole app behind a SecurityAgent prompt or a locked Keychain.
+- Reuse the existing key-helper process (`services/secureStorageHelper.js`, `services/secureStorageHelperProcess.js`) for any potentially blocking key operation. It runs under the same app name, so it uses the same Keychain item and ACL.
+- Preserve the encryption format, Keychain item, app identity, bundle ID and user profile; never migrate or regenerate keys to make startup work, and never bypass a Keychain prompt.
+- Registry loading is a published readiness state (starting / waiting-keychain / ready / unavailable), never a gate: card discovery, photographer search and import must work while it loads or fails.
+
+Avoid:
+- New main-process `safeStorage` calls; blocking the companion on registry readiness; key material or OS error text in IPC payloads or logs.
+
+Validation:
+- Grep for `safeStorage` outside the helper and the non-macOS path; measure main-process round trips during a stalled helper.
+
 ## Validation Checklist
 
 When invoked, return:

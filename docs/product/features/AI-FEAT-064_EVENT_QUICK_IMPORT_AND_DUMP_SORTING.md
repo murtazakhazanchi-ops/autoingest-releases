@@ -5,7 +5,7 @@
 | Feature ID | AI-FEAT-064 |
 | Category | Import |
 | Status | In active development |
-| Stage state | CAM-001 (photographer recognised on card detection, Keychain work isolated in a helper process) released as RC Preview `v0.9.18-rc.4` (`0a95901`, `fix/cam-001-startup-recognition`); not merged to Stable; EQI-2 to EQI-5 planned. *(2026-11-13 earlier:* EQI-1 released as RC Preview `v0.9.18-rc.1` (`4e4fd81`) and used at a live event; EQI-1.1 released as RC Preview `v0.9.18-rc.2` (`000f103`); EQI-1.2 (visual hierarchy and camera-aware photographer suggestions) released as RC Preview `v0.9.18-rc.3` (`cdeb0ea`, `fix/eqi-companion-hierarchy`); not merged to Stable; EQI-2 to EQI-5 planned.)* *(2026-11-13 earlier: EQI-1.1 RC `v0.9.18-rc.2` latest.)* *(2026-11-12: EQI-1 implemented and verified on `feature/event-quick-import-dump`, local, unmerged, unreleased.)* |
+| Stage state | CAM-001 (photographer recognised on card detection, Keychain work isolated in a helper process) **completed at the RC Preview stage** — `v0.9.18-rc.4` (`0a95901`, `fix/cam-001-startup-recognition`), owner-accepted 2026-11-14; not merged to Stable; EQI-2 is the next active stage; EQI-2 to EQI-5 planned. *(Earlier 2026-11-14: CAM-001 released as RC Preview, awaiting owner feedback.)* *(2026-11-13 earlier:* EQI-1 released as RC Preview `v0.9.18-rc.1` (`4e4fd81`) and used at a live event; EQI-1.1 released as RC Preview `v0.9.18-rc.2` (`000f103`); EQI-1.2 (visual hierarchy and camera-aware photographer suggestions) released as RC Preview `v0.9.18-rc.3` (`cdeb0ea`, `fix/eqi-companion-hierarchy`); not merged to Stable; EQI-2 to EQI-5 planned.)* *(2026-11-13 earlier: EQI-1.1 RC `v0.9.18-rc.2` latest.)* *(2026-11-12: EQI-1 implemented and verified on `feature/event-quick-import-dump`, local, unmerged, unreleased.)* |
 | Maturity | Experimental |
 | Parent feature | AI-FEAT-061 (Quick Ingest & Desktop Companion) |
 | Roadmap milestone | AI-RM-016 — Event Quick Import & Dump Sorting (PRIORITY 1 from 2026-11-12) |
@@ -83,8 +83,8 @@ Stable v0.9.17 QMZ attribution protections, Q4 learning, Q5 registry, the Q5 ren
 | EQI-1 | Menu-bar Event Dump Quick Import (single destination) | **Released as RC Preview `v0.9.18-rc.1`** (`4e4fd81`); used at a live event 2026-11-12 (89 files: 88 CR3 + 1 MP4 into `Event/Dump/<Photographer>/`, unsequenced, metadata complete, source untouched). *(Earlier: implemented and verified on `feature/event-quick-import-dump`, awaiting owner review.)* |
 | EQI-1.1 | Adaptive menu-bar companion & live-event usability stabilization | **Released as RC Preview `v0.9.18-rc.2`** (`000f103`) — awaiting owner live-event feedback; not Stable |
 | EQI-1.2 | Visual hierarchy & camera-aware photographer suggestions | **Released as RC Preview `v0.9.18-rc.3`** (`cdeb0ea`) — awaiting owner feedback; not Stable |
-| CAM-001 | Immediate photographer recognition on card detection (Keychain work off the main process) | **Released as RC Preview `v0.9.18-rc.4`** (`0a95901`) — awaiting owner feedback; not Stable |
-| EQI-2 | Multi-event manual time assignment | Planned — not started |
+| CAM-001 | Immediate photographer recognition on card detection (Keychain work off the main process) | **Completed at RC Preview `v0.9.18-rc.4`** (`0a95901`) — owner-accepted 2026-11-14; not Stable *(previously: awaiting owner feedback)* |
+| EQI-2 | Multi-event manual time assignment | Next active stage — not started |
 | EQI-3 | Sort Dump through the existing Import Workspace | Planned — not started |
 | EQI-4 | Safe source cleanup and repeated-session deletion fix | Planned — not started |
 | EQI-5 | Integrated regression, Windows verification, release readiness | Planned — not started |

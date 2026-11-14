@@ -540,6 +540,20 @@ Avoid:
 Validation:
 - Measure memory and process count before adopting keep-alive; compare visual regression of loading states after poller changes.
 
+### Main-Process Responsiveness During Keychain Waits
+
+Context:
+- Applies to startup work that may wait on the macOS Keychain or another OS prompt. Source: learning-log 2026-11-14 (CAM-001).
+
+Rule:
+- Synchronous `safeStorage` on the main process freezes the app for as long as a prompt is pending; keep it in the key-helper process and show a waiting state.
+
+Avoid:
+- Judging responsiveness by eye; a probe that has not been shown to fail on a real block.
+
+Validation:
+- During a stalled helper, measure main-process IPC round trips (CAM-001 baseline: max 3 ms over 39 trips, popup open about 13 ms) and confirm the same probe flags a deliberate 2.5 s main-thread block.
+
 ### Cheap Pre-Check Before Expensive Operation in Hot/Frequently-Triggered Paths
 
 Context:

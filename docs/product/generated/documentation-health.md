@@ -2,7 +2,7 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `44b89c09126f4b4ffe525c72d1e6e4d4bc46eea2`.
+Generated against source commit `21ad0a09c075c7c7c2fc3a2efdd51226ec6eeddf`.
 
 ## Summary
 
