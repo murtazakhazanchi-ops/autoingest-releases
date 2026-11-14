@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data:;" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Event — AutoIngest</title>
+  <script src="theme-init.js"></script>
+  <!-- AI-FEAT-064 EQI-2.1: the menu-bar companion's own Event Creator window. It hosts the SAME
+       Event Creator (eventCreator.js / eventMgmt.js) and the SAME styles (the main window's style
+       block, injected by services/eventCreatorWindow.js) — never the whole application. -->
+</head>
+<body class="ecw-body">
+  <!-- The Event Management shell, identical to index.html's #eventMgmtModal; EventCreator renders into #ecBody. -->
+  <div id="eventMgmtModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="ecTitle">
+    <div class="emm-box">
+
+      <div class="emm-topbar">
+        <span class="emm-topbar-title">Event Management</span>
+      </div>
+
+      <div class="emm-header">
+        <span id="ecTitle" class="emm-title">Select Event</span>
+      </div>
+
+      <div id="ecBody"></div>
+
+      <div class="emm-footer">
+        <button class="emm-btn-ghost" id="emmBackBtn">← Back</button>
+        <div class="emm-footer-right">
+          <button class="emm-btn-secondary" id="emmEditBtn" style="display:none">Edit</button>
+          <button class="emm-btn-secondary" id="emmSeqFoldersBtn" style="display:none">Sequence Folders</button>
+          <button class="emm-btn-primary" id="emmContinueBtn" disabled style="display:none">Continue</button>
+          <button class="emm-btn-primary" id="emmCreateBtn" disabled style="display:none">Continue</button>
+          <button class="emm-btn-primary" id="emmSaveBtn" style="display:none">Save</button>
+          <button class="emm-btn-primary" id="emmRepairBtn" style="display:none">Save &amp; Repair →</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="treeAutocomplete.js"></script>
+  <script src="pathUtils.js"></script>
+  <script src="photographerSequenceUtils.js"></script>
+  <script src="qmzSequenceFormat.js"></script>
+  <script src="eventNamingRules.js"></script>
+  <script src="eventCreator.js"></script>
+  <script src="eventMgmt.js"></script>
+  <script src="eventCreatorWindow.js"></script>
+</body>
+</html>

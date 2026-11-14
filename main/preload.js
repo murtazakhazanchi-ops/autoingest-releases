@@ -484,5 +484,8 @@ contextBridge.exposeInMainWorld('api', {
   // protocol), and its per-event start/end counts for the companion's progress view.
   onCompanionDumpPlanImport:  (cb)                 => _register('companion:dumpPlanImport', (_e, req) => cb(req)),
   companionDumpPlanEvent:     (info)               => ipcRenderer.send('companion:dumpPlanEvent', info),
+  // EQI-2.1: the companion's own Event Creator window reports its single outcome (created event /
+  // cancelled). Accepted by main only from that window (services/eventCreatorWindow.js).
+  eventCreatorWindowResult:   (result)             => ipcRenderer.send('eventCreatorWindow:result', result),
 
 });
