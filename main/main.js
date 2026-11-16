@@ -427,7 +427,10 @@ function _startCompanion() {
       journalDir: path.join(app.getPath('userData'), 'event-dump-plans'),
       // EQI-2.1: Event Dump imports run here, in the main process — no main window needed.
       importDeps: {
-        commit: (params, hooks) => _commitImportTransaction({ sender: null }, params, hooks),
+        commit: (params, hooks) => {
+          if (dumpSort.isRunning()) throw new Error('Sort Dump is moving files in the archive. Import again when it finishes.');
+          return _countedImport(() => _commitImportTransaction({ sender: null }, params, hooks));
+        },
         readEventJson: (p) => _readEventJson(p).catch(() => null),
         ensureLocalMirror: (params) => localMirrorService.ensureLocalMirror(params),
         updateEventJson: (p, patch) => updateEventJson(p, patch),
@@ -1102,8 +1105,12 @@ async function _persistMetadataStateAndCompact(batchId, eventJsonFilePath) {
  * @param {string} eventJsonFilePath
  * @param {Array<{src:string, dest:string, photographer?:string|null}>} files
  * @param {object} context Same evidence shape exifService.applyBatch consumes.
+ * @param {{ onProgress?: Function }} [hooks]  EQI-3 Sort Dump: observes the repair batch
+ * @returns {Promise<{ checked: number, complete: number, ambiguous: number, failed: number, queued: number,
+ *   verificationRequired: number, batchDone: Promise<object|null> }|undefined>}  batchDone settles at the
+ *   repair batch's batch_complete (null when nothing was queued) — existing callers ignore it.
  */
-async function _verifyAndReconcile(eventJsonFilePath, files, context) {
+async function _verifyAndReconcile(eventJsonFilePath, files, context, hooks = null) {
   if (!files || files.length === 0) return;
 
   let results;
@@ -1131,9 +1138,13 @@ async function _verifyAndReconcile(eventJsonFilePath, files, context) {
     }
   }
 
+  let batchDone = Promise.resolve(null);
   if (toQueue.length > 0) {
     const batchId = `verify-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    let settle;
+    batchDone = new Promise((r) => { settle = r; });
     exifService.applyBatch(batchId, toQueue, context, async (p) => {
+      if (hooks && hooks.onProgress) { try { hooks.onProgress(p); } catch { /* observer only */ } }
       if (p.event === 'batch_complete') {
         try {
           await _writeLastMetadataRun(eventJsonFilePath, p, context.groups);
@@ -1141,6 +1152,7 @@ async function _verifyAndReconcile(eventJsonFilePath, files, context) {
           log(`[main] verify-and-repair _writeLastMetadataRun failed for ${eventJsonFilePath}: ${writeErr.message}`);
         }
         await _persistMetadataStateAndCompact(p.batchId, eventJsonFilePath);
+        settle(p);
       }
     });
   }
@@ -1152,6 +1164,10 @@ async function _verifyAndReconcile(eventJsonFilePath, files, context) {
       log(`[main] Failed to persist verification-derived metadataState for ${eventJsonFilePath}: ${err.message}`);
     }
   }
+  return {
+    checked: results.length, complete: extraCounts.complete, ambiguous: extraCounts.ambiguous, failed: extraCounts.failed,
+    queued: toQueue.length, verificationRequired: extraCounts.verificationRequired, batchDone,
+  };
 }
 
 /**
@@ -1207,8 +1223,17 @@ async function _verifyTransferBatch(mainArchiveRoot, batchId) {
 _handleTracked('import:commitTransaction', 'import', (event, params) => {
   // EQI-2.1: one copy at a time — the copy engine's pause/abort state is shared.
   if (companionService.isImportRunning()) throw new Error('A menu-bar import is running. Try again when it finishes.');
-  return _commitImportTransaction(event, params);
+  // EQI-3: an import never runs while Sort Dump is moving files in an archive event.
+  if (dumpSort.isRunning()) throw new Error('Sort Dump is moving files. Try again when it finishes.');
+  return _countedImport(() => _commitImportTransaction(event, params));
 });
+
+// EQI-3: import transactions in flight (main window or menu-bar companion) — Sort Dump waits for none.
+let _importTxActive = 0;
+async function _countedImport(fn) {
+  _importTxActive++;
+  try { return await fn(); } finally { _importTxActive--; }
+}
 
 /**
  * The import transaction (copy + verify, locks, atomic event.json commit, import index, metadata
@@ -3668,6 +3693,102 @@ function _extractPhotographerLockScopes(fileJobs, nasRoot) {
   }
   return Array.from(seen.values());
 }
+
+// ── Sort Dump (AI-FEAT-064 EQI-3) ─────────────────────────────────────────────
+// Moves an event's Dump media into its final component/photographer folders through the Import
+// Workspace (services/dumpSortService.js). Guards, records, Local First and metadata are wired here.
+
+function _dumpSortRoots() {
+  const real = (p) => { try { return fs.realpathSync(path.resolve(p)); } catch { return path.resolve(p); } };
+  const archive = [settings.getArchiveRoot(), settings.getMainArchiveRoot(), settings.getNasRoot()].filter(Boolean).map(real);
+  const staging = settings.getLocalStagingRoot();
+  const nas = settings.getNasRoot();
+  return { archive, staging: staging ? real(staging) : null, nas: nas ? real(nas) : null };
+}
+
+/** Unsynced Local First jobs of the event's staging copy (same collection/event below the staging root). */
+async function _dumpSortPendingSync(realEvent) {
+  const { staging } = _dumpSortRoots();
+  if (!staging) return [];
+  const local = path.join(staging, path.basename(path.dirname(realEvent)), path.basename(realEvent));
+  if (!(await fsp.stat(local).then(st => st.isDirectory()).catch(() => false))) return [];
+  await syncQueueService.refreshQueue();
+  const q = await syncQueueService.getQueue();
+  return ((q && q.jobs) || []).filter(j => j.localEventPath && path.resolve(j.localEventPath) === path.resolve(local) && j.status !== 'synced').map(j => j.jobId);
+}
+
+/** Metadata batches still queued for files in the event's Dump. */
+async function _dumpSortActiveMetadata(realEvent) {
+  const dumpPrefix = path.join(realEvent, 'Dump') + path.sep;
+  let n = 0;
+  for (const id of await metadataQueueStore.listActiveBatchIds()) {
+    const m = await metadataQueueStore.readManifest(id).catch(() => null);
+    const files = (m && Array.isArray(m.files)) ? m.files : [];
+    if (files.some(f => { const d = f && (f.dest || f.path || f); return typeof d === 'string' && path.resolve(d).startsWith(dumpPrefix); })) n++;
+  }
+  return n;
+}
+
+/** Archive folder locks for every top-level and photographer folder the move touches (NAS events only). */
+async function _dumpSortLocks(realEvent, rels) {
+  const { nas } = _dumpSortRoots();
+  if (!nas || !realEvent.startsWith(nas + path.sep)) return { ok: true, release: async () => {} };
+  const collection = path.basename(path.dirname(realEvent));
+  const eventFolderName = path.basename(realEvent);
+  const names = new Set();
+  for (const rel of rels) {
+    const parts = rel.split('/').slice(0, -1).filter(x => x !== 'VIDEO');
+    if (parts.length) { names.add(parts[0]); names.add(parts[parts.length - 1]); }
+  }
+  const held = [];
+  const jobId = `dumpsort-${Date.now().toString(36)}`;
+  for (const photographerFolderName of names) {
+    const r = await archiveLockService.acquireLock(nas, { collection, eventFolderName, photographerFolderName, jobId, batchId: null });
+    if (!r.acquired) { _releaseDirectNasLocks(held); return { ok: false, lockedBy: r.lockedBy || null }; }
+    const owner = { jobId: r.lockData.jobId, deviceName: r.lockData.deviceName };
+    const heartbeatTimer = setInterval(() => { archiveLockService.renewLock(r.lockPath, owner).catch(() => {}); }, archiveLockService.LOCK_HEARTBEAT_INTERVAL_MS);
+    held.push({ lockPath: r.lockPath, heartbeatTimer });
+  }
+  return { ok: true, release: async () => _releaseDirectNasLocks(held) };
+}
+
+/** Verifies moved photos against their new component's tags; awaits any repair batch (10 min watchdog). */
+async function _dumpSortVerifyMetadata(realEvent, files, onProgress) {
+  const doc = JSON.parse(await fsp.readFile(path.join(realEvent, 'event.json'), 'utf8'));
+  const built = buildEventEvidenceContext(realEvent, doc, files.map(f => ({ src: f, dest: f })));
+  const r = await _verifyAndReconcile(built.context.eventJsonPath, built.files, built.context, { onProgress });
+  if (!r) return { state: 'not-needed' };
+  if (!r.queued) return { state: r.failed ? 'failed' : 'complete', checked: r.checked, rewritten: 0, failed: r.failed, verificationRequired: r.verificationRequired };
+  let timer;
+  const batch = await Promise.race([r.batchDone, new Promise(res => { timer = setTimeout(() => res('timeout'), 10 * 60 * 1000); })]);
+  clearTimeout(timer);
+  if (batch === 'timeout') return { state: 'unconfirmed', checked: r.checked, rewritten: r.queued };
+  const failed = (batch && batch.failed) || 0;
+  return { state: failed ? 'completed-with-errors' : 'complete', checked: r.checked, rewritten: r.queued, failed };
+}
+
+const dumpSort = (() => {
+  const { createDumpSortService } = require('../services/dumpSortService');
+  let busy = 0;
+  const svc = createDumpSortService({
+    updateEventJsonAtomic, intent: eventMetadataIntent, roots: _dumpSortRoots,
+    pendingSyncFor: _dumpSortPendingSync, activeMetadataFor: _dumpSortActiveMetadata,
+    isImportRunning: () => _importTxActive > 0 || companionService.isImportRunning(),
+    acquireLocks: _dumpSortLocks, verifyMetadata: _dumpSortVerifyMetadata,
+    imageHash: (p) => require('../services/captureDateReader').readImageDataHash(p),
+    who: () => { let u = null; try { u = userManager.getActiveUser(); } catch { /* none */ } return { device: os.hostname(), operator: u ? { id: u.id, name: u.name } : null }; },
+    log: (m) => log('info', m),
+  });
+  return { ...svc, isRunning: () => busy > 0, _track: async (fn) => { busy++; try { return await fn(); } finally { busy--; } } };
+})();
+
+ipcMain.handle('dumpSort:status', (_e, { eventPath } = {}) => dumpSort.status(eventPath).catch(err => ({ ok: false, showSortDump: false, reason: err.message })));
+ipcMain.handle('dumpSort:plan', (_e, { eventPath, selection } = {}) => dumpSort._track(() => dumpSort.plan(eventPath, selection)));
+_handleTracked('dumpSort:run', 'import', (event, { eventPath, selection, groups } = {}) => dumpSort._track(() => dumpSort.run(eventPath, { selection, groups }, (p) => {
+  if (!event.sender.isDestroyed()) event.sender.send('dumpSort:progress', p);
+})));
+ipcMain.handle('dumpSort:emptyFolders', (_e, { eventPath } = {}) => dumpSort.emptyPhotographerFolders(eventPath));
+ipcMain.handle('dumpSort:deleteEmptyFolder', (_e, { eventPath, name } = {}) => dumpSort.deleteEmptyPhotographerFolder(eventPath, name));
 
 // ── Durable sync queue ────────────────────────────────────────────────────────
 

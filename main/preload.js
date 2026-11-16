@@ -433,6 +433,13 @@ contextBridge.exposeInMainWorld('api', {
   // ── Photographer Folder Sequencing ──
   getPhotographerFolders:      (params) => ipcRenderer.invoke('event:getPhotographerFolders',    params),
   applyPhotographerSequence:   (params) => ipcRenderer.invoke('event:applyPhotographerSequence', params),
+  // AI-FEAT-064 EQI-3 Sort Dump — move an event's Dump media into its final folders.
+  dumpSortStatus:              (eventPath) => ipcRenderer.invoke('dumpSort:status', { eventPath }),
+  dumpSortPlan:                (eventPath, selection) => ipcRenderer.invoke('dumpSort:plan', { eventPath, selection }),
+  dumpSortRun:                 (eventPath, selection, groups) => ipcRenderer.invoke('dumpSort:run', { eventPath, selection, groups }),
+  dumpSortEmptyFolders:        (eventPath) => ipcRenderer.invoke('dumpSort:emptyFolders', { eventPath }),
+  dumpSortDeleteEmptyFolder:   (eventPath, name) => ipcRenderer.invoke('dumpSort:deleteEmptyFolder', { eventPath, name }),
+  onDumpSortProgress:          (cb) => _register('dumpSort:progress', (_e, p) => cb(p)),
 
   // ── Team Live (advisory only — never writes authoritative files) ──
   reportTeamActivity: (data) => ipcRenderer.invoke('team:reportActivity', data),
