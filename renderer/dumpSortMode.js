@@ -267,8 +267,8 @@ const DumpSortMode = (() => {
         <p class="dup-subtitle">This photographer folder is now empty. Would you like to delete it?</p>
         <p class="dsr-folder-name">Dump / ${esc(name)}</p>
         <div class="dup-actions">
-          <button type="button" class="dup-btn dup-btn-cancel" id="dsrKeep">Keep Folder</button>
-          <button type="button" class="dup-btn dup-btn-primary" id="dsrDelete">Delete Empty Folder</button>
+          <button type="button" class="dup-btn dup-btn-primary" id="dsrKeep">Keep Folder</button>
+          <button type="button" class="dup-btn dup-btn-cancel dsr-danger" id="dsrDelete">Delete Empty Folder</button>
         </div></div>`;
       o.classList.add('visible');
       o.querySelector('#dsrKeep').addEventListener('click', () => resolve('keep'), { once: true });
