@@ -180,12 +180,23 @@ function createDumpSortService(deps) {
     }
   }
 
+  /** Completes interrupted sorts — under the same guards and archive folder locks as a new sort. */
   async function recoverPending(real) {
     const { journals } = await journal.listPending(real);
     if (!journals.length) return null;
-    log(`[dump-sort] completing ${journals.length} interrupted sort(s)`);
-    const r = await engine.recover({ eventPath: real, hooks: _hooks(real, () => {}), imageHash: deps.imageHash || null });
-    return r.results.map(x => ({ txId: x.txId, ok: x.ok, movedFiles: x.movedFiles, attention: x.attention }));
+    if (running.has(real) || deps.isImportRunning()) return [{ ok: false, deferred: true, reason: 'busy' }];
+    const rels = journals.flatMap(j => (j.assets || []).flatMap(a => (a.members || []).flatMap(m => [m.src, m.dest])));
+    const locks = await deps.acquireLocks(real, rels);
+    if (!locks.ok) return [{ ok: false, deferred: true, reason: 'locked' }];
+    running.add(real);
+    try {
+      log(`[dump-sort] completing ${journals.length} interrupted sort(s)`);
+      const r = await engine.recover({ eventPath: real, hooks: _hooks(real, () => {}), imageHash: deps.imageHash || null });
+      return r.results.map(x => ({ txId: x.txId, ok: x.ok, movedFiles: x.movedFiles, attention: x.attention }));
+    } finally {
+      running.delete(real);
+      if (locks.release) await locks.release();
+    }
   }
 
   function _hooks(real, onProgress) {
