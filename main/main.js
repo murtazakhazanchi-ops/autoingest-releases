@@ -3714,17 +3714,20 @@ async function _dumpSortPendingSync(realEvent) {
   if (!(await fsp.stat(local).then(st => st.isDirectory()).catch(() => false))) return [];
   await syncQueueService.refreshQueue();
   const q = await syncQueueService.getQueue();
-  return ((q && q.jobs) || []).filter(j => j.localEventPath && path.resolve(j.localEventPath) === path.resolve(local) && j.status !== 'synced').map(j => j.jobId);
+  // Compared by collection/event folder names: queue paths are stored as configured, `local` is a real path.
+  const same = (p) => p && path.basename(p) === path.basename(local) && path.basename(path.dirname(p)) === path.basename(path.dirname(local));
+  return ((q && q.jobs) || []).filter(j => same(j.localEventPath) && j.status !== 'synced').map(j => j.jobId);
 }
 
 /** Metadata batches still queued for files in the event's Dump. */
 async function _dumpSortActiveMetadata(realEvent) {
-  const dumpPrefix = path.join(realEvent, 'Dump') + path.sep;
+  // Matched by <collection>/<event>/Dump/ — manifest paths are stored as written, realEvent is a real path.
+  const needle = path.sep + path.join(path.basename(path.dirname(realEvent)), path.basename(realEvent), 'Dump') + path.sep;
   let n = 0;
   for (const id of await metadataQueueStore.listActiveBatchIds()) {
     const m = await metadataQueueStore.readManifest(id).catch(() => null);
     const files = (m && Array.isArray(m.files)) ? m.files : [];
-    if (files.some(f => { const d = f && (f.dest || f.path || f); return typeof d === 'string' && path.resolve(d).startsWith(dumpPrefix); })) n++;
+    if (files.some(f => { const d = f && (f.dest || f.path || f); return typeof d === 'string' && path.resolve(d).includes(needle); })) n++;
   }
   return n;
 }
