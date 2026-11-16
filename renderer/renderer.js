@@ -408,6 +408,9 @@ function getFileKey(file) {
 }
 
 function isAlreadyImported(file) {
+  // EQI-3 Sort Dump: every Dump photo was imported once already — in that workspace the question
+  // is "sorted yet?", answered by the photo still being in Dump, not by the import history.
+  if (window.DumpSortMode && DumpSortMode.isActive()) return false;
   const key = getFileKey(file);
 
   // Check destination cache (current folder)
@@ -5850,6 +5853,7 @@ async function selectSource({ type, path, label = null, driveObj = null }) {
   // browseFolder race. The first call's own ++fileLoadRequestId inside browseFolder
   // makes subsequent calls supersede it; guard here so only one proceeds at a time.
   if (isLoadingFiles) return;
+  if (window.DumpSortMode) DumpSortMode.onSourceChanged(path);   // EQI-3: leaving the Dump source ends Sort Dump
 
   _pendingSourcePath = path;
   try {
@@ -7048,8 +7052,10 @@ function buildIconTilesHtml(files, enablePairing = false) {
       if (files[i + 1] && isSamePair(file, files[i + 1])) pairCls += ' pair-start';
       if (i > 0 && isSamePair(file, files[i - 1]))        pairCls += ' pair-linked';
     }
-    const tileCls      = 'file-tile' + (checked ? ' selected' : '') + (imported ? ' already-imported' : '') + pairCls;
-    const importedLabel = imported ? `<div class="file-imported-label">${_SVG_CHECK_XS}Imported</div>` : '';
+    const dumpNote     = window.DumpSortMode ? DumpSortMode.tileNote(file.path) : null;   // EQI-3: stayed in Dump
+    const tileCls      = 'file-tile' + (checked ? ' selected' : '') + (imported ? ' already-imported' : '') + (dumpNote ? ' dump-refused' : '') + pairCls;
+    const importedLabel = imported ? `<div class="file-imported-label">${_SVG_CHECK_XS}Imported</div>`
+      : dumpNote ? `<div class="file-imported-label dump-refused-label" title="${escapeHtml(dumpNote)}">Stayed in Dump</div>` : '';
     const grp           = GroupManager.getGroupForFile(file.path);
     const grpBadge      = grp
       ? `<div class="file-group-badge" style="--group-color:${GroupManager.getGroupColor(GroupManager.getGroupIndex(grp.id))}">${grp.label}</div>`
@@ -7671,6 +7677,7 @@ function updateSelectionBar() {
     : `${SVG.download} Import Selected`;
 
   _syncSessionSelectionUI();   // Assign/Unassign buttons, session strip, "Import N Assigned Files"
+  if (window.DumpSortMode && DumpSortMode.isActive()) DumpSortMode.decorateImportButton(importBtn);   // EQI-3
   _syncRefinementSelectedCount();
   _syncEventRefineControl();
 }
@@ -12271,6 +12278,10 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     return;
   }
   if (importRunning) return;
+
+  // EQI-3 Sort Dump: in the event's own Dump the action MOVES the selection into the event's final
+  // folders (renderer/dumpSortMode.js) — never a second import of photos that are already archived.
+  if (window.DumpSortMode && DumpSortMode.isActive()) { await DumpSortMode.run(); return; }
 
   // Multi-event session (files assigned to events beyond / other than the Current Event's own
   // groups): one plan, one runner (importSessionUI.js). Whenever the session is just a one-event,

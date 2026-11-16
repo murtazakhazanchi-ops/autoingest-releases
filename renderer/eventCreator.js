@@ -1833,7 +1833,7 @@ ${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing colle
     <div class="ec-evl-name" title="${esc(displayName)}">${esc(displayName)}</div>
     <div class="ec-evl-date">${esc(ev.hijriDate)}</div>
   </div>
-  ${legacyBadge}${warnBadge}${pendingBadge}${qmzBtnsHTML}
+  ${legacyBadge}${warnBadge}${pendingBadge}${qmzBtnsHTML}${_evlEventFolder ? `<span class="ec-evl-dump-slot" data-dump-event="${esc(_evlEventFolder)}" data-dump-folder="${esc(ev.folderName)}"></span>` : ''}
 </div>`;
     }).join('');
 
@@ -1964,6 +1964,10 @@ ${unparseable.map(ev => `
         }
       });
     });
+
+    // EQI-3: "Sort Dump" beside Sort QMZ — only while the event's Dump really holds unsorted media
+    // (checked on disk for every render, never from a cached flag).
+    _refreshDumpButtons(body);
 
     // Local reference to the currently highlighted element — avoids querySelectorAll
     // on every click (point 11: only touch prev + new element).
@@ -4530,6 +4534,58 @@ ${unparseable.map(ev => `
     el._hideTimer = setTimeout(() => el.classList.remove('visible'), 4500);
   }
 
+  // ── Sort Dump entry point (AI-FEAT-064 EQI-3) ─────────────────────────────
+  // One button per event row, beside Sort QMZ, shown only when main reports unsorted Dump media
+  // (dumpSort:status walks the Dump folder each time). A Dump holding only unexpected files shows a
+  // "Dump needs attention" note instead of silently counting as empty.
+  let _dumpRenderToken = 0;
+  const _DUMP_STATUS_PARALLEL = 4;
+  async function _refreshDumpButtons(body) {
+    const token = ++_dumpRenderToken;
+    const slots = [...(body || document).querySelectorAll('.ec-evl-dump-slot[data-dump-event]')];
+    let next = 0;
+    const worker = async () => {
+      while (next < slots.length) {
+        const slot = slots[next++];
+        let st = null;
+        try { st = await window.api.dumpSortStatus(slot.dataset.dumpEvent); } catch { st = null; }
+        if (token !== _dumpRenderToken || !slot.isConnected) return;
+        _renderDumpSlot(slot, st);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(_DUMP_STATUS_PARALLEL, slots.length) }, worker));
+  }
+  function _renderDumpSlot(slot, st) {
+    slot.innerHTML = '';
+    if (!st) return;
+    if (st.showSortDump) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ec-evl-dump-btn';
+      b.textContent = st.pending ? 'Finish Sort Dump' : 'Sort Dump';
+      const mb = st.bytes ? ` · ${(st.bytes / 1e6).toFixed(st.bytes >= 1e8 ? 0 : 1)} MB` : '';
+      b.title = st.pending ? 'A Sort Dump for this event was interrupted — open it to complete safely'
+        : `${st.unsorted} unsorted photo${st.unsorted === 1 ? '' : 's'} in Dump${mb}${st.reason ? ` — ${st.reason}` : ''}`;
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        document.dispatchEvent(new CustomEvent('eventcreator:sortDump', { detail: { eventPath: slot.dataset.dumpEvent, folderName: slot.dataset.dumpFolder } }));
+      });
+      slot.appendChild(b);
+    } else if (st.attention > 0) {
+      const n = document.createElement('span');
+      n.className = 'ec-evl-dump-attn';
+      n.textContent = 'Dump needs attention';
+      n.title = 'The Dump folder holds files AutoIngest does not sort (unsupported, partial or misplaced files). They are left untouched.';
+      slot.appendChild(n);
+    }
+  }
+  window.addEventListener('focus', () => {
+    if (_navScreen === 'eventList' && document.querySelector('.ec-evl-dump-slot')) _refreshDumpButtons(document);
+  });
+  document.addEventListener('eventcreator:dumpSortChanged', () => {
+    if (document.querySelector('.ec-evl-dump-slot')) _refreshDumpButtons(document);
+  });
+
   // ── Photographer Folder Sequencing Modal ──────────────────────────────────
 
   // Canonical Representation Audit, L6 (2026-08-11): seqPrefix() now lives in
@@ -5762,6 +5818,13 @@ ${unparseable.map(ev => `
      * Phase 2 — Continue from SELECT mode: adopt the highlighted event into the
      * session without going through preview, then dispatch eventcreator:done.
      */
+    /** EQI-3 Sort Dump: adopt the event of one list row (as if it were selected, then Continue). */
+    async adoptEventByFolder(folderName) {
+      if (!folderName || !(_scannedEvents || []).some(e => e.folderName === folderName)) return false;
+      _selectedListFolder = folderName;
+      return this.adoptSelectedEvent();
+    },
+
     async adoptSelectedEvent() {
       if (!_selectedListFolder || !selectedCollection) return false;
       const entry = (_scannedEvents || []).find(e => e.folderName === _selectedListFolder);
