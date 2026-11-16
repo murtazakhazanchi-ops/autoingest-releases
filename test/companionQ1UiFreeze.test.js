@@ -76,6 +76,29 @@ const EQI1_RENDERER_LINES = [
   '+  // active-event report it shows.',
   "+  if (typeof EventDumpImport !== 'undefined') EventDumpImport.init();",
 ];
+// EQI-3 Sort Dump (AI-FEAT-064, owner-approved: it lives in the main window by design — Event Management
+// button + the standard Import Workspace in Dump mode). These are the ONLY renderer.js changes: the
+// four hooks into renderer/dumpSortMode.js and the tile line pair gaining the "Stayed in Dump" mark.
+const EQI3_RENDERER_REMOVED = [
+  "-    const tileCls      = 'file-tile' + (checked ? ' selected' : '') + (imported ? ' already-imported' : '') + pairCls;",
+  "-    const importedLabel = imported ? `<div class=\"file-imported-label\">${_SVG_CHECK_XS}Imported</div>` : '';",
+];
+const EQI3_RENDERER_ADDED = [
+  '+  // EQI-3 Sort Dump: every Dump photo was imported once already — in that workspace the question',
+  '+  // is "sorted yet?", answered by the photo still being in Dump, not by the import history.',
+  '+  if (window.DumpSortMode && DumpSortMode.isActive()) return false;',
+  '+  if (window.DumpSortMode) DumpSortMode.onSourceChanged(path);   // EQI-3: leaving the Dump source ends Sort Dump',
+  '+    const dumpNote     = window.DumpSortMode ? DumpSortMode.tileNote(file.path) : null;   // EQI-3: stayed in Dump',
+  "+    const tileCls      = 'file-tile' + (checked ? ' selected' : '') + (imported ? ' already-imported' : '') + (dumpNote ? ' dump-refused' : '') + pairCls;",
+  '+    const importedLabel = imported ? `<div class="file-imported-label">${_SVG_CHECK_XS}Imported</div>`',
+  "+      : dumpNote ? `<div class=\"file-imported-label dump-refused-label\" title=\"${escapeHtml(dumpNote)}\">Stayed in Dump</div>` : '';",
+  '+  if (window.DumpSortMode && DumpSortMode.isActive()) DumpSortMode.decorateImportButton(importBtn);   // EQI-3',
+  "+  // EQI-3 Sort Dump: in the event's own Dump the action MOVES the selection into the event's final",
+  '+  // folders (renderer/dumpSortMode.js) — never a second import of photos that are already archived.',
+  '+  if (window.DumpSortMode && DumpSortMode.isActive()) { await DumpSortMode.run(); return; }',
+  '+',
+];
+const EQI3_SCRIPT = '<script src="dumpSortMode.js" defer></script>';
 const diffLines = (file) => git('diff', '-U0', mergeBase, '--', file).split('\n')
   .filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
 
@@ -83,18 +106,27 @@ t('no existing renderer file changed except the approved handoff listener (main 
   // EQI-2.1: the companion's own Event Creator window — a separate page (the main window's
   // index.html is untouched; its styles are injected at runtime, not copied).
   const EQI21_WINDOW = ['renderer/eventCreatorWindow.html', 'renderer/eventCreatorWindow.js'];
-  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE, Q5E_MODULE, EQI1_MODULE, EQI1_ROUTER, EQI1_SESSION_UI, ...EQI21_WINDOW].includes(f));
+  // EQI-3: the Sort Dump workspace module and the Event Management "Sort Dump" button.
+  const EQI3_MAIN_WINDOW = ['renderer/dumpSortMode.js', 'renderer/eventCreator.js'];
+  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE, Q5E_MODULE, EQI1_MODULE, EQI1_ROUTER, EQI1_SESSION_UI, ...EQI21_WINDOW, ...EQI3_MAIN_WINDOW].includes(f));
   assert.deepEqual(offending, []);
 });
 
 t('renderer.js: handoff listener is additions only and draws nothing', () => {
-  const all = diffLines(APPROVED_RENDERER_TOUCH);
+  const all = diffLines(APPROVED_RENDERER_TOUCH).filter(l => !EQI3_RENDERER_REMOVED.includes(l) && !EQI3_RENDERER_ADDED.includes(l));
   // Q5c: the only changed existing line is the Metadata Management tab list gaining its fourth id.
   assert.deepEqual(all.filter(l => l.startsWith('-')), all.some(l => l === `+${Q5C_TAB_LINE_NEW}`) ? [`-${Q5C_TAB_LINE_OLD}`] : [], 'no existing line removed or changed');
   const lines = all.filter(l => l !== `+${Q5C_TAB_LINE_NEW}` && l !== `-${Q5C_TAB_LINE_OLD}` && !EQI1_RENDERER_LINES.includes(l));
   const drawing = lines.filter(l => /innerHTML|outerHTML|createElement|insertAdjacent|appendChild|replaceChildren|\.style\.|classList\.(add|remove|toggle)|<[a-z]+[ >]/i.test(l));
   assert.deepEqual(drawing, [], 'no DOM, markup or style created');
   if (lines.length) assert.ok(lines.some(l => l.includes('COMPANION HANDOFF')), 'confined to the documented handoff block');
+});
+
+t('renderer.js (EQI-3): exactly the documented Sort Dump hooks', () => {
+  const all = diffLines(APPROVED_RENDERER_TOUCH);
+  const stray = all.filter(l => /DumpSortMode|dumpNote|dump-refused/.test(l) && !EQI3_RENDERER_ADDED.includes(l) && !EQI3_RENDERER_REMOVED.includes(l));
+  assert.deepEqual(stray, [], 'no Sort Dump line outside the documented hooks');
+  if (all.some(l => /DumpSortMode/.test(l))) assert.deepEqual(all.filter(l => EQI3_RENDERER_REMOVED.includes(l)), EQI3_RENDERER_REMOVED, 'only the tile line pair changed');
 });
 
 t('main-window preload: only the companion handoff channels were added', () => {
@@ -125,10 +157,12 @@ t('index.html (Q5c): additions only, confined to the Photographer Registry tab, 
   const classes = added.flatMap(l => [...l.matchAll(/\bclass="([^"]+)"/g)].flatMap(m => m[1].split(/\s+/)));
   assert.deepEqual(classes.filter(c => !c.startsWith('pr-') && !['ms-tab', 'ms-tab-helper', 'ms-scope-select'].includes(c)), [], 'only pr-* classes plus reused tab/helper/select styles');
   const selectors = added.filter(l => /^\s*[.#@][^{]*\{/.test(l)).map(l => l.trim());
-  const scoped = (sel) => /^@media \(max-width: 860px\)/.test(sel) || sel.split('{')[0].split(',').every(part => /^\s*(\.pr-|#msTabPhotographers\b|#metadataSyncModal \.ms-tabs?\b)/.test(part));
+  // EQI-3 Sort Dump: namespaced styles (.ec-evl-dump-*, .dump-sort-*, .dsb-/.dsr-/.dsp-*, #dumpSortOverlay, the tile mark).
+  const eqi3 = (part) => /^\s*(\.ec-evl-dump-|\.dump-sort-|\.dsr-|\.dsp-|#dumpSortOverlay\b|\.file-tile\.dump-refused\b|\.dump-refused-label\b)/.test(part);
+  const scoped = (sel) => /^@media \(max-width: 860px\)/.test(sel) || /^@media \(prefers-reduced-motion: reduce\) \{ \.dsp-fill/.test(sel) || sel.split('{')[0].split(',').every(part => eqi3(part) || /^\s*(\.pr-|#msTabPhotographers\b|#metadataSyncModal \.ms-tabs?\b)/.test(part));
   assert.deepEqual(selectors.filter(sel => !scoped(sel)), [], 'every new rule is scoped to the Q5c panel or the modal tab row');
   const scripts = added.filter(l => /<script\b/.test(l));
-  assert.deepEqual(scripts.map(l => l.trim()).sort(), ['<script src="photographerRegistryUI.js" defer></script>', '<script src="photographerRegistryActions.js" defer></script>', '<script src="photographerRegistryProfile.js" defer></script>', EQI1_SCRIPT].sort(), 'only the dedicated modules are loaded');
+  assert.deepEqual(scripts.map(l => l.trim()).sort(), ['<script src="photographerRegistryUI.js" defer></script>', '<script src="photographerRegistryActions.js" defer></script>', '<script src="photographerRegistryProfile.js" defer></script>', EQI1_SCRIPT, EQI3_SCRIPT].sort(), 'only the dedicated modules are loaded');
   const tabButtons = added.filter(l => /class="ms-tab"/.test(l));
   assert.equal(tabButtons.length, 1, 'exactly one new Metadata Management tab button');
   assert.ok(/data-ms-tab="msTabPhotographers">Photographer Registry<\/button>/.test(tabButtons[0]));

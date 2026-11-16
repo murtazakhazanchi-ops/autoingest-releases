@@ -354,7 +354,13 @@ const add = (ev, additions, extra = {}) => {
       // EQI-2.1 independent companion: main-process imports, transfer statistics, Event Creator window.
       'main/fileManager.js', 'services/companionImportService.js', 'services/eventComponents.js', 'services/transferStats.js',
       'services/eventCreatorWindow.js', 'renderer/eventCreatorWindow.html', 'renderer/eventCreatorWindow.js', 'renderer/companion/importProgress.js',
-      'test/eqi21CompanionImport.test.js', 'test/eqi21CrashSafeCopy.test.js', 'test/eqi21IndependentCompanionLive.test.js']);
+      'test/eqi21CompanionImport.test.js', 'test/eqi21CrashSafeCopy.test.js', 'test/eqi21IndependentCompanionLive.test.js',
+      // EQI-3 Sort Dump (AI-FEAT-064, not Q5): Dump discovery, destination planning, the journaled move
+      // transaction and its service, the Event Management button, the workspace Dump mode, and tests.
+      'services/dumpSortDiscovery.js', 'services/dumpSortPlanner.js', 'services/dumpSortJournal.js', 'services/dumpSortEngine.js', 'services/dumpSortService.js',
+      'renderer/dumpSortMode.js', 'renderer/eventCreator.js', 'renderer/index.html', 'renderer/renderer.js',
+      'test/eqi3DumpSortEngine.test.js', 'test/eqi3DumpSortService.test.js', 'test/eqi3SortDumpLive.test.js', 'test/photographerRegistryQ5c.test.js',
+    ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f)), []);
   });
 

@@ -389,12 +389,17 @@ function assertClean(payload, fx, label) {
     '-});',
     "-ipcMain.handle('archive:clearSelfStaleLock', async (_event, { lockPath, force = false } = {}) => {",
     '-});',
+    // EQI-3 Sort Dump: the metadata verify-and-repair step gains an optional observer and an awaitable
+    // result (existing callers unchanged), so a sort reports completion only after metadata.
+    '-async function _verifyAndReconcile(eventJsonFilePath, files, context) {',
   ];
   const EQI1_PRELOAD_MEMBERS = ['onCompanionDumpImport', 'onCompanionOpenEventPicker', 'companionWorkspaceEvent', 'onCompanionSelectEvent', 'companionRequestAttention',
     // EQI-2: the multi-event Dump plan handoff and its per-event progress report.
     'onCompanionDumpPlanImport', 'companionDumpPlanEvent',
     // EQI-2.1: the companion's Event Creator window reports its single outcome.
-    'eventCreatorWindowResult'];
+    'eventCreatorWindowResult',
+    // EQI-3 Sort Dump (main window): status, plan, run, progress, empty photographer folders.
+    'dumpSortStatus', 'dumpSortPlan', 'dumpSortRun', 'dumpSortEmptyFolders', 'dumpSortDeleteEmptyFolder', 'onDumpSortProgress'];
   await t('main.js / preload.js change since Q5b is additions only, confined to the Q5c block', async () => {
     let base;
     try { base = execFileSync('git', ['rev-parse', '--verify', 'aa58eb1^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { console.log('    (Q5b commit not available — skipped)'); return; }
@@ -463,7 +468,13 @@ function assertClean(payload, fx, label) {
       // window, byte-level transfer statistics, and the companion's own Event Creator window.
       'main/fileManager.js', 'services/companionImportService.js', 'services/eventComponents.js', 'services/transferStats.js',
       'services/eventCreatorWindow.js', 'renderer/eventCreatorWindow.html', 'renderer/eventCreatorWindow.js', 'renderer/companion/importProgress.js',
-      'test/eqi21CompanionImport.test.js', 'test/eqi21CrashSafeCopy.test.js', 'test/eqi21IndependentCompanionLive.test.js']);
+      'test/eqi21CompanionImport.test.js', 'test/eqi21CrashSafeCopy.test.js', 'test/eqi21IndependentCompanionLive.test.js',
+      // EQI-3 Sort Dump (AI-FEAT-064, not Q5): Dump discovery, destination planning, the journaled move
+      // transaction and its service, the Event Management button, the workspace Dump mode, and tests.
+      'services/dumpSortDiscovery.js', 'services/dumpSortPlanner.js', 'services/dumpSortJournal.js', 'services/dumpSortEngine.js', 'services/dumpSortService.js',
+      'renderer/dumpSortMode.js', 'renderer/eventCreator.js', 'renderer/index.html', 'renderer/renderer.js',
+      'test/eqi3DumpSortEngine.test.js', 'test/eqi3DumpSortService.test.js', 'test/eqi3SortDumpLive.test.js', 'test/photographerRegistryQ5c.test.js',
+    ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });
 
