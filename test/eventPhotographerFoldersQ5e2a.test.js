@@ -363,6 +363,9 @@ const add = (ev, additions, extra = {}) => {
       // EQI-3.1 Sort Dump context safety: import-source preflight, stop reasons, background metadata, tests.
       'services/importSourceGuard.js', 'services/importStopReasons.js', 'services/dumpSortMetadata.js', 'renderer/importSessionRunner.js',
       'test/eqi31SortDumpSafety.test.js', 'test/eqi31SortDumpSafetyLive.test.js', 'test/eventPhotographerFoldersQ5e2a.test.js',
+      // EQI-3.2 Move Selection to Another Event: the two-event planner, journaled transaction, service, UI, tests.
+      'services/crossEventMovePlanner.js', 'services/crossEventMoveEngine.js', 'services/crossEventMoveService.js', 'renderer/crossEventMove.js',
+      'test/eqi32CrossEventMove.test.js', 'test/eqi32CrossEventMoveLive.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f)), []);
   });

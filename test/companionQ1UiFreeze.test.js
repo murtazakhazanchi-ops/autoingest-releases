@@ -120,7 +120,18 @@ const EQI31_RENDERER_ADDED = [
   "+  }",
   "+",
 ];
-const EQI31_RENDERER = new Set([...EQI31_RENDERER_REMOVED, ...EQI31_RENDERER_ADDED]);
+// EQI-3.2 Move Selection to Another Event: Create New Event for a transfer destination returns to the same
+// Sort Dump (renderer/crossEventMove.js) — three guarded early returns in the existing picker handlers.
+const EQI32_RENDERER_ADDED = [
+  '+    if (window.CrossEventMove && CrossEventMove.cancelCreator()) return;   // EQI-3.2: back to the same Sort Dump',
+  '+  if (window.CrossEventMove && CrossEventMove.cancelCreator()) return;   // EQI-3.2: back to the same Sort Dump',
+  "+  // EQI-3.2: Create New Event for a Sort Dump transfer destination — the new event becomes the transfer's",
+  '+  // destination and the Sort Dump workspace returns on its own (source) event; nothing else changes.',
+  '+  if (window.CrossEventMove && CrossEventMove.takeCreatorResult()) return;',
+];
+const EQI31_RENDERER = new Set([...EQI31_RENDERER_REMOVED, ...EQI31_RENDERER_ADDED, ...EQI32_RENDERER_ADDED]);
+const EQI32_SCRIPT = '<script src="crossEventMove.js" defer></script>';
+const EQI32_PRELOAD_CHANNELS = ['crossEvent:destinations', 'crossEvent:plan', 'crossEvent:run', 'crossEvent:progress'];
 // EQI-3.1: copy:abort carries why the copy stopped (user, source disconnected) — same channel, one argument.
 const EQI31_PRELOAD_REMOVED = ["-  abortCopy:  () => ipcRenderer.send('copy:abort'),"];
 const EQI31_PRELOAD_CHANNELS = ['copy:abort'];
@@ -135,7 +146,9 @@ t('no existing renderer file changed except the approved handoff listener (main 
   const EQI3_MAIN_WINDOW = ['renderer/dumpSortMode.js', 'renderer/eventCreator.js'];
   // EQI-3.1: the runner treats "Import stopped/refused" like a cancel and exports that check.
   const EQI31_MAIN_WINDOW = ['renderer/importSessionRunner.js'];
-  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE, Q5E_MODULE, EQI1_MODULE, EQI1_ROUTER, EQI1_SESSION_UI, ...EQI21_WINDOW, ...EQI3_MAIN_WINDOW, ...EQI31_MAIN_WINDOW].includes(f));
+  // EQI-3.2: the Move Selection to Another Event module of the Sort Dump workspace.
+  const EQI32_MAIN_WINDOW = ['renderer/crossEventMove.js'];
+  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE, Q5E_MODULE, EQI1_MODULE, EQI1_ROUTER, EQI1_SESSION_UI, ...EQI21_WINDOW, ...EQI3_MAIN_WINDOW, ...EQI31_MAIN_WINDOW, ...EQI32_MAIN_WINDOW].includes(f));
   assert.deepEqual(offending, []);
 });
 
@@ -159,7 +172,7 @@ t('renderer.js (EQI-3): exactly the documented Sort Dump hooks', () => {
 t('main-window preload: only the companion handoff channels were added', () => {
   const lines = diffLines('main/preload.js').filter(l => !EQI31_PRELOAD_REMOVED.includes(l));
   assert.deepEqual(lines.filter(l => l.startsWith('-')), [], 'no existing API removed or changed');
-  const allowed = new Set(['companion:openSource', 'companion:openSourceProgress', 'companion:openSourceResult', 'companion:workspaceReady', ...Q5C_PRELOAD_CHANNELS, ...Q5D_PRELOAD_CHANNELS, ...EQI1_PRELOAD_CHANNELS, ...EQI31_PRELOAD_CHANNELS]);
+  const allowed = new Set(['companion:openSource', 'companion:openSourceProgress', 'companion:openSourceResult', 'companion:workspaceReady', ...Q5C_PRELOAD_CHANNELS, ...Q5D_PRELOAD_CHANNELS, ...EQI1_PRELOAD_CHANNELS, ...EQI31_PRELOAD_CHANNELS, ...EQI32_PRELOAD_CHANNELS]);
   const channels = [...lines.join('\n').matchAll(/'([a-z-]+:[A-Za-z]+)'/g)].map(m => m[1]);
   assert.deepEqual(channels.filter(c => !allowed.has(c)), [], 'no other channel exposed to the main window');
 });
@@ -185,12 +198,12 @@ t('index.html (Q5c): additions only, confined to the Photographer Registry tab, 
   assert.deepEqual(classes.filter(c => !c.startsWith('pr-') && !['ms-tab', 'ms-tab-helper', 'ms-scope-select'].includes(c)), [], 'only pr-* classes plus reused tab/helper/select styles');
   const selectors = added.filter(l => /^\s*[.#@][^{]*\{/.test(l)).map(l => l.trim());
   // EQI-3 Sort Dump: namespaced styles (.ec-evl-dump-*, .dump-sort-*, .dsb-/.dsr-/.dsp-*, #dumpSortOverlay, the tile mark);
-  // EQI-3.1: the title-bar background-metadata chip (#dsMetaChip).
-  const eqi3 = (part) => /^\s*(\.ec-evl-dump-|\.dump-sort-|\.dsr-|\.dsp-|#dumpSortOverlay\b|\.file-tile\.dump-refused\b|\.dump-refused-label\b|#dsMetaChip\b)/.test(part);
+  // EQI-3.1: the title-bar background-metadata chip (#dsMetaChip); EQI-3.2: the transfer dialog (.xem-*).
+  const eqi3 = (part) => /^\s*(\.ec-evl-dump-|\.dump-sort-|\.dsr-|\.dsp-|#dumpSortOverlay\b|\.file-tile\.dump-refused\b|\.dump-refused-label\b|#dsMetaChip\b|\.xem-)/.test(part);
   const scoped = (sel) => /^@media \(max-width: 860px\)/.test(sel) || /^@media \(prefers-reduced-motion: reduce\) \{ \.dsp-fill/.test(sel) || sel.split('{')[0].split(',').every(part => eqi3(part) || /^\s*(\.pr-|#msTabPhotographers\b|#metadataSyncModal \.ms-tabs?\b)/.test(part));
   assert.deepEqual(selectors.filter(sel => !scoped(sel)), [], 'every new rule is scoped to the Q5c panel or the modal tab row');
   const scripts = added.filter(l => /<script\b/.test(l));
-  assert.deepEqual(scripts.map(l => l.trim()).sort(), ['<script src="photographerRegistryUI.js" defer></script>', '<script src="photographerRegistryActions.js" defer></script>', '<script src="photographerRegistryProfile.js" defer></script>', EQI1_SCRIPT, EQI3_SCRIPT].sort(), 'only the dedicated modules are loaded');
+  assert.deepEqual(scripts.map(l => l.trim()).sort(), ['<script src="photographerRegistryUI.js" defer></script>', '<script src="photographerRegistryActions.js" defer></script>', '<script src="photographerRegistryProfile.js" defer></script>', EQI1_SCRIPT, EQI3_SCRIPT, EQI32_SCRIPT].sort(), 'only the dedicated modules are loaded');
   const tabButtons = added.filter(l => /class="ms-tab"/.test(l));
   assert.equal(tabButtons.length, 1, 'exactly one new Metadata Management tab button');
   assert.ok(/data-ms-tab="msTabPhotographers">Photographer Registry<\/button>/.test(tabButtons[0]));
