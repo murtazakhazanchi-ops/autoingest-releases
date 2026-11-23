@@ -12,9 +12,10 @@
 //      no "already imported" marks, thumbnails and preview work
 //   C  G1 → component Majlis (photographer 1, pairs + video, one per-photo refinement),
 //      G2 → component Waaz (photographer 2, already sequenced there → next PC number)
-//   D  review → move → result; files land in final folders (pairs, XMP, VIDEO/), leave Dump only after;
-//      event.json (intent keys, sequences, audit; imports[] unchanged); metadata rewritten for the new
-//      component and the event's Metadata Audit clean; the staging copy moved too
+//   D  review → move → released at once (EQI-3.1: no result modal, metadata in the background); files
+//      land in final folders (pairs, XMP, VIDEO/), leave Dump only after; event.json (intent keys,
+//      sequences, audit; imports[] unchanged); metadata rewritten for the new component once the
+//      background verification finished, and the event's Metadata Audit clean; the staging copy moved too
 //   E  empty-folder prompt: Delete Empty Folder (photographer 2), later Keep Folder (photographer 1)
 //   F  the rest sorted into the QMZ component (plain folder, never PC); Sort Dump disappears;
 //      Sort QMZ still opens the QMZ manager
@@ -205,14 +206,11 @@ async function shoot(page, dir, name) {
     check(/10 files/.test(review.sub) && /XMP/.test(review.sub), `review shows files, size and XMP sidecars ("${review.sub}")`);
     await shoot(main, shots, '3-review');
     await main.click('#dsrGo');
-    await main.waitForSelector('#dumpSortOverlay.visible #dsrOk', { timeout: 120000 });
-    const result = await main.evaluate(() => [...document.querySelectorAll('#dumpSortOverlay .dup-subtitle')].map(p => p.textContent));
-    check(/10 files moved/.test(result.join(' ')) && /Metadata verified/.test(result.join(' ')), `result: moved, metadata verified, remaining (${J(result)})`);
+    // ═══ E: empty-folder prompt — photographer 2's folder is empty now (the move itself needs no click) ═══
+    await main.waitForSelector('#dumpSortOverlay.visible #dsrDelete', { timeout: 120000 });
+    const result = await main.evaluate(() => document.getElementById('dsbLast')?.textContent || '');
+    check(/Files moved successfully/.test(result) && /10 files moved/.test(result) && /Metadata verification queued/.test(result) && !/Metadata verified/.test(result), `result: moved, metadata QUEUED — not claimed verified (${J(result)})`);
     await shoot(main, shots, '4-result');
-    await main.click('#dsrOk');
-
-    // ═══ E: empty-folder prompt — photographer 2's folder is empty now ═══
-    await main.waitForSelector('#dumpSortOverlay.visible #dsrDelete', { timeout: 15000 });
     const prompt = await main.evaluate(() => ({ q: document.querySelector('#dumpSortOverlay .dup-subtitle').textContent, name: document.querySelector('.dsr-folder-name').textContent }));
     check(prompt.q === 'This photographer folder is now empty. Would you like to delete it?' && prompt.name.includes(P2), `empty-folder prompt names the folder (${prompt.name})`);
     await shoot(main, shots, '5-empty-folder-prompt');
@@ -232,6 +230,9 @@ async function shoot(page, dir, name) {
     check(Array.isArray(doc.dumpSorts) && doc.dumpSorts.length === 1 && doc.dumpSorts[0].movedFiles === 10, `Sort Dump audit entry (${J(doc.dumpSorts && doc.dumpSorts[0] && { files: doc.dumpSorts[0].movedFiles, ph: doc.dumpSorts[0].photographers })})`);
     check(J(doc.photographerSequences[WAAZ][P2]) === J({ sequence: 2, folderName: `PC02-${P2}` }), 'the new PC folder is recorded in photographerSequences');
     check((doc.tagRefinements || []).some(b => b.relPaths.includes(`${MAJ}/${P1}/IMG_0001.JPG`)) && !J(doc).includes(`Dump/${P1}/IMG_0001`), 'per-photo refinement recorded at the final path; no stale Dump path');
+    const metaDone = await main.waitForFunction(() => window.DumpSortMetaChip && DumpSortMetaChip.states.length > 0 && DumpSortMetaChip.states.every(s => !s.active), null, { timeout: 120000 }).then(() => true, () => false);
+    const metaStates = await main.evaluate(() => DumpSortMetaChip.states.map(s => [s.state, s.total, s.failed]));
+    check(metaDone && metaStates.every(([st]) => st === 'complete'), `background metadata finished: ${J(metaStates)}`);
     const kw = async (p) => { const t = await et.read(p); return [].concat(t.Subject || [], t.Keywords || []).map(String); };
     const kMaj = await kw(path.join(ev, MAJ, P1, 'IMG_0002.JPG'));
     const kXmp = await kw(path.join(ev, MAJ, P1, 'IMG_0002.xmp'));
@@ -263,9 +264,7 @@ async function shoot(page, dir, name) {
       throw err;
     });
     await main.click('#dsrGo');
-    await main.waitForSelector('#dumpSortOverlay.visible #dsrOk', { timeout: 120000 });
-    await main.click('#dsrOk');
-    await main.waitForSelector('#dumpSortOverlay.visible #dsrKeep', { timeout: 15000 });
+    await main.waitForSelector('#dumpSortOverlay.visible #dsrKeep', { timeout: 120000 });
     await main.click('#dsrKeep');
     await main.waitForFunction(() => !(window.DumpSortMode && DumpSortMode.isActive()), null, { timeout: 20000 });
     const tree2 = await listFiles(ev);

@@ -99,6 +99,31 @@ const EQI3_RENDERER_ADDED = [
   '+',
 ];
 const EQI3_SCRIPT = '<script src="dumpSortMode.js" defer></script>';
+// EQI-3.1 Sort Dump context safety (AI-FEAT-064): the card-disconnect stop gains its reason, Change Source
+// is held while a move runs, and photos in a managed event's Dump are never offered an ordinary import.
+const EQI31_RENDERER_REMOVED = [
+  '-      window.api.abortCopy();',
+  "-      showMessage('Card disconnected. Import cancelled.');",
+];
+const EQI31_RENDERER_ADDED = [
+  "+      window.api.abortCopy('source-disconnected');",
+  "+      showMessage('Card disconnected. Import stopped.');",
+  "+  if (window.DumpSortMode && DumpSortMode.busy) { showMessage('A Sort Dump move is running. Wait for it to finish.', 6000); return; }",
+  "+  // EQI-3.1: photos inside a managed event's Dump were imported once already. Outside an open Sort Dump",
+  "+  // (e.g. the folder chosen by hand as a Local Folder source) they are never offered an ordinary import.",
+  "+  if (activeSource && activeSource.type === 'local-folder' && window.api.dumpSortSourceOwner) {",
+  "+    const dumpOwner = await window.api.dumpSortSourceOwner(activeSource.path).catch(() => null);",
+  "+    if (dumpOwner) {",
+  "+      showMessage(`These photos are in the Dump of ${dumpOwner.eventName}, so they were imported already. Open Event Management → Sort Dump for that event to move them into its folders.`, 10000);",
+  "+      return;",
+  "+    }",
+  "+  }",
+  "+",
+];
+const EQI31_RENDERER = new Set([...EQI31_RENDERER_REMOVED, ...EQI31_RENDERER_ADDED]);
+// EQI-3.1: copy:abort carries why the copy stopped (user, source disconnected) — same channel, one argument.
+const EQI31_PRELOAD_REMOVED = ["-  abortCopy:  () => ipcRenderer.send('copy:abort'),"];
+const EQI31_PRELOAD_CHANNELS = ['copy:abort'];
 const diffLines = (file) => git('diff', '-U0', mergeBase, '--', file).split('\n')
   .filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
 
@@ -108,12 +133,14 @@ t('no existing renderer file changed except the approved handoff listener (main 
   const EQI21_WINDOW = ['renderer/eventCreatorWindow.html', 'renderer/eventCreatorWindow.js'];
   // EQI-3: the Sort Dump workspace module and the Event Management "Sort Dump" button.
   const EQI3_MAIN_WINDOW = ['renderer/dumpSortMode.js', 'renderer/eventCreator.js'];
-  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE, Q5E_MODULE, EQI1_MODULE, EQI1_ROUTER, EQI1_SESSION_UI, ...EQI21_WINDOW, ...EQI3_MAIN_WINDOW].includes(f));
+  // EQI-3.1: the runner treats "Import stopped/refused" like a cancel and exports that check.
+  const EQI31_MAIN_WINDOW = ['renderer/importSessionRunner.js'];
+  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE, Q5E_MODULE, EQI1_MODULE, EQI1_ROUTER, EQI1_SESSION_UI, ...EQI21_WINDOW, ...EQI3_MAIN_WINDOW, ...EQI31_MAIN_WINDOW].includes(f));
   assert.deepEqual(offending, []);
 });
 
 t('renderer.js: handoff listener is additions only and draws nothing', () => {
-  const all = diffLines(APPROVED_RENDERER_TOUCH).filter(l => !EQI3_RENDERER_REMOVED.includes(l) && !EQI3_RENDERER_ADDED.includes(l));
+  const all = diffLines(APPROVED_RENDERER_TOUCH).filter(l => !EQI3_RENDERER_REMOVED.includes(l) && !EQI3_RENDERER_ADDED.includes(l) && !EQI31_RENDERER.has(l));
   // Q5c: the only changed existing line is the Metadata Management tab list gaining its fourth id.
   assert.deepEqual(all.filter(l => l.startsWith('-')), all.some(l => l === `+${Q5C_TAB_LINE_NEW}`) ? [`-${Q5C_TAB_LINE_OLD}`] : [], 'no existing line removed or changed');
   const lines = all.filter(l => l !== `+${Q5C_TAB_LINE_NEW}` && l !== `-${Q5C_TAB_LINE_OLD}` && !EQI1_RENDERER_LINES.includes(l));
@@ -123,16 +150,16 @@ t('renderer.js: handoff listener is additions only and draws nothing', () => {
 });
 
 t('renderer.js (EQI-3): exactly the documented Sort Dump hooks', () => {
-  const all = diffLines(APPROVED_RENDERER_TOUCH);
+  const all = diffLines(APPROVED_RENDERER_TOUCH).filter(l => !EQI31_RENDERER.has(l));
   const stray = all.filter(l => /DumpSortMode|dumpNote|dump-refused/.test(l) && !EQI3_RENDERER_ADDED.includes(l) && !EQI3_RENDERER_REMOVED.includes(l));
   assert.deepEqual(stray, [], 'no Sort Dump line outside the documented hooks');
   if (all.some(l => /DumpSortMode/.test(l))) assert.deepEqual(all.filter(l => EQI3_RENDERER_REMOVED.includes(l)), EQI3_RENDERER_REMOVED, 'only the tile line pair changed');
 });
 
 t('main-window preload: only the companion handoff channels were added', () => {
-  const lines = diffLines('main/preload.js');
+  const lines = diffLines('main/preload.js').filter(l => !EQI31_PRELOAD_REMOVED.includes(l));
   assert.deepEqual(lines.filter(l => l.startsWith('-')), [], 'no existing API removed or changed');
-  const allowed = new Set(['companion:openSource', 'companion:openSourceProgress', 'companion:openSourceResult', 'companion:workspaceReady', ...Q5C_PRELOAD_CHANNELS, ...Q5D_PRELOAD_CHANNELS, ...EQI1_PRELOAD_CHANNELS]);
+  const allowed = new Set(['companion:openSource', 'companion:openSourceProgress', 'companion:openSourceResult', 'companion:workspaceReady', ...Q5C_PRELOAD_CHANNELS, ...Q5D_PRELOAD_CHANNELS, ...EQI1_PRELOAD_CHANNELS, ...EQI31_PRELOAD_CHANNELS]);
   const channels = [...lines.join('\n').matchAll(/'([a-z-]+:[A-Za-z]+)'/g)].map(m => m[1]);
   assert.deepEqual(channels.filter(c => !allowed.has(c)), [], 'no other channel exposed to the main window');
 });
@@ -157,8 +184,9 @@ t('index.html (Q5c): additions only, confined to the Photographer Registry tab, 
   const classes = added.flatMap(l => [...l.matchAll(/\bclass="([^"]+)"/g)].flatMap(m => m[1].split(/\s+/)));
   assert.deepEqual(classes.filter(c => !c.startsWith('pr-') && !['ms-tab', 'ms-tab-helper', 'ms-scope-select'].includes(c)), [], 'only pr-* classes plus reused tab/helper/select styles');
   const selectors = added.filter(l => /^\s*[.#@][^{]*\{/.test(l)).map(l => l.trim());
-  // EQI-3 Sort Dump: namespaced styles (.ec-evl-dump-*, .dump-sort-*, .dsb-/.dsr-/.dsp-*, #dumpSortOverlay, the tile mark).
-  const eqi3 = (part) => /^\s*(\.ec-evl-dump-|\.dump-sort-|\.dsr-|\.dsp-|#dumpSortOverlay\b|\.file-tile\.dump-refused\b|\.dump-refused-label\b)/.test(part);
+  // EQI-3 Sort Dump: namespaced styles (.ec-evl-dump-*, .dump-sort-*, .dsb-/.dsr-/.dsp-*, #dumpSortOverlay, the tile mark);
+  // EQI-3.1: the title-bar background-metadata chip (#dsMetaChip).
+  const eqi3 = (part) => /^\s*(\.ec-evl-dump-|\.dump-sort-|\.dsr-|\.dsp-|#dumpSortOverlay\b|\.file-tile\.dump-refused\b|\.dump-refused-label\b|#dsMetaChip\b)/.test(part);
   const scoped = (sel) => /^@media \(max-width: 860px\)/.test(sel) || /^@media \(prefers-reduced-motion: reduce\) \{ \.dsp-fill/.test(sel) || sel.split('{')[0].split(',').every(part => eqi3(part) || /^\s*(\.pr-|#msTabPhotographers\b|#metadataSyncModal \.ms-tabs?\b)/.test(part));
   assert.deepEqual(selectors.filter(sel => !scoped(sel)), [], 'every new rule is scoped to the Q5c panel or the modal tab row');
   const scripts = added.filter(l => /<script\b/.test(l));

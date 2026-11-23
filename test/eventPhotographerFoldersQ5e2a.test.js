@@ -360,6 +360,9 @@ const add = (ev, additions, extra = {}) => {
       'services/dumpSortDiscovery.js', 'services/dumpSortPlanner.js', 'services/dumpSortJournal.js', 'services/dumpSortEngine.js', 'services/dumpSortService.js',
       'renderer/dumpSortMode.js', 'renderer/eventCreator.js', 'renderer/index.html', 'renderer/renderer.js',
       'test/eqi3DumpSortEngine.test.js', 'test/eqi3DumpSortService.test.js', 'test/eqi3SortDumpLive.test.js', 'test/photographerRegistryQ5c.test.js',
+      // EQI-3.1 Sort Dump context safety: import-source preflight, stop reasons, background metadata, tests.
+      'services/importSourceGuard.js', 'services/importStopReasons.js', 'services/dumpSortMetadata.js', 'renderer/importSessionRunner.js',
+      'test/eqi31SortDumpSafety.test.js', 'test/eqi31SortDumpSafetyLive.test.js', 'test/eventPhotographerFoldersQ5e2a.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f)), []);
   });

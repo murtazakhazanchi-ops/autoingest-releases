@@ -393,13 +393,31 @@ function assertClean(payload, fx, label) {
     // result (existing callers unchanged), so a sort reports completion only after metadata.
     '-async function _verifyAndReconcile(eventJsonFilePath, files, context) {',
   ];
+  // EQI-3.1 Sort Dump context safety: a copy stop records WHY (user, source unavailable, source
+  // disconnected, lock lost) and the stopped-import message is built from that reason.
+  const EQI31_MAIN_CHANGED = [
+    '-                abortCopy(); // signals copyFileJobs to skip remaining files',
+    '-              abortCopy();',
+    "-        `Import was cancelled — ${copied} of ${total} file${total !== 1 ? 's' : ''} copied before cancellation. ` +",
+    '-        `Retry to import the remaining files (already-copied files will be skipped automatically).`',
+    '-      );',
+    '-      const copied = result.copied || 0;',
+    '-      const total  = fileJobs.length;',
+    '-      throw new Error(',
+    '-  abortCopy();',
+    "-  log('Copy abort requested');",
+    "-ipcMain.on('copy:abort',  () => {",
+  ];
+  const EQI31_PRELOAD_CHANGED = ["-  abortCopy:  () => ipcRenderer.send('copy:abort'),"];
   const EQI1_PRELOAD_MEMBERS = ['onCompanionDumpImport', 'onCompanionOpenEventPicker', 'companionWorkspaceEvent', 'onCompanionSelectEvent', 'companionRequestAttention',
     // EQI-2: the multi-event Dump plan handoff and its per-event progress report.
     'onCompanionDumpPlanImport', 'companionDumpPlanEvent',
     // EQI-2.1: the companion's Event Creator window reports its single outcome.
     'eventCreatorWindowResult',
     // EQI-3 Sort Dump (main window): status, plan, run, progress, empty photographer folders.
-    'dumpSortStatus', 'dumpSortPlan', 'dumpSortRun', 'dumpSortEmptyFolders', 'dumpSortDeleteEmptyFolder', 'onDumpSortProgress'];
+    'dumpSortStatus', 'dumpSortPlan', 'dumpSortRun', 'dumpSortEmptyFolders', 'dumpSortDeleteEmptyFolder', 'onDumpSortProgress',
+    // EQI-3.1: the stop reason on abortCopy, background-metadata state/resume/events, the Dump-source check.
+    'abortCopy', 'dumpSortMetadataState', 'dumpSortResumeMetadata', 'onDumpSortMetadata', 'dumpSortSourceOwner'];
   await t('main.js / preload.js change since Q5b is additions only, confined to the Q5c block', async () => {
     let base;
     try { base = execFileSync('git', ['rev-parse', '--verify', 'aa58eb1^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { console.log('    (Q5b commit not available — skipped)'); return; }
@@ -410,7 +428,7 @@ function assertClean(payload, fx, label) {
       // EQI-1 (AI-FEAT-064 / AI-RM-016, owner-approved milestone, not Q5): the companion gets the
       // import-index / photographer-list dependencies, Dump import entries are marked, and Dump
       // imports get their own learning workflow label — exactly these lines change.
-      const allowedRemoved = f === 'main/main.js' ? ['-});', ...EQI1_MAIN_CHANGED] : [];
+      const allowedRemoved = f === 'main/main.js' ? ['-});', ...EQI1_MAIN_CHANGED, ...EQI31_MAIN_CHANGED] : EQI31_PRELOAD_CHANGED;
       assert.deepEqual(lines.filter(l => l.startsWith('-')).sort(), [...allowedRemoved].sort(), `${f}: nothing removed`);
     }
     const pre = execFileSync('git', ['diff', '-U0', base, '--', 'main/preload.js'], { cwd: ROOT, encoding: 'utf8' });
@@ -474,6 +492,9 @@ function assertClean(payload, fx, label) {
       'services/dumpSortDiscovery.js', 'services/dumpSortPlanner.js', 'services/dumpSortJournal.js', 'services/dumpSortEngine.js', 'services/dumpSortService.js',
       'renderer/dumpSortMode.js', 'renderer/eventCreator.js', 'renderer/index.html', 'renderer/renderer.js',
       'test/eqi3DumpSortEngine.test.js', 'test/eqi3DumpSortService.test.js', 'test/eqi3SortDumpLive.test.js', 'test/photographerRegistryQ5c.test.js',
+      // EQI-3.1 Sort Dump context safety: import-source preflight, stop reasons, background metadata, tests.
+      'services/importSourceGuard.js', 'services/importStopReasons.js', 'services/dumpSortMetadata.js', 'renderer/importSessionRunner.js',
+      'test/eqi31SortDumpSafety.test.js', 'test/eqi31SortDumpSafetyLive.test.js', 'test/eventPhotographerFoldersQ5e2a.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });
