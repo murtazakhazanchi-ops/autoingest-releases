@@ -49,6 +49,8 @@ const toAbs = (root, rel) => path.join(root, ...rel.split('/'));
  * @param {ReturnType<import('./dumpSortMetadata').createDumpSortMetadata>} [deps.metadata]  background metadata (preferred)
  * @param {(p: string) => Promise<string|null>} [deps.imageHash]
  * @param {() => { device: string|null, operator: object|null }} [deps.who]
+ * @param {(real: string) => Promise<string|null>} [deps.transferBusyFor]  EQI-3.2 cross-event transfer running/unfinished
+ * @param {(real: string) => Promise<object[]>} [deps.recoverTransfers]   EQI-3.2 completes interrupted transfers of the event
  * @param {Function} [deps.log]
  */
 function createDumpSortService(deps) {
@@ -77,7 +79,8 @@ function createDumpSortService(deps) {
     }
     const found = await discoverDump(ev.real);
     const { journals, unreadable } = await journal.listPending(ev.real);
-    return { ok: true, ...summarize(found, { pending: journals.length + unreadable.length }) };
+    const transfer = deps.transferBusyFor ? await deps.transferBusyFor(ev.real).catch(() => null) : null;   // EQI-3.2
+    return { ok: true, ...summarize(found, { pending: journals.length + unreadable.length + (transfer ? 1 : 0) }) };
   }
 
   async function _blockers(ev) {
@@ -88,6 +91,8 @@ function createDumpSortService(deps) {
     if (pendingSync.length) out.push('This event has Local First imports that are not yet synced to the archive. Sync them first (Sync Queue).');
     const meta = await deps.activeMetadataFor(ev.real).catch(() => 0);
     if (meta > 0) out.push('Metadata is still being written to this event\'s Dump. Sort Dump when it has finished.');
+    const transfer = deps.transferBusyFor ? await deps.transferBusyFor(ev.real).catch(() => null) : null;   // EQI-3.2
+    if (transfer) out.push(transfer);
     return out;
   }
 
@@ -110,7 +115,8 @@ function createDumpSortService(deps) {
   async function plan(eventPath, selection) {
     const ev = await _event(eventPath);
     if (!ev.real) return { ok: false, blockers: [ev.reason] };
-    const recovered = await recoverPending(ev.real);
+    const transfers = deps.recoverTransfers ? await deps.recoverTransfers(ev.real).catch(() => []) : [];   // EQI-3.2
+    const recovered = [...(await recoverPending(ev.real) || []), ...transfers];
     if (deps.metadata) await deps.metadata.resume(ev.real).catch(() => {});   // metadata an earlier sort left unfinished
     const blockers = await _blockers(ev);
     const waiting = (recovered || []).find(r => r && r.deferred);
@@ -356,6 +362,8 @@ function createDumpSortService(deps) {
     if (!ev.real) return { ok: false, reason: ev.reason };
     if (!safeSegment(name)) return { ok: false, reason: 'Not a photographer folder.' };
     if (running.has(ev.real)) return { ok: false, reason: 'A Sort Dump is running for this event.' };
+    const transfer = deps.transferBusyFor ? await deps.transferBusyFor(ev.real).catch(() => null) : null;   // EQI-3.2
+    if (transfer) return { ok: false, reason: transfer };
     const dumpDir = await findDumpDir(ev.real);
     if (!dumpDir) return { ok: false, reason: 'This event has no Dump folder.' };
     if ((await journal.listPending(ev.real)).journals.length) return { ok: false, reason: 'A Sort Dump for this event has not finished.' };

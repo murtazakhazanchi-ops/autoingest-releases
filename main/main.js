@@ -3856,6 +3856,9 @@ const dumpSort = (() => {
     pendingSyncFor: _dumpSortPendingSync, activeMetadataFor: _dumpSortActiveMetadata,
     isImportRunning: () => _importTxActive > 0 || companionService.isImportRunning(),
     acquireLocks: _dumpSortLocks, metadata: dumpSortMetadata,
+    // EQI-3.2: a cross-event transfer running or unfinished on the event blocks sorting it, and is
+    // completed (from its journal) when Sort Dump opens either event.
+    transferBusyFor: (real) => crossEventMove.busyFor(real), recoverTransfers: (real) => crossEventMove.recoverFor(real),
     imageHash: (p) => require('../services/captureDateReader').readImageDataHash(p),
     who: () => { let u = null; try { u = userManager.getActiveUser(); } catch { /* none */ } return { device: os.hostname(), operator: u ? { id: u.id, name: u.name } : null }; },
     log: (m) => log('info', m),
@@ -3881,11 +3884,35 @@ ipcMain.handle('dumpSort:sourceOwner', async (_e, { path: p } = {}) => {
 /** EQI-3.1: a rename/restructure of an event folder that Sort Dump is using is refused, never raced. */
 async function _dumpSortRenameBlocker(folderPath) {
   for (const p of [folderPath, path.dirname(folderPath)]) {
-    const why = await dumpSort.busyFor(p).catch(() => null);
+    const why = await dumpSort.busyFor(p).catch(() => null) || await crossEventMove.busyFor(p).catch(() => null);
     if (why) return why;
   }
   return null;
 }
+
+// ── Move Selection to Another Event (AI-FEAT-064 EQI-3.2) ─────────────────────
+// From the Sort Dump workspace: selected Dump photos move to another event of the same collection
+// (its Dump, or one of its final folders) through a two-event journal (services/crossEventMove*.js).
+// Same guards, locks, Local First mirror and background metadata as Sort Dump — never a new import.
+const crossEventMove = require('../services/crossEventMoveService').createCrossEventMoveService({
+  updateEventJsonAtomic, intent: eventMetadataIntent, roots: _dumpSortRoots,
+  pendingSyncFor: _dumpSortPendingSync, activeMetadataFor: _dumpSortActiveMetadata,
+  isImportRunning: () => _importTxActive > 0 || companionService.isImportRunning(),
+  sortBusyFor: (real) => dumpSort.busyFor(real),
+  acquireLocks: _dumpSortLocks, metadata: dumpSortMetadata,
+  scanEvents: async (collectionPath) => {
+    const r = await _scanEventsCore(collectionPath, `xevent-${Date.now().toString(36)}`);
+    return r && r.ok && Array.isArray(r.events) ? r.events : [];
+  },
+  imageHash: (p) => require('../services/captureDateReader').readImageDataHash(p),
+  who: () => { let u = null; try { u = userManager.getActiveUser(); } catch { /* none */ } return { device: os.hostname(), operator: u ? { id: u.id, name: u.name } : null }; },
+  log: (m) => log('info', m),
+});
+ipcMain.handle('crossEvent:destinations', (_e, { eventPath } = {}) => crossEventMove.destinations(eventPath).catch(err => ({ ok: false, reason: err.message, events: [] })));
+ipcMain.handle('crossEvent:plan', (_e, { eventPath, destPath, kind, component, selection } = {}) => dumpSort._track(() => crossEventMove.plan(eventPath, { destPath, kind, component, selection })));
+_handleTracked('crossEvent:run', 'import', (event, { eventPath, destPath, kind, component, selection } = {}) => dumpSort._track(() => crossEventMove.run(eventPath, { destPath, kind, component, selection }, (p) => {
+  if (!event.sender.isDestroyed()) event.sender.send('crossEvent:progress', p);
+})));
 ipcMain.handle('dumpSort:deleteEmptyFolder', (_e, { eventPath, name } = {}) => dumpSort.deleteEmptyPhotographerFolder(eventPath, name));
 
 // ── Durable sync queue ────────────────────────────────────────────────────────

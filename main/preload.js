@@ -444,6 +444,11 @@ contextBridge.exposeInMainWorld('api', {
   dumpSortResumeMetadata:      () => ipcRenderer.invoke('dumpSort:resumeMetadata'),
   onDumpSortMetadata:          (cb) => _register('dumpSort:metadata', (_e, st) => cb(st)),
   dumpSortSourceOwner:         (folderPath) => ipcRenderer.invoke('dumpSort:sourceOwner', { path: folderPath }),
+  // EQI-3.2 Move Selection to Another Event (from the Sort Dump workspace)
+  crossEventDestinations:      (eventPath) => ipcRenderer.invoke('crossEvent:destinations', { eventPath }),
+  crossEventPlan:              (args) => ipcRenderer.invoke('crossEvent:plan', args),
+  crossEventRun:               (args) => ipcRenderer.invoke('crossEvent:run', args),
+  onCrossEventProgress:        (cb) => _register('crossEvent:progress', (_e, p) => cb(p)),
 
   // ── Team Live (advisory only — never writes authoritative files) ──
   reportTeamActivity: (data) => ipcRenderer.invoke('team:reportActivity', data),
