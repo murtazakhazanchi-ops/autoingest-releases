@@ -154,6 +154,33 @@ async function shoot(page, dir, name) {
   const setup = async () => {
     main = await passSplash(app);
     main.on('dialog', (d) => d.accept().catch(() => {}));
+    // Diagnostics: why a page would go away (renderer crash vs a window closed by the app).
+    main.on('crash', () => log('DIAG — main window renderer crashed'));
+    main.on('close', () => log('DIAG — main window closed'));
+    // Main-process probe: which window closes, whether JS asked for it (stack), whether it was focused,
+    // and every Cmd/Ctrl keystroke delivered to a window (an external Cmd+W would show here).
+    await app.evaluate(({ BrowserWindow, app: eApp }) => {
+      global.__diag = global.__diag || [];
+      const hook = (w) => {
+        if (w.__diagHooked) return; w.__diagHooked = true;
+        const page = () => { try { return w.webContents.getURL().split('/').pop(); } catch { return '?'; } };
+        w.webContents.on('before-input-event', (_e, i) => { if (i.meta || i.control) global.__diag.push({ t: Date.now(), key: i.key, meta: i.meta, type: i.type, page: page() }); });
+        w.on('close', () => global.__diag.push({ t: Date.now(), close: page(), focused: w.isFocused(), stack: (new Error().stack || '').split('\n').slice(2, 7).join(' | ') }));
+      };
+      BrowserWindow.getAllWindows().forEach(hook);
+      if (!BrowserWindow.prototype.__diagWrapped) {
+        BrowserWindow.prototype.__diagWrapped = true;
+        for (const m of ['close', 'destroy', 'hide']) {
+          const orig = BrowserWindow.prototype[m];
+          BrowserWindow.prototype[m] = function (...a) {
+            let page = '?'; try { page = this.webContents.getURL().split('/').pop(); } catch { /* destroyed */ }
+            global.__diag.push({ t: Date.now(), call: m, page, stack: (new Error().stack || '').split('\n').slice(2, 9).map(x => x.trim().replace(/\(\/.*\/([^/]+:\d+:\d+)\)/, '($1)')).join(' | ') });
+            return orig.apply(this, a);
+          };
+        }
+      }
+      eApp.on('browser-window-created', (_e, w) => hook(w));
+    }).catch(err => log('DIAG — probe not installed', err.message));
   };
 
   try {
@@ -400,9 +427,15 @@ async function shoot(page, dir, name) {
     failures++;
     log('FAIL — exception:', err && err.stack ? err.stack.split('\n').slice(0, 6).join('\n') : err);
     try { log('overlay:', (await overlayText()).slice(0, 600)); } catch { /* app gone */ }
+    try { log('DIAG probe:', JSON.stringify(await app.evaluate(() => global.__diag || []))); } catch (e) { log('DIAG probe unreadable', e.message); }
+    try { log('app.log tail:\n' + fs.readFileSync(path.join(ud, 'app.log'), 'utf8').split('\n').slice(-40).join('\n')); } catch { /* none */ }
   } finally {
     await et.end().catch(() => {});
-    if (app) await app.close().catch(() => {});
+    // Never leave a test app behind (a window lost mid-run can leave app.close() waiting forever).
+    if (app) {
+      await Promise.race([app.close().catch(() => {}), sleep(15000)]);
+      try { if (app.process() && app.process().exitCode === null) app.process().kill('SIGKILL'); } catch { /* gone */ }
+    }
     check(H.removeTestKeychainItem(iso, testKcBefore), 'test Keychain item absent after the run');
     if (!process.env.AI_EQI32_KEEP) await fsp.rm(work, { recursive: true, force: true }).catch(() => {});
   }
