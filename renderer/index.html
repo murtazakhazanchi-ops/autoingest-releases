@@ -4889,6 +4889,41 @@
     .dump-sort-banner .dsb-dest:empty { display: none; }
     .dump-sort-banner .dsb-last { flex-basis: 100%; color: var(--green); font-weight: 600; }
     .dump-sort-banner .dsb-last:empty { display: none; }
+    /* EQI-3.2 Move Selection to Another Event */
+    .dump-sort-banner .dsb-move-other {
+      margin-left: auto; align-self: center; padding: 5px 12px; border-radius: 7px; cursor: pointer;
+      border: 1px solid color-mix(in srgb, var(--blue) 55%, transparent); background: var(--surface);
+      color: var(--blue); font-size: 0.76rem; font-weight: 600; white-space: nowrap; min-height: 30px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .dump-sort-banner .dsb-move-other:hover { background: color-mix(in srgb, var(--blue) 14%, var(--surface)); border-color: var(--blue); }
+    .dump-sort-banner .dsb-move-other:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+    .xem-modal { width: min(720px, 94vw) !important; }
+    .xem-field { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .xem-field[disabled] { opacity: 0.5; }
+    .xem-field legend, .xem-legend { font-size: 0.7rem; font-weight: 700; color: var(--subtext); text-transform: uppercase; letter-spacing: 0.06em; padding: 0; margin-bottom: 4px; }
+    .xem-radio { display: flex; align-items: baseline; gap: 8px; font-size: 0.84rem; color: var(--text); cursor: pointer; line-height: 1.45; }
+    .xem-radio input { accent-color: var(--blue); }
+    .xem-search-row { display: flex; gap: 8px; align-items: stretch; }
+    .xem-search { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 0.85rem; }
+    .xem-search:focus-visible, .xem-select:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+    .xem-create { white-space: nowrap; }
+    .xem-list { display: flex; flex-direction: column; gap: 4px; max-height: 232px; overflow: auto; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); }
+    .xem-event { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 8px 10px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--text); cursor: pointer; min-height: 44px; }
+    .xem-event:hover { background: var(--blue-dim); }
+    .xem-event:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+    .xem-event.selected { border-color: var(--blue); background: var(--blue-dim); }
+    .xem-event[aria-disabled="true"] { cursor: not-allowed; opacity: 0.55; }
+    .xem-event-name { font-size: 0.85rem; font-weight: 600; word-break: break-word; }
+    .xem-event-meta { font-size: 0.72rem; color: var(--subtext); }
+    .xem-empty { margin: 0; padding: 12px; font-size: 0.8rem; color: var(--subtext); text-align: center; }
+    .xem-select { padding: 7px 9px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 0.84rem; max-width: 100%; }
+    .xem-facts { display: grid; grid-template-columns: max-content 1fr; gap: 5px 14px; margin: 0; font-size: 0.84rem; }
+    .xem-facts dt { color: var(--subtext); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 2px; }
+    .xem-facts dd { margin: 0; color: var(--text); word-break: break-word; font-variant-numeric: tabular-nums; }
+    .xem-mix { color: var(--subtext); }
+    .xem-statement { margin: 0; padding: 10px 12px; border-radius: 8px; border-left: 3px solid var(--blue); background: var(--blue-dim); color: var(--text); font-size: 0.82rem; font-weight: 600; line-height: 1.5; }
+    .xem-note-ok { margin: 0; color: var(--green); font-size: 0.82rem; font-weight: 600; }
     #dsMetaChip {
       position: absolute; right: 260px; top: 50%; transform: translateY(-50%);
       display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 7px;
@@ -4912,6 +4947,9 @@
       align-items: center; justify-content: center;
     }
     #dumpSortOverlay.visible { display: flex; }
+    /* EQI-3.2: Sort Dump's prompts can open while Event Management is still up (an interrupted move completed
+       from its "Finish Sort Dump" button asks to release a crash-left lock) — they must be above it (1000). */
+    #dumpSortOverlay.visible { z-index: 1010; }
     .dump-sort-modal { width: min(640px, 92vw) !important; max-height: 86vh; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
     .dsr-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
     .dsr-table th { text-align: left; font-weight: 600; color: var(--subtext); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 8px; border-bottom: 1px solid var(--border); }
@@ -9345,6 +9383,7 @@
   <script src="photographerRegistryProfile.js" defer></script>
   <script src="renderer.js" defer></script>
   <script src="dumpSortMode.js" defer></script>
+  <script src="crossEventMove.js" defer></script>
   <!-- Internal command registry for future external controllers (MX Creative
        Console, etc.) — see docs/commandLayer.md. Must load after renderer.js:
        it only calls window.__autoIngestRendererBridge, defined at the end of

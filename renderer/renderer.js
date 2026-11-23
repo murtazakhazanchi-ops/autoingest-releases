@@ -3102,6 +3102,7 @@ async function selectLocalFolder() {
 
 document.getElementById('ecBackBtn')?.addEventListener('click', () => {
   if (!EventCreator.navigateBack()) {
+    if (window.CrossEventMove && CrossEventMove.cancelCreator()) return;   // EQI-3.2: back to the same Sort Dump
     if (_ecReturnsToWorkspace()) _returnToWorkspaceFromPicker(true);
     else showLanding();
   }
@@ -3187,12 +3188,16 @@ document.addEventListener('eventcreator:listDeselect', () => {
   if (seq) seq.style.display = 'none';
 });
 document.addEventListener('eventmgmt:requestClose', () => {
+  if (window.CrossEventMove && CrossEventMove.cancelCreator()) return;   // EQI-3.2: back to the same Sort Dump
   // Picker opened from the Import workspace → dismissing it returns to that same workspace.
   if (_ecReturnsToWorkspace()) { _returnToWorkspaceFromPicker(true); return; }
   showLanding();
 });
 document.addEventListener('eventcreator:openArchiveLocations', () => _alocOpen());
 document.addEventListener('eventcreator:done', () => {
+  // EQI-3.2: Create New Event for a Sort Dump transfer destination — the new event becomes the transfer's
+  // destination and the Sort Dump workspace returns on its own (source) event; nothing else changes.
+  if (window.CrossEventMove && CrossEventMove.takeCreatorResult()) return;
   if (EventCreator.consumeMetaOutdated()) {
     const _savedEventPath = EventCreator.getActiveEventData()?.eventPath || null;
     if (_savedEventPath) _metaOutdatedPath = _savedEventPath;

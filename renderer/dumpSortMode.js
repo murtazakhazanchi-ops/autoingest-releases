@@ -26,6 +26,7 @@ const DumpSortMode = (() => {
   let _opening = false;
   let _overlay = null;
   let _lastNote = '';   // outcome of the last move, kept in the banner until the next one
+  let _hold = false;     // EQI-3.2: Create New Event for a transfer destination — the source event comes back
   const refused = new Map();   // absolute path → reason (shown on the tile until the next sort)
 
   const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -80,7 +81,8 @@ const DumpSortMode = (() => {
     if (st.pending) {
       // An interrupted sort is completed first (rolled forward from its journal), before anything else.
       let p = await window.api.dumpSortPlan(eventPath, []);
-      if (p && p.lock && p.lock.self && await offerSelfLockRelease(p.lock)) p = await window.api.dumpSortPlan(eventPath, []);
+      // EQI-3.2: an interrupted cross-event transfer may hold locks in two events — offered until none is left.
+      for (let i = 0; i < 3 && p && p.lock && p.lock.self && await offerSelfLockRelease(p.lock); i++) p = await window.api.dumpSortPlan(eventPath, []);
       let rec = (p && p.recovered) || [];
       if (rec.some(x => x.deferred)) {
         // Not completed yet (folder locked, or an import/sort is running) — said as it is, nothing opened.
@@ -136,9 +138,11 @@ const DumpSortMode = (() => {
     el.innerHTML = `<span class="dsb-title">Sort Dump</span><span class="dsb-event">${esc(_ctx.eventName)}</span>`
       + `<span class="dsb-count">${n === null ? '' : `${plural(n, 'unsorted photo')} · ${bytes(st.bytes)}`}</span>`
       + '<span class="dsb-dest" id="dsbDest"></span>'
+      + '<button type="button" class="dsb-move-other" id="dsbMoveOther" title="Move the selected photos (or a group) to another event\'s Dump or folders — this workspace stays open">Move Selection to Another Event</button>'
       + `<span class="dsb-last" id="dsbLast" role="status">${esc(_lastNote)}</span>`
-      + '<span class="dsb-hint">Sorting photos already imported into this event\'s Dump: group them (G1/G2/G3) to components, then Move to Event Folders. They are moved, not imported again. Changing the event closes Sort Dump.</span>';
+      + '<span class="dsb-hint">Sorting photos already imported into this event\'s Dump: group them (G1/G2/G3) to components, then Move to Event Folders. They are moved, not imported again. Photos that belong to another event: Move Selection to Another Event. Changing the event closes Sort Dump.</span>';
     host.prepend(el);
+    el.querySelector('#dsbMoveOther').addEventListener('click', () => { if (window.CrossEventMove) CrossEventMove.open(); });
     _renderDestinations();
   }
 
@@ -197,7 +201,7 @@ const DumpSortMode = (() => {
   }
 
   function onEventChanged() {
-    if (!_ctx || _running || _opening) return;
+    if (!_ctx || _running || _opening || _hold) return;
     const ed = EventCreator.getActiveEventData();
     if (!ed || norm(ed.eventPath) !== norm(_ctx.eventPath)) _leave('The current event changed, so Sort Dump was closed. Nothing was moved.');
   }
@@ -367,7 +371,7 @@ const DumpSortMode = (() => {
     });
   }
 
-  const STAGES = { moving: 'Moving photos', records: 'Updating the event record', cleanup: 'Removing the Dump copies', metadata: 'Queuing metadata verification', done: 'Finished', 'needs-attention': 'Needs attention' };
+  const STAGES = { moving: 'Moving photos', records: 'Updating the event record', cleanup: 'Removing the Dump copies', metadata: 'Queuing metadata verification', done: 'Finished', 'needs-attention': 'Needs attention', cancelled: 'Nothing was moved' };
   function _showProgress() {
     const o = _ensureOverlay();
     o.innerHTML = `<div class="dupWarningModal dump-sort-modal" aria-busy="true">
@@ -503,7 +507,16 @@ const DumpSortMode = (() => {
     _close();
   }
 
-  return { isActive, onSourceChanged, open, run, decorateImportButton, tileNote, requestEventChange, blocksEdit, onEventChanged, offerSelfLockRelease, get context() { return isActive() ? _ctx : null; }, get busy() { return _running; } };
+  // EQI-3.2 Move Selection to Another Event (renderer/crossEventMove.js) shares this workspace's overlay,
+  // prompts and banner; while it runs, Sort Dump's own move and Change Event wait (`setBusy`).
+  const ui = { ensureOverlay: _ensureOverlay, close: _close, showResult: _showResult, askEmptyFolder: _askEmptyFolder, onProgress: _onProgress };
+  function setBusy(v) { _running = !!v; }
+  function holdContext(v) { _hold = !!v; }
+  function setLastNote(text) { _lastNote = text || ''; const el = document.getElementById('dsbLast'); if (el) el.textContent = _lastNote; }
+  function refreshBanner(st) { if (isActive()) _banner(st); }
+  function closeFullySorted(message) { _close(); _end(); showLanding(); if (message) showMessage(message, 8000); }
+
+  return { isActive, onSourceChanged, open, run, decorateImportButton, tileNote, requestEventChange, blocksEdit, onEventChanged, offerSelfLockRelease, ui, setBusy, holdContext, setLastNote, refreshBanner, closeFullySorted, get context() { return isActive() ? _ctx : null; }, get busy() { return _running; } };
 })();
 
 window.DumpSortMode = DumpSortMode;
