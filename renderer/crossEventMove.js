@@ -283,8 +283,9 @@ const CrossEventMove = (() => {
       await ui().showResult({ title: 'Move stopped', lines: [msg, 'Every photo is either still in this Dump or safely at the destination. Open Sort Dump for this event again to complete the move.'], tone: 'error' });
       return;
     }
-    DumpSortMode.setBusy(false);
-    await _finish(result, planned, ctx);
+    // Busy until the result, the empty-folder prompts and the workspace refresh are done — nothing else
+    // (Sort Dump's own move, Change Event, another transfer) may start against a half-refreshed workspace.
+    try { await _finish(result, planned, ctx); } finally { DumpSortMode.setBusy(false); }
   }
 
   async function _finish(result, planned, ctx) {
