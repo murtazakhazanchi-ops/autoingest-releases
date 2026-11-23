@@ -146,9 +146,15 @@ async function _decideNames(io, realEvent, asset, claimed, hash, imageHash) {
 }
 
 /** Step 3 for one file. Returns { mode } or throws { code: 'CONFLICT' }. */
-async function placeMember(io, realEvent, m, hash = sha256) {
-  const src = toAbs(realEvent, m.src);
-  const dest = toAbs(realEvent, m.dest);
+function placeMember(io, realEvent, m, hash = sha256) {
+  return placeFile(io, toAbs(realEvent, m.src), toAbs(realEvent, m.dest), hash);
+}
+
+/**
+ * Places one file at an absolute destination without ever overwriting: hard link, no-overwrite rename,
+ * or copy → SHA-256 verify → commit across volumes. Shared with the cross-event move (EQI-3.2).
+ */
+async function placeFile(io, src, dest, hash = sha256) {
   await io.mkdir(path.dirname(dest), { recursive: true });
   try {
     await io.link(src, dest);
@@ -190,9 +196,12 @@ async function _copyVerified(io, src, dest, hash) {
  * Removes the Dump name of a placed file — only when the destination is verified to be the same file.
  * @returns {'removed'|'gone'|'kept'}
  */
-async function cleanupMember(io, realEvent, m, hash = sha256) {
-  const src = toAbs(realEvent, m.src);
-  const dest = toAbs(realEvent, m.dest);
+function cleanupMember(io, realEvent, m, hash = sha256) {
+  return removeIfSame(io, toAbs(realEvent, m.src), toAbs(realEvent, m.dest), hash);
+}
+
+/** cleanupMember for absolute paths: removes `src` only when `dest` is verified to be the same file. */
+async function removeIfSame(io, src, dest, hash = sha256) {
   if (!(await _exists(io, src))) return 'gone';
   if (!(await _exists(io, dest))) return 'kept';
   if (!(await sameFile(io, src, dest, hash))) return 'kept';
@@ -348,4 +357,4 @@ async function _assetState(io, realEvent, asset, hash) {
   return placedAny ? 'partial' : 'untouched';
 }
 
-module.exports = { preflight, run, recover, placeMember, cleanupMember, sameFile, sha256, _renameWithSuffix };
+module.exports = { preflight, run, recover, placeMember, cleanupMember, placeFile, removeIfSame, sameFile, sha256, _realish, _renameWithSuffix };

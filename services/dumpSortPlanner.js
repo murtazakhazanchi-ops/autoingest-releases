@@ -68,15 +68,7 @@ function planSort({ dumpDir, components, photographerSequences, scopeDirs, dumpR
   const isMulti = comps.length > 1;
   const compByFolder = new Map(comps.map(c => [c.folderName, c]));
 
-  // Shots: media + sidecars sharing a stem in one folder (case-insensitive stem).
-  const shots = new Map();   // dir\0stem → { dir, stem, media: [], sidecars: [] }
-  for (const rel of dumpRels || []) {
-    const kind = mediaKind(baseOf(rel));
-    if (!kind) continue;
-    const key = `${dirOf(rel)}\0${stemOf(baseOf(rel)).toLowerCase()}`;
-    if (!shots.has(key)) shots.set(key, { dir: dirOf(rel), media: [], sidecars: [] });
-    (kind === 'sidecar' ? shots.get(key).sidecars : shots.get(key).media).push(rel);
-  }
+  const shots = groupShots(dumpRels);
 
   // Each selected file → its shot; every member of one shot must go to the same component.
   const chosen = new Map();   // shot key → { shot, subEventId, photographer }
@@ -120,6 +112,20 @@ function planSort({ dumpDir, components, photographerSequences, scopeDirs, dumpR
   return { assets, newFolders, problems };
 }
 
+/** Shots: media + sidecars sharing a stem in one folder (case-insensitive stem). Key = shotKey(rel). */
+function groupShots(dumpRels) {
+  const shots = new Map();   // dir\0stem → { dir, media: [], sidecars: [] }
+  for (const rel of dumpRels || []) {
+    const kind = mediaKind(baseOf(rel));
+    if (!kind) continue;
+    const key = shotKey(rel);
+    if (!shots.has(key)) shots.set(key, { dir: dirOf(rel), media: [], sidecars: [] });
+    (kind === 'sidecar' ? shots.get(key).sidecars : shots.get(key).media).push(rel);
+  }
+  return shots;
+}
+const shotKey = (rel) => `${dirOf(rel)}\0${stemOf(baseOf(rel)).toLowerCase()}`;
+
 function _photographerFolder({ scopeKey, photographer, comp, photographerSequences, scopeDirs, folderCache, newFolders, allocated }) {
   const cacheKey = `${scopeKey}\0${photographer}`;
   if (folderCache.has(cacheKey)) return folderCache.get(cacheKey);
@@ -153,4 +159,4 @@ function _photographerFolder({ scopeKey, photographer, comp, photographerSequenc
   return result;
 }
 
-module.exports = { planSort, dumpPhotographerOf, safeSegment, stemOf, extOf, EVENT_ROOT_KEY };
+module.exports = { planSort, groupShots, shotKey, dumpPhotographerOf, safeSegment, stemOf, extOf, norm, EVENT_ROOT_KEY };
