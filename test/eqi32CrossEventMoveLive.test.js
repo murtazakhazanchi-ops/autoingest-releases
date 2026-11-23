@@ -115,7 +115,7 @@ async function shoot(page, dir, name) {
     await main.waitForFunction((n) => document.querySelectorAll('#fileGrid .file-tile').length >= n, minTiles, { polling: 100, timeout: 60000 });
   };
   const select = (paths) => main.evaluate((ps) => { selectedFiles.clear(); for (const p of ps) selectedFiles.add(p); updateSelectionBar(); return selectedFiles.size; }, paths);
-  const settle = () => main.waitForFunction(() => !document.getElementById('dumpSortOverlay')?.classList.contains('visible') && !DumpSortMode.busy, null, { polling: 100, timeout: 120000 });
+  const settle = () => main.waitForFunction(() => !document.getElementById('dumpSortOverlay')?.classList.contains('visible') && !DumpSortMode.busy, null, { polling: 100, timeout: 180000 });
   const openMove = async () => {
     await main.click('#dsbMoveOther');
     await main.waitForSelector('#dumpSortOverlay.visible #xemSearch', { timeout: 15000 });
@@ -132,10 +132,13 @@ async function shoot(page, dir, name) {
   const answerEmpty = async (choice) => {
     const prompts = [];
     for (;;) {
-      const s = await Promise.race([
-        main.waitForSelector('#dumpSortOverlay.visible #dsrKeep', { timeout: 30000 }).then(() => 'prompt'),
-        settle().then(() => 'settled'),
-      ]).catch(() => 'timeout');
+      // One condition, one timeout: the next empty-folder prompt, or the move fully finished (not busy).
+      const s = await main.waitForFunction(() => {
+        const o = document.getElementById('dumpSortOverlay');
+        const open = !!o && o.classList.contains('visible');
+        if (open && o.querySelector('#dsrKeep')) return 'prompt';
+        return !open && !DumpSortMode.busy ? 'settled' : false;
+      }, null, { polling: 100, timeout: 180000 }).then(h => h.jsonValue(), () => 'timeout');
       if (s !== 'prompt') break;
       prompts.push(await main.evaluate(() => document.querySelector('.dsr-folder-name')?.textContent || ''));
       await main.click(choice === 'delete' ? '#dsrDelete' : '#dsrKeep');
