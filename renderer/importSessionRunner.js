@@ -44,9 +44,9 @@ const ImportSessionRunner = (() => {
     return raw.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') || raw;
   }
 
-  /** main.js throws this text when copyFileJobs reports wasAborted (abort or source loss). */
+  /** main.js throws this text when the copy was aborted, its source vanished or was refused (services/importStopReasons.js). */
   function isCancelMessage(msg) {
-    return /^Import was cancelled/i.test(msg || '');
+    return /^Import (was cancelled|stopped|refused)/i.test(msg || '');
   }
 
   function newSessionId() {
@@ -171,7 +171,7 @@ const ImportSessionRunner = (() => {
     return { status, fatal: fatal || null, importSessionId, events: entries, totals, copiedFiles, completedKeys, retainedKeys };
   }
 
-  return { run, STATUS, cleanMessage, newSessionId };
+  return { run, STATUS, cleanMessage, newSessionId, isCancelMessage };
 
 })();
 

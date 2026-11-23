@@ -13,7 +13,8 @@
  *               kept. imports[] and the import index are never touched: a sorted photo is not a new import.
  *   staging     a synced Local First staging copy of the event gets the same moves (and the same intent
  *               remap), so no later sync can bring an obsolete Dump copy back to the archive
- *   metadata    the moved photos are verified against their new component's tags; only incomplete
+ *   metadata    the moved photos are verified against their new component's tags in the BACKGROUND
+ *               (dumpSortMetadata): the move finishes first and releases the operator; only incomplete
  *               ones are rewritten by the existing metadata batch
  *
  * Nothing here deletes a photographer folder: emptyPhotographerFolders() reports them and
@@ -44,7 +45,8 @@ const toAbs = (root, rel) => path.join(root, ...rel.split('/'));
  * @param {(eventPath: string) => Promise<number>} deps.activeMetadataFor     metadata batches still writing its Dump
  * @param {() => boolean} deps.isImportRunning
  * @param {(eventPath: string, rels: string[]) => Promise<{ ok: boolean, release: Function, lockedBy?: string }>} deps.acquireLocks
- * @param {(eventPath: string, files: string[], onProgress?: Function) => Promise<object>} deps.verifyMetadata
+ * @param {(eventPath: string, files: string[], onProgress?: Function) => Promise<object>} [deps.verifyMetadata]  in-transaction (legacy; tests)
+ * @param {ReturnType<import('./dumpSortMetadata').createDumpSortMetadata>} [deps.metadata]  background metadata (preferred)
  * @param {(p: string) => Promise<string|null>} [deps.imageHash]
  * @param {() => { device: string|null, operator: object|null }} [deps.who]
  * @param {Function} [deps.log]
@@ -109,7 +111,14 @@ function createDumpSortService(deps) {
     const ev = await _event(eventPath);
     if (!ev.real) return { ok: false, blockers: [ev.reason] };
     const recovered = await recoverPending(ev.real);
+    if (deps.metadata) await deps.metadata.resume(ev.real).catch(() => {});   // metadata an earlier sort left unfinished
     const blockers = await _blockers(ev);
+    const waiting = (recovered || []).find(r => r && r.deferred);
+    if (waiting) {
+      blockers.push(waiting.reason === 'locked'
+        ? `An interrupted Sort Dump of this event is waiting for its archive folder lock${waiting.lock && waiting.lock.lockedBy ? ` (held by ${waiting.lock.lockedBy})` : ''}. It is completed before anything else is sorted.`
+        : 'An interrupted Sort Dump of this event will be completed when the running import or sort has finished.');
+    }
     const found = await discoverDump(ev.real);
     if (!found.exists) return { ok: false, blockers: ['This event has no Dump folder.'], recovered };
     const dumpRels = [...found.photographers.flatMap(p => p.files.map(f => f.rel)), ...found.sidecars];
@@ -124,7 +133,7 @@ function createDumpSortService(deps) {
     const p = planSort({ dumpDir: found.dumpDir, components: doc.components, photographerSequences: doc.photographerSequences, scopeDirs: await _scopeDirs(ev.real, doc.components), dumpRels, selection: sel });
     const sizes = new Map(found.photographers.flatMap(ph => ph.files.map(f => [f.rel, f.size])));
     for (const a of p.assets) for (const m of a.members) m.size = sizes.get(m.src) || 0;
-    return { ok: blockers.length === 0, blockers, recovered, eventPath: ev.real, dumpDir: found.dumpDir, plan: p, problems: [...problems, ...p.problems], review: _review(p, found) };
+    return { ok: blockers.length === 0, blockers, recovered, lock: (waiting && waiting.lock) || null, eventPath: ev.real, dumpDir: found.dumpDir, plan: p, problems: [...problems, ...p.problems], review: _review(p, found) };
   }
 
   function _review(p, found) {
@@ -159,7 +168,7 @@ function createDumpSortService(deps) {
     try {
       const rels = planned.plan.assets.flatMap(a => a.members.flatMap(m => [m.src, m.dest]));
       locks = await deps.acquireLocks(real, rels);
-      if (!locks.ok) return { ok: false, blockers: [`The archive folder is busy${locks.lockedBy ? ` (in use by ${locks.lockedBy})` : ''}. Try again shortly.`], problems: planned.problems };
+      if (!locks.ok) return { ok: false, blockers: [`The archive folder is busy${locks.lockedBy ? ` (in use by ${locks.lockedBy})` : ''}. Try again shortly.`], lock: _lockInfo(locks), problems: planned.problems };
       const who = deps.who ? deps.who() : {};
       const intentGroups = (groups || []).map(g => ({
         metadataTags: Array.isArray(g.metadataTags) ? g.metadataTags : null,
@@ -173,6 +182,11 @@ function createDumpSortService(deps) {
         meta: { device: who.device || null, operator: who.operator || null, intent: { groups: intentGroups } },
         hooks: _hooks(real, onProgress), imageHash: deps.imageHash || null,
       });
+      // Background metadata takes its own hold on the destination folders BEFORE this sort releases its
+      // locks below, so they are never unlocked while metadata is still to be written to them.
+      if (deps.metadata && result.metadata && result.metadata.state === 'queued') {
+        result.metadataStart = await deps.metadata.start(real, result.txId).catch(err => ({ started: false, reason: err.message }));
+      }
       return { ...result, problems: [...planned.problems, ...(result.refused || [])], recovered: planned.recovered };
     } finally {
       if (locks && locks.release) await locks.release();
@@ -187,11 +201,14 @@ function createDumpSortService(deps) {
     if (running.has(real) || deps.isImportRunning()) return [{ ok: false, deferred: true, reason: 'busy' }];
     const rels = journals.flatMap(j => (j.assets || []).flatMap(a => (a.members || []).flatMap(m => [m.src, m.dest])));
     const locks = await deps.acquireLocks(real, rels);
-    if (!locks.ok) return [{ ok: false, deferred: true, reason: 'locked' }];
+    if (!locks.ok) return [{ ok: false, deferred: true, reason: 'locked', lock: _lockInfo(locks) }];
     running.add(real);
     try {
       log(`[dump-sort] completing ${journals.length} interrupted sort(s)`);
       const r = await engine.recover({ eventPath: real, hooks: _hooks(real, () => {}), imageHash: deps.imageHash || null });
+      for (const x of r.results) {
+        if (deps.metadata && x.metadata && x.metadata.state === 'queued') await deps.metadata.start(real, x.txId).catch(() => {});
+      }
       return r.results.map(x => ({ txId: x.txId, ok: x.ok, movedFiles: x.movedFiles, attention: x.attention }));
     } finally {
       running.delete(real);
@@ -199,7 +216,21 @@ function createDumpSortService(deps) {
     }
   }
 
+  const _lockInfo = (l) => ({ lockedBy: l.lockedBy || null, self: !!l.self, lockPath: l.lockPath || null, lockPaths: l.lockPaths || (l.lockPath ? [l.lockPath] : []) });
+
   function _hooks(real, onProgress) {
+    const metaFiles = (pairs) => pairs.filter(p => p.role === 'media' && p.kind !== 'video').map(p => p.dest);
+    if (deps.metadata) {
+      return {
+        onProgress,
+        applyRecords: ({ doc, pairs, assets }) => _applyRecords(real, doc, pairs, assets),
+        mirrorStaging: ({ pairs }) => _mirrorStaging(real, pairs),
+        queueMetadata: ({ doc, pairs }) => {
+          const rels = metaFiles(pairs);
+          return rels.length ? deps.metadata.record(real, doc.txId, rels) : Promise.resolve({ state: 'not-needed' });
+        },
+      };
+    }
     return {
       onProgress,
       applyRecords: ({ doc, pairs, assets }) => _applyRecords(real, doc, pairs, assets),
@@ -344,7 +375,21 @@ function createDumpSortService(deps) {
     return { ok: true, dumpRemoved };
   }
 
-  return { status, plan, run, recoverPending, emptyPhotographerFolders, deleteEmptyPhotographerFolder };
+  /**
+   * Why the event folder must not be renamed or restructured now, or null: a sort is moving files in it,
+   * a sort is unfinished (journal), or background metadata is still to be written to its moved photos.
+   * @param {string} eventPath  any path naming the event folder (resolved here)
+   */
+  async function busyFor(eventPath) {
+    const real = await fsp.realpath(eventPath).catch(() => null);
+    if (!real) return null;
+    if (running.has(real)) return 'A Sort Dump is moving photos in this event.';
+    const { journals, unreadable } = await journal.listPending(real);
+    if (journals.length || unreadable.length) return 'A Sort Dump of this event has not finished. Open Sort Dump for this event to complete it first.';
+    return deps.metadata ? deps.metadata.busyFor(real) : null;
+  }
+
+  return { status, plan, run, recoverPending, emptyPhotographerFolders, deleteEmptyPhotographerFolder, busyFor };
 }
 
 /** True when the tree holds no file other than Finder state, and no link or special entry. */

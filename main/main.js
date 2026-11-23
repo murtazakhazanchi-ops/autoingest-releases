@@ -77,6 +77,8 @@ const metadataQueueStore    = require('./metadataQueueStore');
 const metadataStateService  = require('./metadataStateService');
 const metadataQueueRecovery = require('./metadataQueueRecovery');
 const metadataVerificationService = require('./metadataVerificationService');
+const importSourceGuard = require('../services/importSourceGuard');
+const { abortedImportMessage } = require('../services/importStopReasons');
 const metadataAuditService  = require('../services/metadataAuditService');
 const metadataAuditExport   = require('../services/metadataAuditExport');
 const metadataRepairService = require('./metadataRepairService');
@@ -309,6 +311,9 @@ app.whenReady().then(() => {
   // short delay so it never competes with startup I/O for the splash screen.
   setTimeout(() => {
     metadataQueueRecovery.resumeInterruptedBatches()
+      // EQI-3.1: Sort Dump metadata left unfinished resumes only after the interrupted batches have been
+      // replayed, so a file an interrupted batch still owns is never given a second metadata task.
+      .finally(() => dumpSortMetadata.resumeAll().catch(err => log(`[dump-sort] metadata resume failed (${err.code || 'error'})`)))
       .then(summary => {
         if (summary.batchesScanned > 0) {
           log(`[main] Metadata queue resume: ${summary.batchesScanned} batch(es) scanned, ${summary.filesResumed} file(s) resumed, ${summary.filesStale} stale, ${summary.eventsUpdated} event(s) updated`);
@@ -1269,6 +1274,19 @@ async function _commitImportTransaction(event, {
     const refusal = eventDumpPaths.dumpJobsRefusal(fileJobs, eventJsonPath, photographer);
     if (refusal) throw new Error(`Event Dump import refused: ${refusal}`);
   }
+  // EQI-3.1: read-only source checks BEFORE anything is written (no lock, no folder, no event.json).
+  // A photo in a managed event's Dump was imported already: it is sorted (moved), never imported again.
+  const _dumpOwner = await importSourceGuard.firstDumpSource(fileJobs);
+  if (_dumpOwner) {
+    throw new Error('Import refused: these photos are already in an event\'s Dump, so they were imported once. '
+      + 'Use Sort Dump in Event Management to move them into the event\'s folders.');
+  }
+  const _missingSources = await importSourceGuard.missingSourceDirs(fileJobs);
+  if (_missingSources.length) {
+    log(`[import] source unavailable before copy: ${_missingSources.length} folder(s) missing — nothing written`);
+    throw new Error(`Import stopped: the source folder is no longer available (it was renamed, moved or disconnected). `
+      + `0 of ${fileJobs.length} file${fileJobs.length !== 1 ? 's' : ''} copied and nothing was written. Select the source again and retry.`);
+  }
 
   const restoreCreatedStatus = async () => {
     if (!eventJsonPath) return;
@@ -1326,14 +1344,14 @@ async function _commitImportTransaction(event, {
                 heartbeatAbortSignal.aborted = true;
                 heartbeatAbortSignal.reason  = r.reason;
                 clearInterval(heartbeatTimer);
-                abortCopy(); // signals copyFileJobs to skip remaining files
+                abortCopy('lock-lost'); // signals copyFileJobs to skip remaining files
               }
             }).catch(err => {
               console.error('[import:commitTransaction] Lock heartbeat I/O error:', err.message);
               heartbeatAbortSignal.aborted = true;
               heartbeatAbortSignal.reason  = 'heartbeat-io-error';
               clearInterval(heartbeatTimer);
-              abortCopy();
+              abortCopy('lock-lost');
             });
           }, archiveLockService.LOCK_HEARTBEAT_INTERVAL_MS);
           _directNasLocks.push({ lockPath: lockResult.lockPath, heartbeatTimer });
@@ -1440,12 +1458,7 @@ async function _commitImportTransaction(event, {
     // will skip files that were already successfully copied.
     if (result.wasAborted) {
       _releaseDirectNasLocks(_directNasLocks);
-      const copied = result.copied || 0;
-      const total  = fileJobs.length;
-      throw new Error(
-        `Import was cancelled — ${copied} of ${total} file${total !== 1 ? 's' : ''} copied before cancellation. ` +
-        `Retry to import the remaining files (already-copied files will be skipped automatically).`
-      );
+      throw new Error(abortedImportMessage(result.abortReason, result.copied || 0, fileJobs.length));
     }
 
     const auditContext = {
@@ -1725,9 +1738,10 @@ ipcMain.handle('users:setActive', async (_e, id) => {
 // Pause / Resume / Abort copy pipeline
 ipcMain.on('copy:pause',  () => setPaused(true));
 ipcMain.on('copy:resume', () => setPaused(false));
-ipcMain.on('copy:abort',  () => {
-  log('Copy abort requested');
-  abortCopy();
+ipcMain.on('copy:abort',  (_e, reason) => {
+  const why = reason === 'source-disconnected' ? reason : 'user';
+  log(`Copy abort requested (${why})`);
+  abortCopy(why);
 });
 
 // Global import index — returns { lowercaseFilename: { size, addedAt } }
@@ -2752,6 +2766,8 @@ ipcMain.handle('dir:inspectContent', async (_event, dirPath) => {
 ipcMain.handle('dir:rename', async (_event, oldPath, newPath) => {
   if (!oldPath || !newPath) return { ok: false, reason: 'Missing paths.' };
   if (oldPath === newPath) return { ok: true };
+  const sortBusy = await _dumpSortRenameBlocker(oldPath);
+  if (sortBusy) return { ok: false, reason: `This folder can't be renamed right now. ${sortBusy}` };
 
   // ── Collect configured archive roots ─────────────────────────────────
   const configuredRoots = [
@@ -2825,6 +2841,8 @@ ipcMain.handle('master:renameEvent', async (_event, masterPath, oldName, newName
   if (oldName === newName) return { ok: true }; // no-op
   const oldPath = path.join(masterPath, oldName);
   const newPath = path.join(masterPath, newName);
+  const sortBusy = await _dumpSortRenameBlocker(oldPath);
+  if (sortBusy) return { ok: false, reason: `This event can't be renamed right now. ${sortBusy}` };
   // Fresh stat for collision check (not cached — catches out-of-band changes).
   try {
     await fsp.stat(newPath);
@@ -3743,32 +3761,92 @@ async function _dumpSortLocks(realEvent, rels) {
     const parts = rel.split('/').slice(0, -1).filter(x => x !== 'VIDEO');
     if (parts.length) { names.add(parts[0]); names.add(parts[parts.length - 1]); }
   }
-  const held = [];
+  // EQI-3.1: re-entrant on this computer — a sort's background metadata keeps its destination folders
+  // locked (against other computers and against renames) while the operator's next Sort Dump of the
+  // same event, holding a reference to the same folder, is not refused by its own lock.
+  const taken = [];
   const jobId = `dumpsort-${Date.now().toString(36)}`;
+  const releaseTaken = () => {
+    for (const key of taken.splice(0)) {
+      const h = _dumpSortHolds.get(key);
+      if (!h || --h.refs > 0) continue;
+      _dumpSortHolds.delete(key);
+      _releaseDirectNasLocks([h]);
+    }
+  };
+  const blockedAll = async () => {   // every folder of this request still locked — one explicit release covers them all
+    const out = [];
+    for (const n of names) {
+      if (_dumpSortHolds.has([collection, eventFolderName, n].join('\0'))) continue;
+      const c = await archiveLockService.checkLock(nas, { collection, eventFolderName, photographerFolderName: n }).catch(() => ({ blocked: false }));
+      if (c.blocked) out.push({ lockedBy: c.lockedBy || null, lockPath: archiveLockService.getLockPath(nas, { collection, eventFolderName, photographerFolderName: n }) });
+    }
+    return out;
+  };
   for (const photographerFolderName of names) {
+    const key = [collection, eventFolderName, photographerFolderName].join('\0');
+    const h = _dumpSortHolds.get(key);
+    if (h) { h.refs++; taken.push(key); continue; }
     const r = await archiveLockService.acquireLock(nas, { collection, eventFolderName, photographerFolderName, jobId, batchId: null });
-    if (!r.acquired) { _releaseDirectNasLocks(held); return { ok: false, lockedBy: r.lockedBy || null }; }
+    if (!r.acquired) {
+      releaseTaken();
+      // `self`: every blocking lock was left by this computer (an interrupted run) — the operator may
+      // release them explicitly through the existing self-lock release; another computer's lock is only
+      // ever waited for.
+      const blocked = await blockedAll();
+      const host = os.hostname();
+      return { ok: false, lockedBy: r.lockedBy || null, self: blocked.length > 0 && blocked.every(b => b.lockedBy === host),
+        lockPath: blocked[0] ? blocked[0].lockPath : null, lockPaths: blocked.map(b => b.lockPath) };
+    }
     const owner = { jobId: r.lockData.jobId, deviceName: r.lockData.deviceName };
     const heartbeatTimer = setInterval(() => { archiveLockService.renewLock(r.lockPath, owner).catch(() => {}); }, archiveLockService.LOCK_HEARTBEAT_INTERVAL_MS);
-    held.push({ lockPath: r.lockPath, heartbeatTimer });
+    _dumpSortHolds.set(key, { lockPath: r.lockPath, heartbeatTimer, refs: 1 });
+    taken.push(key);
   }
-  return { ok: true, release: async () => _releaseDirectNasLocks(held) };
+  let released = false;
+  return { ok: true, release: async () => { if (released) return; released = true; releaseTaken(); } };
 }
+const _dumpSortHolds = new Map();   // collection\0event\0folder → { lockPath, heartbeatTimer, refs }
 
-/** Verifies moved photos against their new component's tags; awaits any repair batch (10 min watchdog). */
-async function _dumpSortVerifyMetadata(realEvent, files, onProgress) {
+/**
+ * EQI-3.1 background verification of moved photos (dumpSortMetadata): verifies them against their new
+ * component's tags and queues the incomplete ones on the existing metadata batch; returns WITHOUT waiting
+ * for that batch (`batchDone` settles at its batch_complete).
+ */
+async function _dumpSortVerifyInBackground(realEvent, files, { onBatchProgress } = {}) {
   const doc = JSON.parse(await fsp.readFile(path.join(realEvent, 'event.json'), 'utf8'));
   const built = buildEventEvidenceContext(realEvent, doc, files.map(f => ({ src: f, dest: f })));
-  const r = await _verifyAndReconcile(built.context.eventJsonPath, built.files, built.context, { onProgress });
-  if (!r) return { state: 'not-needed' };
-  if (!r.queued) return { state: r.failed ? 'failed' : 'complete', checked: r.checked, rewritten: 0, failed: r.failed, verificationRequired: r.verificationRequired };
-  let timer;
-  const batch = await Promise.race([r.batchDone, new Promise(res => { timer = setTimeout(() => res('timeout'), 10 * 60 * 1000); })]);
-  clearTimeout(timer);
-  if (batch === 'timeout') return { state: 'unconfirmed', checked: r.checked, rewritten: r.queued };
-  const failed = (batch && batch.failed) || 0;
-  return { state: failed ? 'completed-with-errors' : 'complete', checked: r.checked, rewritten: r.queued, failed };
+  const r = await _verifyAndReconcile(built.context.eventJsonPath, built.files, built.context, { onProgress: onBatchProgress });
+  if (!r) throw new Error('metadata verification could not run');
+  return r;
 }
+
+/** Paths (resolved) owned by active metadata batches of this event — never given a second metadata task. */
+async function _dumpSortQueuedFiles(realEvent) {
+  const prefix = path.sep + path.join(path.basename(path.dirname(realEvent)), path.basename(realEvent)) + path.sep;
+  const out = new Set();
+  for (const id of await metadataQueueStore.listActiveBatchIds()) {
+    const m = await metadataQueueStore.readManifest(id).catch(() => null);
+    for (const f of (m && Array.isArray(m.files)) ? m.files : []) {
+      const d = f && (f.dest || f.path || f);
+      if (typeof d !== 'string') continue;
+      const abs = path.resolve(d);
+      if (abs.includes(prefix)) out.add(path.join(realEvent, abs.slice(abs.indexOf(prefix) + prefix.length)));
+    }
+  }
+  return out;
+}
+
+const dumpSortMetadata = require('../services/dumpSortMetadata').createDumpSortMetadata({
+  verify: _dumpSortVerifyInBackground,
+  holdLocks: (real, rels) => _dumpSortLocks(real, rels),
+  activeQueuedFiles: _dumpSortQueuedFiles,
+  indexFile: () => path.join(app.getPath('userData'), 'dump-sort-metadata-pending.json'),
+  emit: (st) => { for (const w of BrowserWindow.getAllWindows()) { if (!w.isDestroyed()) w.webContents.send('dumpSort:metadata', st); } },
+  // The rewrite batch is an ordinary metadata batch: the title-bar indicator and Metadata Management show it.
+  forwardBatch: (p, real) => { const win = windowRegistry.getProgressTarget(); if (win && !win.isDestroyed()) win.webContents.send('metadata:progress', { ...p, eventPath: real }); },
+  log: (m) => log('info', m),
+});
 
 const dumpSort = (() => {
   const { createDumpSortService } = require('../services/dumpSortService');
@@ -3777,7 +3855,7 @@ const dumpSort = (() => {
     updateEventJsonAtomic, intent: eventMetadataIntent, roots: _dumpSortRoots,
     pendingSyncFor: _dumpSortPendingSync, activeMetadataFor: _dumpSortActiveMetadata,
     isImportRunning: () => _importTxActive > 0 || companionService.isImportRunning(),
-    acquireLocks: _dumpSortLocks, verifyMetadata: _dumpSortVerifyMetadata,
+    acquireLocks: _dumpSortLocks, metadata: dumpSortMetadata,
     imageHash: (p) => require('../services/captureDateReader').readImageDataHash(p),
     who: () => { let u = null; try { u = userManager.getActiveUser(); } catch { /* none */ } return { device: os.hostname(), operator: u ? { id: u.id, name: u.name } : null }; },
     log: (m) => log('info', m),
@@ -3791,6 +3869,23 @@ _handleTracked('dumpSort:run', 'import', (event, { eventPath, selection, groups 
   if (!event.sender.isDestroyed()) event.sender.send('dumpSort:progress', p);
 })));
 ipcMain.handle('dumpSort:emptyFolders', (_e, { eventPath } = {}) => dumpSort.emptyPhotographerFolders(eventPath));
+ipcMain.handle('dumpSort:metadataState', () => dumpSortMetadata.snapshot());
+ipcMain.handle('dumpSort:resumeMetadata', () => dumpSortMetadata.resumeAll().then(n => ({ ok: true, events: n }), err => ({ ok: false, reason: err.message })));
+// Whether a folder chosen as an import source is (inside) a managed event's Dump — those photos are sorted, not imported.
+ipcMain.handle('dumpSort:sourceOwner', async (_e, { path: p } = {}) => {
+  if (typeof p !== 'string' || !path.isAbsolute(p)) return null;
+  const owner = await importSourceGuard.dumpOwnerOf(path.join(p, '.probe')).catch(() => null);
+  return owner ? { eventPath: owner.eventPath, eventName: path.basename(owner.eventPath) } : null;
+});
+
+/** EQI-3.1: a rename/restructure of an event folder that Sort Dump is using is refused, never raced. */
+async function _dumpSortRenameBlocker(folderPath) {
+  for (const p of [folderPath, path.dirname(folderPath)]) {
+    const why = await dumpSort.busyFor(p).catch(() => null);
+    if (why) return why;
+  }
+  return null;
+}
 ipcMain.handle('dumpSort:deleteEmptyFolder', (_e, { eventPath, name } = {}) => dumpSort.deleteEmptyPhotographerFolder(eventPath, name));
 
 // ── Durable sync queue ────────────────────────────────────────────────────────
@@ -4132,6 +4227,8 @@ ipcMain.handle('archive:clearSelfStaleLock', async (_event, args = {}) => _clear
 /** Shared by the IPC handler and the companion's Event Dump imports (EQI-2.1). */
 async function _clearSelfStaleLock({ lockPath, force = false } = {}) {
   if (!lockPath || typeof lockPath !== 'string') return { ok: false, reason: 'invalid-path' };
+  // EQI-3.1: a lock this process holds for Sort Dump (a move, or its background metadata) is live, never stale.
+  if ([..._dumpSortHolds.values()].some(h => path.resolve(h.lockPath) === path.resolve(lockPath))) return { ok: false, reason: 'in use by Sort Dump on this computer' };
   const nas  = settings.getNasRoot();
   const main = settings.getMainArchiveRoot();
   const configuredRoots = [nas, main].filter(Boolean);

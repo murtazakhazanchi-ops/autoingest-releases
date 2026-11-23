@@ -112,7 +112,7 @@ contextBridge.exposeInMainWorld('api', {
 
   pauseCopy:  () => ipcRenderer.send('copy:pause'),
   resumeCopy: () => ipcRenderer.send('copy:resume'),
-  abortCopy:  () => ipcRenderer.send('copy:abort'),
+  abortCopy:  (reason) => ipcRenderer.send('copy:abort', reason),
 
   /**
    * Returns a URL for a small cached thumbnail (max 160px, JPEG 50%).
@@ -440,6 +440,10 @@ contextBridge.exposeInMainWorld('api', {
   dumpSortEmptyFolders:        (eventPath) => ipcRenderer.invoke('dumpSort:emptyFolders', { eventPath }),
   dumpSortDeleteEmptyFolder:   (eventPath, name) => ipcRenderer.invoke('dumpSort:deleteEmptyFolder', { eventPath, name }),
   onDumpSortProgress:          (cb) => _register('dumpSort:progress', (_e, p) => cb(p)),
+  dumpSortMetadataState:       () => ipcRenderer.invoke('dumpSort:metadataState'),
+  dumpSortResumeMetadata:      () => ipcRenderer.invoke('dumpSort:resumeMetadata'),
+  onDumpSortMetadata:          (cb) => _register('dumpSort:metadata', (_e, st) => cb(st)),
+  dumpSortSourceOwner:         (folderPath) => ipcRenderer.invoke('dumpSort:sourceOwner', { path: folderPath }),
 
   // ── Team Live (advisory only — never writes authoritative files) ──
   reportTeamActivity: (data) => ipcRenderer.invoke('team:reportActivity', data),

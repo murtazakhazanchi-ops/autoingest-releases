@@ -4885,6 +4885,26 @@
     .dump-sort-banner .dsb-event { font-weight: 600; color: var(--text); }
     .dump-sort-banner .dsb-count { color: var(--text); font-variant-numeric: tabular-nums; }
     .dump-sort-banner .dsb-hint { color: var(--subtext); flex-basis: 100%; }
+    .dump-sort-banner .dsb-dest { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .dump-sort-banner .dsb-dest:empty { display: none; }
+    .dump-sort-banner .dsb-last { flex-basis: 100%; color: var(--green); font-weight: 600; }
+    .dump-sort-banner .dsb-last:empty { display: none; }
+    #dsMetaChip {
+      position: absolute; right: 260px; top: 50%; transform: translateY(-50%);
+      display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 7px;
+      border-radius: 999px; border: 1px solid var(--border); background: var(--blue-dim);
+      color: var(--text-primary); font-size: 0.67rem; font-weight: 600; letter-spacing: 0.03em;
+      white-space: nowrap; cursor: pointer; -webkit-app-region: no-drag; font-variant-numeric: tabular-nums;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    #dsMetaChip[hidden] { display: none; }
+    #dsMetaChip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--blue); flex-shrink: 0; }
+    #dsMetaChip[data-state="complete"] { background: color-mix(in srgb, var(--green) 14%, transparent); }
+    #dsMetaChip[data-state="complete"]::before { background: var(--green); }
+    #dsMetaChip[data-state="attention"] { background: color-mix(in srgb, #f59e0b 16%, transparent); border-color: color-mix(in srgb, #f59e0b 55%, transparent); }
+    #dsMetaChip[data-state="attention"]::before { background: #f59e0b; }
+    #dsMetaChip:hover { border-color: var(--blue); }
+    #dsMetaChip:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
     .file-tile.dump-refused { outline: 2px solid color-mix(in srgb, var(--yellow) 70%, transparent); outline-offset: -2px; }
     .dump-refused-label { color: var(--yellow) !important; }
     #dumpSortOverlay {

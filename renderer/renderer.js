@@ -5690,12 +5690,12 @@ function renderDrives(cards) {
   if (activeDrive && activeSource?.type === 'memory-card') {
     const stillPresent = cards.some(c => c.mountpoint === activeDrive.mountpoint);
     if (!stillPresent) {
-      window.api.abortCopy();
+      window.api.abortCopy('source-disconnected');
       _multiImportAbort = true;   // a multi-event run must not start its next event
       importRunning = false;
       _notifyCommandLayer();
       document.getElementById('progressOverlay').classList.remove('visible');
-      showMessage('Card disconnected. Import cancelled.');
+      showMessage('Card disconnected. Import stopped.');
       resetAppState({ preserveEvent: true });
       return;
     }
@@ -6051,6 +6051,7 @@ function _registerCompanionHandoff() {
 }
 
 document.getElementById('changeDriveBtn').addEventListener('click', () => {
+  if (window.DumpSortMode && DumpSortMode.busy) { showMessage('A Sort Dump move is running. Wait for it to finish.', 6000); return; }
   hideSourceScanState();
   resetWorkspaceState();
   hasSelectedDrive = false;
@@ -12282,6 +12283,16 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   // EQI-3 Sort Dump: in the event's own Dump the action MOVES the selection into the event's final
   // folders (renderer/dumpSortMode.js) — never a second import of photos that are already archived.
   if (window.DumpSortMode && DumpSortMode.isActive()) { await DumpSortMode.run(); return; }
+
+  // EQI-3.1: photos inside a managed event's Dump were imported once already. Outside an open Sort Dump
+  // (e.g. the folder chosen by hand as a Local Folder source) they are never offered an ordinary import.
+  if (activeSource && activeSource.type === 'local-folder' && window.api.dumpSortSourceOwner) {
+    const dumpOwner = await window.api.dumpSortSourceOwner(activeSource.path).catch(() => null);
+    if (dumpOwner) {
+      showMessage(`These photos are in the Dump of ${dumpOwner.eventName}, so they were imported already. Open Event Management → Sort Dump for that event to move them into its folders.`, 10000);
+      return;
+    }
+  }
 
   // Multi-event session (files assigned to events beyond / other than the Current Event's own
   // groups): one plan, one runner (importSessionUI.js). Whenever the session is just a one-event,

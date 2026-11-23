@@ -21,9 +21,11 @@
  *                 one Sort Dump audit entry (never an import entry)              [hooks.applyRecords]
  *   5 staging     the same moves in a synced Local First staging copy            [hooks.mirrorStaging]
  *   6 cleanup     the Dump name is removed — only when the destination is verified as the same file
- *   7 metadata    the moved photos are verified against their new component's tags; incomplete ones
- *                 are rewritten by the existing metadata batch                    [hooks.verifyMetadata]
- *   8 done        the journal moves to done/ (audit trail)
+ *   7 metadata    the moved photos are handed to background metadata: a durable record of them is
+ *                 written (verification + rewrite then run without holding the operator)
+ *                                                                                 [hooks.queueMetadata]
+ *                 (hooks.verifyMetadata instead awaits verification inside the transaction)
+ *   8 done        the journal moves to done/ (audit trail) — the move's durable completion boundary
  *
  * RECOVERY (any crash point): the journal says what was intended; the filesystem says what happened.
  * Per shot: nothing placed → it stays in Dump; anything placed → the shot is completed (pairs never
@@ -306,7 +308,9 @@ async function _complete({ eventPath, realEvent, doc, hooks, io, hash, progress,
   await journal.write(eventPath, doc, io);
   progress({ stage: 'metadata', done, total });
   let metadata = null;
-  if (hooks.verifyMetadata) {
+  if (hooks.queueMetadata) {
+    try { metadata = await hooks.queueMetadata({ doc, pairs }); } catch (err) { metadata = { state: 'not-queued', error: err.message }; }
+  } else if (hooks.verifyMetadata) {
     try { metadata = await hooks.verifyMetadata({ doc, pairs }); } catch (err) { metadata = { state: 'failed', error: err.message }; }
   }
 

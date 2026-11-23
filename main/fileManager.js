@@ -50,8 +50,10 @@ function waitIfPaused() {
 // ── Abort state (Patch 32) ────────────────────────────────────────────────────
 
 let isAborted = false;
+let abortReason = null;   // EQI-3.1: why the run stopped — 'source-unavailable' | 'source-disconnected' | 'lock-lost' | 'user'
 
-function abortCopy() {
+function abortCopy(reason = 'user') {
+  if (!isAborted) abortReason = reason;   // the first cause wins; later aborts only echo it
   isAborted = true;
   setPaused(false); // release any paused waiters
 }
@@ -251,6 +253,7 @@ async function copyFiles(filePaths, destination, onProgress) {
 
   isPaused  = false; // always start fresh
   isAborted = false; // always start fresh
+  abortReason = null;
 
   const total = filePaths.length;
   const reserved = new Set();   // destinations claimed by this run's in-flight copies
@@ -337,7 +340,7 @@ async function copyFiles(filePaths, destination, onProgress) {
     } catch {
       // Parent directory also gone → source disconnected mid-copy.
       // Abort so commitImportTransaction rolls back instead of committing partial data.
-      try { await fsp.access(path.dirname(srcPath)); } catch { abortCopy(); return; }
+      try { await fsp.access(path.dirname(srcPath)); } catch { abortCopy('source-unavailable'); return; }
       errors++;
       completedCount++;
       const { eta, speedBps } = getSpeedAndEta();
@@ -457,7 +460,7 @@ async function copyFiles(filePaths, destination, onProgress) {
         if (copied + skipped + errors !== total) {
           log(`[copyFiles] accounting drift: copied=${copied} skipped=${skipped} errors=${errors} total=${total}`);
         }
-        resolve({ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, duration: Date.now() - startTime, wasAborted: isAborted });
+        resolve({ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, duration: Date.now() - startTime, wasAborted: isAborted, abortReason: isAborted ? abortReason : null });
         return;
       }
 
@@ -515,6 +518,7 @@ async function copyFileJobs(fileJobs, onProgress, hooks = null) {
 
   isPaused  = false; // always start fresh
   isAborted = false; // always start fresh
+  abortReason = null;
 
   const total   = fileJobs.length;
   const startTime = Date.now();
@@ -603,7 +607,7 @@ async function copyFileJobs(fileJobs, onProgress, hooks = null) {
     } catch {
       // Parent directory also gone → source disconnected mid-copy.
       // Abort so commitImportTransaction rolls back instead of committing partial data.
-      try { await fsp.access(path.dirname(job.src)); } catch { abortCopy(); return; }
+      try { await fsp.access(path.dirname(job.src)); } catch { abortCopy('source-unavailable'); return; }
       errors++;
       completedCount++;
       const { eta, speedBps } = getSpeedAndEta();
@@ -710,7 +714,7 @@ async function copyFileJobs(fileJobs, onProgress, hooks = null) {
         if (copied + skipped + errors !== total) {
           log(`[copyFileJobs] accounting drift: copied=${copied} skipped=${skipped} errors=${errors} total=${total}`);
         }
-        resolve({ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, skippedFiles, duration: Date.now() - startTime, wasAborted: isAborted });
+        resolve({ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, skippedFiles, duration: Date.now() - startTime, wasAborted: isAborted, abortReason: isAborted ? abortReason : null });
         return;
       }
       while (active < MAX_CONCURRENT_COPIES && queueIndex < total) {

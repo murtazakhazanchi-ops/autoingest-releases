@@ -278,6 +278,12 @@ function _refreshEventWorkspaceUI() {
  */
 function openEventPickerFromWorkspace(opts = {}) {
   if (importRunning || _sessionRunBusy) return false;
+  // EQI-3.1: a Sort Dump workspace belongs to its event. Changing the event closes it (after the operator
+  // confirms; never mid-move) and opens Event Management from home — assignments are never carried over.
+  if (window.DumpSortMode && DumpSortMode.context) {
+    DumpSortMode.requestEventChange().then(ok => { if (ok) showEventCreatorResume(); });
+    return true;
+  }
   const cur = _captureEventData();
   if (!cur) { showMessage('No active event to change.'); return false; }
   ImportSession.switchTo(cur);   // make sure the current event's workspace exists and is bound
@@ -366,6 +372,10 @@ document.getElementById('ctxChangeEventBtn')?.addEventListener('click', () => op
 // the current session stay editable exactly as before.
 
 EventCreator.setEditGuard((eventPath, folderName) => {
+  if (window.DumpSortMode && DumpSortMode.blocksEdit(eventPath, folderName)) {
+    showMessage('Sort Dump is open for this event, so it can’t be edited or renamed right now. Finish sorting, or close Sort Dump (Change Source), then edit the event.', 12000);
+    return false;
+  }
   const blocked = ImportSession.isParticipating(eventPath) ||
     ImportSession.isParticipatingByName(EventCreator.getSelectedCollection(), folderName);
   if (!blocked) return true;

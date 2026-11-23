@@ -87,4 +87,4 @@ async function finish(eventPath, doc, io = fsp) {
   return final;
 }
 
-module.exports = { write, listPending, finish, newTxId, journalDir, SCHEMA, VERSION };
+module.exports = { write, listPending, finish, newTxId, journalDir, atomicWrite: _atomicWrite, SCHEMA, VERSION };
