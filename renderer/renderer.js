@@ -612,6 +612,7 @@ function prepareDisplayData(files) {
   if (key !== cacheKey) {
     cacheKey = key;
     const sorted   = sortGroup(files);
+    _lastSortSig   = _captureSortSig(sorted);
     cachedPaired   = pairingEnabled ? pairFiles(sorted) : sorted;
     cachedTimeline = groupByTime(cachedPaired);
   }
@@ -6850,13 +6851,27 @@ function syncViewToggles() {
 // Called ONLY on: folder change, sort change, view change, initial load.
 // NEVER called on: scroll, selection toggle, dest change, post-import.
 // ════════════════════════════════════════════════════════════════
-function _resortAfterCaptureTimes() {
-  if (sortKey !== 'date' && !timelineMode) return;
+// EQI-3.2 hotfix: once the capture times of the shown files are read, a date sort / timeline is rebuilt
+// once — only while that same file list is still on screen, and never clearing a status-bar message
+// (the re-render refreshes the selection count, which would otherwise blank e.g. "Sort Dump was closed").
+let _lastSortSig = null;
+function _captureSortSig(sorted) {
+  return sorted.map(f => timelineMode ? `${f.path}|${CaptureTime.groupKey(f)}` : f.path).join('\n');
+}
+function _resortAfterCaptureTimes(files) {
+  if (files !== currentFiles || (sortKey !== 'date' && !timelineMode)) return;
+  const ws = document.getElementById('workspace');
+  if (!ws || !ws.classList.contains('visible')) return;
+  // Labels are already updated in place; rebuild only when the order or timeline grouping changed.
+  if (_lastSortSig !== null && _captureSortSig(sortGroup(files)) === _lastSortSig) return;
   const area = document.getElementById('fileGrid');
+  const status = document.getElementById('statusMessage');
+  const msg = status ? status.textContent : '';
   const top = area ? area.scrollTop : 0;
   resetViewCache();
   renderCurrentView();
   if (area) area.scrollTop = top;
+  if (status && msg && !status.textContent) status.textContent = msg;
 }
 
 function renderFileArea(files) {

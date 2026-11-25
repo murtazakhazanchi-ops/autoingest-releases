@@ -504,6 +504,7 @@ function assertClean(payload, fx, label) {
       'test/eqi32CrossEventMove.test.js', 'test/eqi32CrossEventMoveLive.test.js',
       // EQI-3.2 hotfix: original capture time for the workspace (resolver, renderer module, tests).
       'services/captureTimeResolver.js', 'renderer/captureTime.js', 'test/eqi32CaptureTime.test.js', 'test/eqi32PickerCaptureLive.test.js', 'test/companionQ1UiFreeze.test.js',
+      'test/multiEventImportUiLive.test.js', 'test/multiEventNewEventUiLive.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });

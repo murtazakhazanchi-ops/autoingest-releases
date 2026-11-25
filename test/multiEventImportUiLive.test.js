@@ -180,6 +180,9 @@ async function writeFake(p, bytes = 60 * 1024, fill = 0xab) {
     check(await ev(() => !ImportSession.hasAssignments()), `[${label}] a newly opened source starts with NO assignments (previous source's state cleared)`);
 
     // handles proving "no rescan / no rebuild": identity of the tile map + the load request id
+    // EQI-3.2 hotfix: the baseline is taken once the shown files' capture times are read (that one-time
+    // re-sort is part of loading the source, not a rescan).
+    await window.waitForFunction(() => !window.CaptureTime || CaptureTime.settled, null, { polling: 100, timeout: 60000 });
     await ev(() => { window.__tileMap = tileMap; window.__loadId = fileLoadRequestId; window.__filesRef = currentFiles; });
     const nFiles = await ev(() => currentFiles.length);
 

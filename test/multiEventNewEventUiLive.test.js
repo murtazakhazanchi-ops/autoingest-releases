@@ -110,6 +110,9 @@ async function writeFake(p, bytes = 60 * 1024) { await fsp.mkdir(path.dirname(p)
   await ev((s) => { GroupManager.setSubEvent(1, s); renderGroupPanel(); }, A1);
   check(await ev(() => GroupManager.getGroups().length) === 1, 'Event A prepared: one group with two files');
 
+  // EQI-3.2 hotfix: the baseline is taken once the shown files' capture times are read (that one-time
+  // re-sort is part of loading the source, not a rescan).
+  await window.waitForFunction(() => !window.CaptureTime || CaptureTime.settled, null, { polling: 100, timeout: 60000 });
   await ev(() => { window.__tileMap = tileMap; window.__loadId = fileLoadRequestId; window.__filesRef = currentFiles; });
 
   // ── create-form helpers (real widgets) ──

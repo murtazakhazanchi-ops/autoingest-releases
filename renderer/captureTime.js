@@ -22,6 +22,7 @@ const CaptureTime = (() => {
   let generation = 0;            // bumped per ensure(); a stale view is never re-rendered
   let resortTimer = null;
   let onDone = null;
+  let onDoneFiles = null;       // the list the latest ensure() was for — the caller checks it is still shown
 
   const pad2 = (n) => String(n).padStart(2, '0');
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -142,17 +143,22 @@ const CaptureTime = (() => {
     // files to this same drain). It runs only if no further ensure() came in meanwhile.
     const g = generation;
     clearTimeout(resortTimer);
-    resortTimer = setTimeout(() => { if (g === generation && !queue.length && !running && typeof onDone === 'function') onDone(); }, RESORT_DELAY_MS);
+    resortTimer = setTimeout(() => {
+      resortTimer = null;
+      if (g === generation && !queue.length && !running && typeof onDone === 'function') onDone(onDoneFiles);
+    }, RESORT_DELAY_MS);
   }
 
   /**
    * Reads the capture time of every file in `files` not read yet. `done` runs once when they are all
-   * read and this is still the latest request — the caller re-sorts / re-groups then.
+   * read and this is still the latest request; it receives `files` so the caller can check that list is
+   * still the one on screen before re-sorting / re-grouping.
    * @returns {boolean} true when something is being read
    */
   function ensure(files, done) {
     ++generation;
     onDone = done || null;
+    onDoneFiles = files || null;
     const media = (files || []).filter(f => f && !f.capture && !pending.has(f) && (f.type === 'photo' || f.type === 'raw' || f.type === 'video'));
     for (const f of (files || [])) if (f && !f.capture && f.type !== 'photo' && f.type !== 'raw' && f.type !== 'video') f.capture = { status: 'unavailable', reason: 'not-media' };
     for (const f of media) pending.add(f);
@@ -162,7 +168,12 @@ const CaptureTime = (() => {
     return true;
   }
 
-  return { ensure, label, title, cellHtml, sortMs, compare, groupKey, groupLabel, get busy() { return running || queue.length > 0; } };
+  return {
+    ensure, label, title, cellHtml, sortMs, compare, groupKey, groupLabel,
+    get busy() { return running || queue.length > 0; },
+    /** Nothing being read and no re-sort pending (tests wait for this before comparing renders). */
+    get settled() { return !running && !queue.length && !resortTimer; },
+  };
 })();
 
 window.CaptureTime = CaptureTime;
