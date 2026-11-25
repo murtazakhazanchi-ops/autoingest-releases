@@ -1568,6 +1568,19 @@ async function _commitImportTransaction(event, {
       }
     }
 
+    // EQI-4 Source Cleanup: durable evidence of THIS committed import's verified copies (source identity,
+    // destination, Direct Archive / Local First). Written only after event.json is 'complete'; never fails
+    // the import — without evidence the files simply stay on the source.
+    if (eventJsonPath && result.copiedFiles?.length > 0) {
+      const _src = normalizeImportSource(source);
+      const _ev = await sourceCleanupEvidence.recordBatch(app.getPath('userData'), {
+        batchId: result.auditLogs?.[0]?.id || Date.now().toString(36), importMode: importMode || null,
+        eventPath: eventJsonPath, destination, sourceRoot: _src.path || null, sourceLabel: _src.label, sourceType: _src.type,
+        files: result.copiedFiles,
+      });
+      if (!_ev.ok) log(`[source-cleanup] no cleanup evidence recorded for this import (${_ev.reason})`);
+    }
+
     // Post-import EXIF metadata hook — fire-and-forget; never blocks the response.
     // Context is derived from event.json (originalEventJson) + import results,
     // not from transient renderer UI state (liveComps is intentionally excluded).
@@ -3894,6 +3907,79 @@ async function _dumpSortRenameBlocker(folderPath) {
 // From the Sort Dump workspace: selected Dump photos move to another event of the same collection
 // (its Dump, or one of its final folders) through a two-event journal (services/crossEventMove*.js).
 // Same guards, locks, Local First mirror and background metadata as Sort Dump — never a new import.
+// ── EQI-4 Safe Source Cleanup ────────────────────────────────────────────────
+// Source card / drive / folder → the OS's recoverable Trash, only for files verified against their archive
+// copy (services/sourceCleanupService.js). Never Sort Dump, never an archive or staging path.
+const sourceCleanupEvidence = require('../services/sourceCleanupEvidence');
+const sourceCleanup = require('../services/sourceCleanupService').createSourceCleanupService({
+  userData: app.getPath('userData'),
+  evidence: sourceCleanupEvidence,
+  eligibility: require('../services/sourceCleanupEligibility'),
+  trash: require('../services/trashService'),
+  io: {
+    realpath: (p) => fsp.realpath(p),
+    stat: (p) => fsp.stat(p),
+    sha256: (p) => _sha256File(p),
+    imageHash: (p) => require('../services/captureDateReader').readImageDataHash(p),
+    fingerprint: (p) => sourceCleanupEvidence.fingerprint(p),
+  },
+  roots: () => ({ nasRoot: settings.getNasRoot(), mainArchiveRoot: settings.getMainArchiveRoot(), stagingRoot: settings.getLocalStagingRoot() }),
+  resolveArchiveEvent: (localEventPath, nasRoot) => archiveSyncService.resolveArchiveEventPath(localEventPath, nasRoot),
+  readManifest: (localEventPath) => localSyncManifest.readManifest(localEventPath),
+  relKey: (eventPath, file) => require('../services/eventMetadataIntent').fileRelKey(eventPath, file),
+  busyReason: () => {
+    if (_importTxActive > 0 || companionService.isImportRunning()) return 'An import is running — clean up when it has finished.';
+    if (exifService.hasActiveBatch()) return 'Metadata is still being written to imported photos — clean up when it has finished.';
+    return null;
+  },
+  listSource: (root) => _listCleanupSource(root),
+  log,
+  testHooks: process.env.AI_EQI4_TEST_CRASH_AFTER ? { crashAfterTrash: (n) => { if (n >= Number(process.env.AI_EQI4_TEST_CRASH_AFTER)) process.kill(process.pid, 'SIGKILL'); } } : null,
+});
+
+function _sha256File(p) {
+  return new Promise((resolve, reject) => {
+    const h = require('crypto').createHash('sha256');
+    fs.createReadStream(p).on('data', (c) => h.update(c)).on('end', () => resolve(h.digest('hex'))).on('error', reject);
+  });
+}
+
+/** Every media file and XMP sidecar under a cleanup source (hidden folders and the volume's Trash skipped). */
+async function _listCleanupSource(root) {
+  const config = require('../config/app.config');
+  const exts = new Set([...config.PHOTO_EXTENSIONS, ...config.RAW_EXTENSIONS, ...config.VIDEO_EXTENSIONS, '.xmp'].map(e => e.toLowerCase()));
+  const out = [];
+  const walk = async (dir, depth) => {
+    if (depth > 12 || out.length > 100000) return;
+    let entries = [];
+    try { entries = await fsp.readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.name.startsWith('.')) continue;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) await walk(p, depth + 1);
+      else if (e.isFile() && exts.has(path.extname(e.name).toLowerCase())) {
+        try { const st = await fsp.stat(p); out.push({ path: p, size: st.size }); } catch { /* gone */ }
+      }
+    }
+  };
+  await walk(root, 0);
+  return out;
+}
+
+ipcMain.handle('sourceCleanup:review', async (_e, { sourceRoot, sourceLabel } = {}) => {
+  const w = windowRegistry.getProgressTarget();
+  return sourceCleanup.review(sourceRoot, { sourceLabel, onProgress: (p) => { if (w && !w.isDestroyed()) w.webContents.send('sourceCleanup:progress', { phase: 'review', ...p }); } });
+});
+ipcMain.handle('sourceCleanup:run', async (_e, { reviewId } = {}) => {
+  const w = windowRegistry.getProgressTarget();
+  return sourceCleanup.run(reviewId, { onProgress: (p) => { if (w && !w.isDestroyed()) w.webContents.send('sourceCleanup:progress', { phase: 'run', ...p }); } });
+});
+ipcMain.handle('sourceCleanup:history', async () => sourceCleanup.history(20));
+app.whenReady().then(() => {
+  sourceCleanup.recover().catch(err => log(`[source-cleanup] recovery failed: ${err.message}`));
+  sourceCleanupEvidence.prune(app.getPath('userData')).catch(() => {});
+});
+
 const crossEventMove = require('../services/crossEventMoveService').createCrossEventMoveService({
   updateEventJsonAtomic, intent: eventMetadataIntent, roots: _dumpSortRoots,
   pendingSyncFor: _dumpSortPendingSync, activeMetadataFor: _dumpSortActiveMetadata,
@@ -4509,108 +4595,10 @@ ipcMain.handle('audit:verifyEvent', async (_event, eventPath) => {
 });
 
 // ── Window controls ──────────────────────────────────────────────────────────
-ipcMain.handle('files:deleteFromSource', async (_event, files, sourceRoot) => {
-  if (!Array.isArray(files) || !sourceRoot || typeof sourceRoot !== 'string') {
-    return { ok: false, error: 'Invalid arguments' };
-  }
-
-  // Resolve symlinks on the root once — fail the whole batch if the root is gone
-  let realRoot;
-  try {
-    realRoot = await fsp.realpath(sourceRoot);
-  } catch {
-    return { ok: false, error: 'Cannot resolve source root — drive may have been ejected' };
-  }
-
-  const results = [];
-  for (const f of files) {
-    if (!f || typeof f !== 'object') {
-      results.push({ src: String(f), deleted: false, error: 'Invalid entry' });
-      continue;
-    }
-    const { src, dest, size, copyVerified } = f;
-    if (!src || typeof src !== 'string') {
-      results.push({ src: String(src), deleted: false, error: 'Invalid src path' });
-      continue;
-    }
-
-    // ── Resolve symlinks on the source path ──────────────────────────────────
-    let realSrc;
-    try {
-      realSrc = await fsp.realpath(src);
-    } catch {
-      results.push({ src, deleted: false, error: 'Source file not found' });
-      continue;
-    }
-
-    // ── Containment check (after symlink resolution) ─────────────────────────
-    if (process.env.DEBUG_SOURCE_CLEANUP) {
-      console.log('[CSQ DEBUG] containment:', {
-        src, dest, realSrc, realRoot,
-        separator: JSON.stringify(path.sep),
-        relative: path.relative(realRoot, realSrc),
-        passes: PathUtils.isPathUnderRoot(realSrc, realRoot),
-      });
-    }
-    if (!PathUtils.isPathUnderRoot(realSrc, realRoot)) {
-      results.push({ src, deleted: false, error: 'Path outside source root' });
-      continue;
-    }
-
-    // ── Must be a regular file, not a directory or device ────────────────────
-    let srcStat;
-    try {
-      srcStat = await fsp.stat(realSrc);
-    } catch {
-      results.push({ src, deleted: false, error: 'Cannot stat source file' });
-      continue;
-    }
-    if (!srcStat.isFile()) {
-      results.push({ src, deleted: false, error: 'Not a regular file' });
-      continue;
-    }
-
-    // ── Source file must be unchanged since copy ─────────────────────────────
-    if (typeof size === 'number' && srcStat.size !== size) {
-      results.push({ src, deleted: false, error: `Source file changed after import (expected ${size}, got ${srcStat.size})` });
-      continue;
-    }
-
-    // ── Destination revalidation ──────────────────────────────────────────────
-    if (!dest || typeof dest !== 'string') {
-      results.push({ src, deleted: false, error: 'No destination path provided' });
-      continue;
-    }
-    let destStat;
-    try {
-      destStat = await fsp.stat(dest);
-    } catch {
-      results.push({ src, deleted: false, error: 'Destination file not found — cannot confirm import' });
-      continue;
-    }
-    // copyVerified entries may have a larger destination than the original source size
-    // because metadata tagging (exiftool) embeds EXIF after copy verification.
-    // Only block on destination size mismatch for entries without copy-time verification.
-    if (!copyVerified && typeof size === 'number' && destStat.size !== size) {
-      results.push({ src, deleted: false, error: `Destination size mismatch (expected ${size}, got ${destStat.size})` });
-      continue;
-    }
-    if (copyVerified && typeof size === 'number' && destStat.size !== size) {
-      log(`[sourceCleanup] ${path.basename(src)}: dest size changed after copy (${size} → ${destStat.size}), likely metadata update`);
-    }
-
-    // ── All checks passed — delete ────────────────────────────────────────────
-    try {
-      await fsp.unlink(realSrc);
-      log(`[sourceCleanup] Deleted: ${realSrc} | dest: ${dest} | size: ${size ?? 'unknown'}`);
-      results.push({ src, deleted: true });
-    } catch (err) {
-      results.push({ src, deleted: false, error: err.message });
-    }
-  }
-
-  return { ok: true, results };
-});
+// EQI-4: the pre-EQI-4 source cleanup deleted files permanently (unlink) from an in-memory list. Source
+// files are now only ever moved to the recoverable Trash after verification (sourceCleanup:review/run);
+// this channel refuses so no older caller can delete a source file.
+ipcMain.handle('files:deleteFromSource', async () => ({ ok: false, error: 'Permanent deletion of source files is not supported. Use Clean Up Imported Source Files (moves verified files to the Trash).' }));
 
 // ── Media preview URL (read-only) ────────────────────────────────────────────
 // Returns a safe file:// URL for JPEG/PNG/MP4/MOV preview.

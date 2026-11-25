@@ -451,6 +451,11 @@ contextBridge.exposeInMainWorld('api', {
   crossEventPlan:              (args) => ipcRenderer.invoke('crossEvent:plan', args),
   crossEventRun:               (args) => ipcRenderer.invoke('crossEvent:run', args),
   onCrossEventProgress:        (cb) => _register('crossEvent:progress', (_e, p) => cb(p)),
+  // EQI-4 Safe Source Cleanup: review (read-only), run (verified files → recoverable Trash), audit history.
+  sourceCleanupReview:         (args) => ipcRenderer.invoke('sourceCleanup:review', args),
+  sourceCleanupRun:            (args) => ipcRenderer.invoke('sourceCleanup:run', args),
+  sourceCleanupHistory:        () => ipcRenderer.invoke('sourceCleanup:history'),
+  onSourceCleanupProgress:     (cb) => _register('sourceCleanup:progress', (_e, p) => cb(p)),
 
   // ── Team Live (advisory only — never writes authoritative files) ──
   reportTeamActivity: (data) => ipcRenderer.invoke('team:reportActivity', data),
