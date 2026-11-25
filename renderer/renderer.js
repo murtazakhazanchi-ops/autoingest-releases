@@ -590,11 +590,12 @@ function pairFiles(files) {
   return result;
 }
 
+// EQI-3.2 hotfix: grouped by the ORIGINAL CAPTURE time (renderer/captureTime.js), never the
+// filesystem modification time; files without one get their own "Capture date unavailable" group.
 function groupByTime(files) {
   const groups = new Map();
   for (const file of files) {
-    const date = file.modifiedAt ? new Date(file.modifiedAt) : new Date(0);
-    const key = date.toDateString() + '-' + date.getHours();
+    const key = CaptureTime.groupKey(file);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(file);
   }
@@ -6449,11 +6450,10 @@ function sortGroup(files) {
   copy.sort((a, b) => {
     let cmp = 0;
     if (sortKey === 'date') {
-      cmp = _validTimeOrEpoch(a.modifiedAt) - _validTimeOrEpoch(b.modifiedAt);
-      // Deterministic tie-break on equal/missing timestamps — otherwise relies solely on
-      // Array.sort's stability (guaranteed by spec, but an explicit tie-break keeps the
-      // order deterministic from the comparator itself, not an implementation detail).
-      if (cmp === 0) cmp = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      // EQI-3.2 hotfix: capture chronology (EXIF DateTimeOriginal …), never the filesystem
+      // modification time. Files without a capture date sort after the dated ones in either
+      // direction; ties break on the name. The comparator applies the direction itself.
+      return CaptureTime.compare(a, b, sortDir);
     }
     else if (sortKey === 'size') cmp = (a.size ?? 0) - (b.size ?? 0);
     else                         cmp = a.name.localeCompare(b.name, undefined, { sensitivity:'base' });
@@ -6850,6 +6850,15 @@ function syncViewToggles() {
 // Called ONLY on: folder change, sort change, view change, initial load.
 // NEVER called on: scroll, selection toggle, dest change, post-import.
 // ════════════════════════════════════════════════════════════════
+function _resortAfterCaptureTimes() {
+  if (sortKey !== 'date' && !timelineMode) return;
+  const area = document.getElementById('fileGrid');
+  const top = area ? area.scrollTop : 0;
+  resetViewCache();
+  renderCurrentView();
+  if (area) area.scrollTop = top;
+}
+
 function renderFileArea(files) {
   if (!currentFiles) {
     console.error('renderFileArea called without files — aborting');
@@ -6865,6 +6874,10 @@ function renderFileArea(files) {
   // older value will see the mismatch after its await and silently exit.
   renderSessionId++;
   const currentSession = renderSessionId;
+
+  // EQI-3.2 hotfix: read the original capture times in the background (labels update in place);
+  // once all are read, a date sort or timeline is rebuilt once, keeping the scroll position.
+  CaptureTime.ensure(currentFiles, _resortAfterCaptureTimes);
 
   const area = document.getElementById('fileGrid');
   area.onscroll = null;
@@ -7080,7 +7093,7 @@ function buildIconTilesHtml(files, enablePairing = false) {
               <span class="file-ext-badge ${badgeCls}">${extUp}</span>
               <span class="file-size">${formatSize(file.size)}</span>
             </div>
-            <div class="file-date">${formatDate(file.modifiedAt)}</div>
+            ${_captureDateHtml(file, 'div', 'file-date')}
           </div>
           <div class="file-meta-right">${evBadge}${grpBadge}</div>
         </div>
@@ -7117,9 +7130,15 @@ function buildListRowsHtml(files, enablePairing = false) {
       <td class="lt-name"><span class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>${dupLabel}${evLabel}${grpLabel}</td>
       <td class="lt-type"><span class="file-ext-badge ${badgeCls}">${extUp}</span></td>
       <td class="lt-size">${formatSize(file.size)}</td>
-      <td class="lt-date">${formatDate(file.modifiedAt)}</td>
+      ${_captureDateHtml(file, 'td', 'lt-date')}
     </tr>`;
   }).join('');
+}
+
+/** EQI-3.2 hotfix: the tile/list date cell — the original capture time, patched in place once read. */
+function _captureDateHtml(file, tag, cls) {
+  const c = CaptureTime.cellHtml(file, escapeHtml);
+  return `<${tag} class="${cls}${c.cls}" data-capture-for="${escapeHtml(file.path)}" title="${c.title}">${c.text}</${tag}>`;
 }
 
 /** Flat list of all files — no section headers. Used when pairingEnabled. */
@@ -7143,7 +7162,7 @@ function buildTimelineHtml(groups) {
     const lastDash = key.lastIndexOf('-');
     const datePart = key.slice(0, lastDash);
     const hour     = parseInt(key.slice(lastDash + 1), 10);
-    const label    = `${datePart}  ·  ${String(hour).padStart(2, '0')}:00`;
+    const label    = CaptureTime.groupLabel(key) || `${datePart}  ·  ${String(hour).padStart(2, '0')}:00`;
     const tilesHtml = viewMode === 'list'
       ? buildListRowsHtml(files, pairingEnabled)
       : buildIconTilesHtml(files, pairingEnabled);
@@ -15007,8 +15026,9 @@ function renderGroupPanel() {
           const name   = p.split(/[/\\]/).pop();
           const dotIdx = name.lastIndexOf('.');
           const ext    = dotIdx >= 0 ? name.slice(dotIdx + 1).toUpperCase() : '';
-          const time   = meta?.modifiedAt
-            ? new Date(meta.modifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          // EQI-3.2 hotfix: the capture time (never the filesystem time); blank until read.
+          const time   = meta && meta.capture && meta.capture.status === 'dated'
+            ? CaptureTime.label(meta).split(', ').pop()
             : '';
           return `<div class="gc-file-row">
             <span class="gc-file-name" title="${_esc(p)}">${_esc(name)}</span>

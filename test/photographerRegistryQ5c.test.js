@@ -419,7 +419,9 @@ function assertClean(payload, fx, label) {
     // EQI-3.1: the stop reason on abortCopy, background-metadata state/resume/events, the Dump-source check.
     'abortCopy', 'dumpSortMetadataState', 'dumpSortResumeMetadata', 'onDumpSortMetadata', 'dumpSortSourceOwner',
     // EQI-3.2 Move Selection to Another Event: destinations, plan, run, progress.
-    'crossEventDestinations', 'crossEventPlan', 'crossEventRun', 'onCrossEventProgress'];
+    'crossEventDestinations', 'crossEventPlan', 'crossEventRun', 'onCrossEventProgress',
+    // EQI-3.2 hotfix: original capture times for the workspace grid.
+    'readCaptureTimes'];
   await t('main.js / preload.js change since Q5b is additions only, confined to the Q5c block', async () => {
     let base;
     try { base = execFileSync('git', ['rev-parse', '--verify', 'aa58eb1^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { console.log('    (Q5b commit not available — skipped)'); return; }
@@ -500,6 +502,8 @@ function assertClean(payload, fx, label) {
       // EQI-3.2 Move Selection to Another Event: the two-event planner, journaled transaction, service, UI, tests.
       'services/crossEventMovePlanner.js', 'services/crossEventMoveEngine.js', 'services/crossEventMoveService.js', 'renderer/crossEventMove.js',
       'test/eqi32CrossEventMove.test.js', 'test/eqi32CrossEventMoveLive.test.js',
+      // EQI-3.2 hotfix: original capture time for the workspace (resolver, renderer module, tests).
+      'services/captureTimeResolver.js', 'renderer/captureTime.js', 'test/eqi32CaptureTime.test.js', 'test/eqi32PickerCaptureLive.test.js', 'test/companionQ1UiFreeze.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });

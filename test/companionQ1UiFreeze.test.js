@@ -129,9 +129,56 @@ const EQI32_RENDERER_ADDED = [
   '+  // destination and the Sort Dump workspace returns on its own (source) event; nothing else changes.',
   '+  if (window.CrossEventMove && CrossEventMove.takeCreatorResult()) return;',
 ];
-const EQI31_RENDERER = new Set([...EQI31_RENDERER_REMOVED, ...EQI31_RENDERER_ADDED, ...EQI32_RENDERER_ADDED]);
+// EQI-3.2 hotfix: the workspace shows and sorts by the ORIGINAL CAPTURE time (renderer/captureTime.js)
+// instead of the filesystem modification time — the date cell, date sort, timeline key/label, group panel.
+const EQI32H_RENDERER = [
+  "+// EQI-3.2 hotfix: grouped by the ORIGINAL CAPTURE time (renderer/captureTime.js), never the",
+  "+// filesystem modification time; files without one get their own \"Capture date unavailable\" group.",
+  "-    const date = file.modifiedAt ? new Date(file.modifiedAt) : new Date(0);",
+  "-    const key = date.toDateString() + '-' + date.getHours();",
+  "+    const key = CaptureTime.groupKey(file);",
+  "-      cmp = _validTimeOrEpoch(a.modifiedAt) - _validTimeOrEpoch(b.modifiedAt);",
+  "-      // Deterministic tie-break on equal/missing timestamps — otherwise relies solely on",
+  "-      // Array.sort's stability (guaranteed by spec, but an explicit tie-break keeps the",
+  "-      // order deterministic from the comparator itself, not an implementation detail).",
+  "-      if (cmp === 0) cmp = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });",
+  "+      // EQI-3.2 hotfix: capture chronology (EXIF DateTimeOriginal …), never the filesystem",
+  "+      // modification time. Files without a capture date sort after the dated ones in either",
+  "+      // direction; ties break on the name. The comparator applies the direction itself.",
+  "+      return CaptureTime.compare(a, b, sortDir);",
+  "+function _resortAfterCaptureTimes() {",
+  "+  if (sortKey !== 'date' && !timelineMode) return;",
+  "+  const area = document.getElementById('fileGrid');",
+  "+  const top = area ? area.scrollTop : 0;",
+  "+  resetViewCache();",
+  "+  renderCurrentView();",
+  "+  if (area) area.scrollTop = top;",
+  "+}",
+  "+  // EQI-3.2 hotfix: read the original capture times in the background (labels update in place);",
+  "+  // once all are read, a date sort or timeline is rebuilt once, keeping the scroll position.",
+  "+  CaptureTime.ensure(currentFiles, _resortAfterCaptureTimes);",
+  "-            <div class=\"file-date\">${formatDate(file.modifiedAt)}</div>",
+  "+            ${_captureDateHtml(file, 'div', 'file-date')}",
+  "-      <td class=\"lt-date\">${formatDate(file.modifiedAt)}</td>",
+  "+      ${_captureDateHtml(file, 'td', 'lt-date')}",
+  "+/** EQI-3.2 hotfix: the tile/list date cell — the original capture time, patched in place once read. */",
+  "+function _captureDateHtml(file, tag, cls) {",
+  "+  const c = CaptureTime.cellHtml(file, escapeHtml);",
+  "+  return `<${tag} class=\"${cls}${c.cls}\" data-capture-for=\"${escapeHtml(file.path)}\" title=\"${c.title}\">${c.text}</${tag}>`;",
+  "+}",
+  "-    const label    = `${datePart}  ·  ${String(hour).padStart(2, '0')}:00`;",
+  "+    const label    = CaptureTime.groupLabel(key) || `${datePart}  ·  ${String(hour).padStart(2, '0')}:00`;",
+  "-          const time   = meta?.modifiedAt",
+  "-            ? new Date(meta.modifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })",
+  "+          // EQI-3.2 hotfix: the capture time (never the filesystem time); blank until read.",
+  "+          const time   = meta && meta.capture && meta.capture.status === 'dated'",
+  "+            ? CaptureTime.label(meta).split(', ').pop()",
+  "",
+];
+const EQI31_RENDERER = new Set([...EQI31_RENDERER_REMOVED, ...EQI31_RENDERER_ADDED, ...EQI32_RENDERER_ADDED, ...EQI32H_RENDERER]);
 const EQI32_SCRIPT = '<script src="crossEventMove.js" defer></script>';
-const EQI32_PRELOAD_CHANNELS = ['crossEvent:destinations', 'crossEvent:plan', 'crossEvent:run', 'crossEvent:progress'];
+const EQI32H_SCRIPT = '<script src="captureTime.js" defer></script>';
+const EQI32_PRELOAD_CHANNELS = ['crossEvent:destinations', 'crossEvent:plan', 'crossEvent:run', 'crossEvent:progress', 'media:captureTimes'];
 // EQI-3.1: copy:abort carries why the copy stopped (user, source disconnected) — same channel, one argument.
 const EQI31_PRELOAD_REMOVED = ["-  abortCopy:  () => ipcRenderer.send('copy:abort'),"];
 const EQI31_PRELOAD_CHANNELS = ['copy:abort'];
@@ -147,7 +194,7 @@ t('no existing renderer file changed except the approved handoff listener (main 
   // EQI-3.1: the runner treats "Import stopped/refused" like a cancel and exports that check.
   const EQI31_MAIN_WINDOW = ['renderer/importSessionRunner.js'];
   // EQI-3.2: the Move Selection to Another Event module of the Sort Dump workspace.
-  const EQI32_MAIN_WINDOW = ['renderer/crossEventMove.js'];
+  const EQI32_MAIN_WINDOW = ['renderer/crossEventMove.js', 'renderer/captureTime.js'];
   const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE, Q5E_MODULE, EQI1_MODULE, EQI1_ROUTER, EQI1_SESSION_UI, ...EQI21_WINDOW, ...EQI3_MAIN_WINDOW, ...EQI31_MAIN_WINDOW, ...EQI32_MAIN_WINDOW].includes(f));
   assert.deepEqual(offending, []);
 });
@@ -199,11 +246,11 @@ t('index.html (Q5c): additions only, confined to the Photographer Registry tab, 
   const selectors = added.filter(l => /^\s*[.#@][^{]*\{/.test(l)).map(l => l.trim());
   // EQI-3 Sort Dump: namespaced styles (.ec-evl-dump-*, .dump-sort-*, .dsb-/.dsr-/.dsp-*, #dumpSortOverlay, the tile mark);
   // EQI-3.1: the title-bar background-metadata chip (#dsMetaChip); EQI-3.2: the transfer dialog (.xem-*).
-  const eqi3 = (part) => /^\s*(\.ec-evl-dump-|\.dump-sort-|\.dsr-|\.dsp-|#dumpSortOverlay\b|\.file-tile\.dump-refused\b|\.dump-refused-label\b|#dsMetaChip\b|\.xem-)/.test(part);
+  const eqi3 = (part) => /^\s*(\.ec-evl-dump-|\.dump-sort-|\.dsr-|\.dsp-|#dumpSortOverlay\b|\.file-tile\.dump-refused\b|\.dump-refused-label\b|#dsMetaChip\b|\.xem-|\.(file|lt)-date\.capture-)/.test(part);
   const scoped = (sel) => /^@media \(max-width: 860px\)/.test(sel) || /^@media \(prefers-reduced-motion: reduce\) \{ \.dsp-fill/.test(sel) || sel.split('{')[0].split(',').every(part => eqi3(part) || /^\s*(\.pr-|#msTabPhotographers\b|#metadataSyncModal \.ms-tabs?\b)/.test(part));
   assert.deepEqual(selectors.filter(sel => !scoped(sel)), [], 'every new rule is scoped to the Q5c panel or the modal tab row');
   const scripts = added.filter(l => /<script\b/.test(l));
-  assert.deepEqual(scripts.map(l => l.trim()).sort(), ['<script src="photographerRegistryUI.js" defer></script>', '<script src="photographerRegistryActions.js" defer></script>', '<script src="photographerRegistryProfile.js" defer></script>', EQI1_SCRIPT, EQI3_SCRIPT, EQI32_SCRIPT].sort(), 'only the dedicated modules are loaded');
+  assert.deepEqual(scripts.map(l => l.trim()).sort(), ['<script src="photographerRegistryUI.js" defer></script>', '<script src="photographerRegistryActions.js" defer></script>', '<script src="photographerRegistryProfile.js" defer></script>', EQI1_SCRIPT, EQI3_SCRIPT, EQI32_SCRIPT, EQI32H_SCRIPT].sort(), 'only the dedicated modules are loaded');
   const tabButtons = added.filter(l => /class="ms-tab"/.test(l));
   assert.equal(tabButtons.length, 1, 'exactly one new Metadata Management tab button');
   assert.ok(/data-ms-tab="msTabPhotographers">Photographer Registry<\/button>/.test(tabButtons[0]));

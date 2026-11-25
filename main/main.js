@@ -6182,6 +6182,18 @@ ipcMain.handle('qmz:resolveCaptureDates', async (_e, { files }) => {
   return qmzService.resolveCaptureDates(files);
 });
 
+// EQI-3.2 hotfix: the Import Workspace's (and Sort Dump's) original capture time — EXIF/XMP/IPTC/
+// QuickTime, never the filesystem modification time. Read-only; batches are bounded and read
+// through the shared ExifTool pool in the background (services/captureTimeResolver.js).
+const CAPTURE_TIMES_MAX_BATCH = 500;
+ipcMain.handle('media:captureTimes', async (_e, files) => {
+  if (!Array.isArray(files)) return {};
+  const list = files.slice(0, CAPTURE_TIMES_MAX_BATCH)
+    .filter(f => f && typeof f.path === 'string' && f.path && ['photo', 'raw', 'video'].includes(f.type))
+    .map(f => ({ path: f.path, type: f.type, size: Number(f.size) || 0, modifiedAt: typeof f.modifiedAt === 'string' ? f.modifiedAt : '' }));
+  return require('../services/captureTimeResolver').readCaptureTimes(list);
+});
+
 // Stage 5 fix: `suffix` was previously dropped by this handler entirely — any caller
 // attempting to create a suffixed sequence (e.g. "05aMZ") through this specific IPC channel
 // silently got the wrong, unsuffixed folder ("05MZ") with no error. The manual "Add

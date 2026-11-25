@@ -404,6 +404,8 @@ contextBridge.exposeInMainWorld('api', {
   // Bug 2 perf fix, round 2: separate from qmzScanRoot — resolves real EXIF
   // capture dates for an already-scanned file list in the background.
   qmzResolveCaptureDates: (params) => ipcRenderer.invoke('qmz:resolveCaptureDates', params),
+  // EQI-3.2 hotfix: original capture times for the Import Workspace / Sort Dump grid (never mtime).
+  readCaptureTimes:     (files) => ipcRenderer.invoke('media:captureTimes', files),
   qmzCreateSequence:    (params) => ipcRenderer.invoke('qmz:createSequence',    params),
   qmzBulkCreate:        (params) => ipcRenderer.invoke('qmz:bulkCreate',        params),
   qmzEditSequence:      (params) => ipcRenderer.invoke('qmz:editSequence',      params),
