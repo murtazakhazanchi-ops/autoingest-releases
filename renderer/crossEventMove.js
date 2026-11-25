@@ -64,7 +64,7 @@ const CrossEventMove = (() => {
     _renderChoose(sets, note);
   }
 
-  function _renderChoose(sets, note) {
+  function _renderChoose(sets, note, refocus = false) {
     const ctx = DumpSortMode.context;
     const o = ui().ensureOverlay();
     const ev = (_events && _events.events) || [];
@@ -73,9 +73,12 @@ const CrossEventMove = (() => {
     if (_state.kind === 'component' && dest && comps.length === 1) _state.component = comps[0].folderName;
     if (_state.component && !comps.some(c => c.folderName === _state.component)) _state.component = null;
     const sourceName = (_events && _events.source && _events.source.folderName) || ctx.eventName;
+    const oldList = document.getElementById('xemList');
+    const listScroll = oldList ? oldList.scrollTop : 0;        // kept across this re-render (selection, kind)
     o.innerHTML = `<div class="dupWarningModal dump-sort-modal xem-modal">
       <h3 id="dumpSortTitle">Move Photos to Another Event</h3>
-      <p class="dup-subtitle">From <strong>${esc(sourceName)}</strong>${_events && _events.collection ? ` · ${esc(_events.collection)}` : ''}. This Sort Dump stays open; the current event does not change.</p>
+      <p class="xem-source">From <strong>${esc(sourceName)}</strong>${_events && _events.collection ? ` · ${esc(_events.collection)}` : ''} — Sort Dump stays open; the current event does not change.</p>
+      <div class="xem-body">
       ${note ? `<p class="xem-note-ok" role="status">${esc(note)}</p>` : ''}
       ${_events && !_events.ok ? `<div class="dsr-block" role="alert"><p>${esc(_events.reason || 'The events of this collection could not be read.')}</p></div>` : ''}
       <fieldset class="xem-field"><legend>Photos</legend>
@@ -88,31 +91,53 @@ const CrossEventMove = (() => {
           <button type="button" class="dup-btn dup-btn-cancel xem-create" id="xemCreate">Create New Event…</button>
         </div>
         <div class="xem-list" id="xemList" role="listbox" aria-label="Destination events"></div>
+        ${dest ? `<p class="xem-chosen" id="xemChosen" role="status">Destination: <strong>${esc(dest.folderName)}</strong> · ${plural(comps.length, 'component')}</p>`
+          : '<p class="xem-chosen none" id="xemChosen" role="status">No destination event chosen yet.</p>'}
       </div>
       <fieldset class="xem-field" ${dest ? '' : 'disabled'}><legend>Put them in</legend>
-        <label class="xem-radio"><input type="radio" name="xemKind" value="dump" ${_state.kind === 'dump' ? 'checked' : ''}> ${dest ? esc(dest.folderName) : 'The destination event'}'s <strong>Dump</strong> — sort them there later with Sort Dump</label>
-        <label class="xem-radio"><input type="radio" name="xemKind" value="component" ${_state.kind === 'component' ? 'checked' : ''}> A final component folder of that event</label>
-        <select id="xemComponent" class="xem-select" aria-label="Destination component" ${_state.kind === 'component' && dest ? '' : 'disabled'}>
+        <label class="xem-radio"><input type="radio" name="xemKind" value="dump" ${_state.kind === 'dump' ? 'checked' : ''}><span>The destination event's <strong>Dump</strong> — sort them there later with Sort Dump</span></label>
+        <label class="xem-radio"><input type="radio" name="xemKind" value="component" ${_state.kind === 'component' ? 'checked' : ''}><span>A final component folder of the destination event</span></label>
+        ${_state.kind === 'component' && dest ? `<select id="xemComponent" class="xem-select" aria-label="Destination component">
           <option value="">Choose a component…</option>
           ${comps.map(c => `<option value="${esc(c.folderName)}" ${c.folderName === _state.component ? 'selected' : ''}>${esc(c.label)}${c.qmz ? ' (QMZ — no PC numbers)' : ''}</option>`).join('')}
-        </select>
+        </select>` : ''}
       </fieldset>
+      </div>
       <div class="dup-actions">
         <button type="button" class="dup-btn dup-btn-primary" id="xemReview" ${_canReview(dest) ? '' : 'disabled'}>Review Move</button>
         <button type="button" class="dup-btn dup-btn-cancel" id="xemCancel">Cancel</button>
       </div></div>`;
     o.classList.add('visible');
     _renderList();
+    const list = o.querySelector('#xemList');
+    list.scrollTop = listScroll;
     const search = o.querySelector('#xemSearch');
-    search.addEventListener('input', () => { _state.query = search.value; _renderList(); });
+    search.addEventListener('input', () => { _state.query = search.value; list.scrollTop = 0; _renderList(); });
+    search.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown') { e.preventDefault(); _rows()[0]?.focus(); } });
+    list.addEventListener('keydown', _listKeys);
     o.querySelectorAll('input[name="xemPhotos"]').forEach(r => r.addEventListener('change', () => { _state.photos = r.value; }));
-    o.querySelectorAll('input[name="xemKind"]').forEach(r => r.addEventListener('change', () => { _state.kind = r.value; _renderChoose(sets); }));
+    o.querySelectorAll('input[name="xemKind"]').forEach(r => r.addEventListener('change', () => { _state.kind = r.value; _renderChoose(sets, null, true); o.querySelector(`input[name="xemKind"][value="${r.value}"]`)?.focus(); }));
     o.querySelector('#xemComponent')?.addEventListener('change', (e) => { _state.component = e.target.value || null; o.querySelector('#xemReview').disabled = !_canReview(dest); });
     o.querySelector('#xemCreate').addEventListener('click', () => _createEvent());
     o.querySelector('#xemCancel').addEventListener('click', () => _dismiss());
     o.querySelector('#xemReview').addEventListener('click', () => _review(sets));
     _trapEscape();
-    search.focus();
+    if (!refocus) search.focus();
+  }
+
+  const _rows = () => [...document.querySelectorAll('#xemList .xem-event')];
+  /** Arrow keys / Home / End move between rows; Enter or Space (the row is a button) chooses one. */
+  function _listKeys(e) {
+    const rows = _rows();
+    const i = rows.indexOf(document.activeElement);
+    if (i < 0) return;
+    const to = e.key === 'ArrowDown' ? Math.min(i + 1, rows.length - 1) : e.key === 'ArrowUp' ? i - 1
+      : e.key === 'Home' ? 0 : e.key === 'End' ? rows.length - 1 : null;
+    if (to === null) return;
+    e.preventDefault();
+    if (to < 0) { document.getElementById('xemSearch')?.focus(); return; }
+    rows[to].focus();
+    rows[to].scrollIntoView({ block: 'nearest' });
   }
 
   function _canReview(dest) {
@@ -126,15 +151,24 @@ const CrossEventMove = (() => {
     const q = (_state.query || '').trim().toLowerCase();
     const ev = ((_events && _events.events) || []).filter(e => !q || `${e.folderName} ${e.eventName} ${e.hijriDate}`.toLowerCase().includes(q));
     if (!ev.length) { list.innerHTML = `<p class="xem-empty">${q ? 'No event matches.' : 'This collection has no other event yet. Create one with Create New Event.'}</p>`; return; }
-    list.innerHTML = ev.map(e => `<button type="button" role="option" class="xem-event${norm(e.eventPath) === norm(_state.dest) ? ' selected' : ''}" aria-selected="${norm(e.eventPath) === norm(_state.dest)}" data-path="${esc(e.eventPath)}" ${e.unavailable ? 'aria-disabled="true"' : ''}>
-        <span class="xem-event-name">${esc(e.folderName)}</span>
-        <span class="xem-event-meta">${e.unavailable ? `Unavailable — ${esc(e.unavailable)}` : `${plural(e.components.length, 'component')}${e.components.length ? `: ${esc(e.components.map(c => c.folderName).join(', '))}` : ''}`}</span>
-      </button>`).join('');
+    // Each row carries its own event path; a click reads it from the row itself (never a list index),
+    // so filtering or scrolling can never make a click choose a different event than the one shown.
+    list.innerHTML = ev.map(e => {
+      const sel = norm(e.eventPath) === norm(_state.dest);
+      const meta = e.unavailable ? `Unavailable — ${e.unavailable}`
+        : `${plural(e.components.length, 'component')}${e.components.length ? ` · ${e.components.map(c => c.folderName).join(', ')}` : ''}`;
+      return `<button type="button" role="option" class="xem-event${sel ? ' selected' : ''}" aria-selected="${sel}" data-path="${esc(e.eventPath)}" title="${esc(e.folderName)}
+${esc(meta)}" aria-label="${esc(e.folderName)}. ${esc(meta)}" ${e.unavailable ? 'aria-disabled="true"' : ''}>
+        <span class="xem-event-mark" aria-hidden="true"></span>
+        <span class="xem-event-text"><span class="xem-event-name">${esc(e.folderName)}</span>
+        <span class="xem-event-meta">${esc(meta)}</span></span>
+      </button>`;
+    }).join('');
     list.querySelectorAll('.xem-event').forEach(b => b.addEventListener('click', () => {
       if (b.getAttribute('aria-disabled') === 'true') return;
       _state.dest = b.dataset.path;
-      _renderChoose(_photoSets());
-      document.querySelector(`.xem-event[data-path="${CSS.escape(_state.dest)}"]`)?.focus();
+      _renderChoose(_photoSets(), null, true);
+      document.querySelector(`.xem-event[data-path="${CSS.escape(_state.dest)}"]`)?.focus({ preventScroll: true });
     }));
   }
 
@@ -215,11 +249,14 @@ const CrossEventMove = (() => {
     const planned = await window.api.crossEventPlan(args).catch(err => ({ ok: false, blockers: [err.message] }));
     if (retried < 3 && planned && planned.lock && planned.lock.self && await DumpSortMode.offerSelfLockRelease(planned.lock)) return _review(sets, retried + 1);
     const r = planned && planned.review;
-    const blockers = (planned && planned.blockers) || [];
+    const blockers = [...((planned && planned.blockers) || [])];
     const problems = (planned && planned.problems) || [];
-    const canMove = !!(planned && planned.ok && r && r.files > 0);
     const src = planned && planned.source;
     const dst = planned && planned.destination;
+    // The event main planned against must be the one chosen in the list (same folder name).
+    const sameDest = !dst || dst.folderName === norm(args.destPath).split('/').pop();
+    if (!sameDest) blockers.push('The planned destination does not match the event you chose. Go back and choose the destination again.');
+    const canMove = !!(planned && planned.ok && r && r.files > 0 && sameDest);
     const typeLabel = _state.kind === 'dump' ? 'Dump (sorted later with Sort Dump)' : `Final component — ${_state.component || ''}`;
     const rows = r ? r.destinations.map(d => `<tr><td>${esc(d.photographer)}</td><td class="dsr-folder">${esc(d.path)}${d.isNew ? ` <span class="dsr-new">${d.sequence ? `new · PC${String(d.sequence).padStart(2, '0')}` : 'new folder'}</span>` : ''}</td><td class="num">${d.files.toLocaleString()}</td><td class="num">${bytes(d.bytes)}</td></tr>`).join('') : '';
     const blocking = r ? r.collisions.filter(c => c.blocking) : [];

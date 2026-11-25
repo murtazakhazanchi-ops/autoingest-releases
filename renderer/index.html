@@ -4898,24 +4898,47 @@
     }
     .dump-sort-banner .dsb-move-other:hover { background: color-mix(in srgb, var(--blue) 14%, var(--surface)); border-color: var(--blue); }
     .dump-sort-banner .dsb-move-other:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-    .xem-modal { width: min(720px, 94vw) !important; }
+    /* EQI-3.2 hotfix: the dialog is a header / scrolling body / fixed action footer, so on a short window the
+       body scrolls and Review Move + Cancel stay reachable. Every child keeps its natural height
+       (flex-shrink: 0) — in RC.9 the flex column squeezed the event rows (below). */
+    .xem-modal { width: min(720px, 94vw) !important; max-height: min(88vh, 860px) !important; overflow: hidden !important; padding-bottom: 18px !important; }
+    .xem-modal > * { flex-shrink: 0; }
+    .xem-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 12px; margin: 0 -6px; padding: 2px 6px; }
+    .xem-body > * { flex-shrink: 0; }
+    .xem-modal .dup-actions { padding-top: 10px; border-top: 1px solid var(--border); }
+    .xem-source { margin: 0; font-size: 0.8rem; color: var(--subtext); text-align: center; line-height: 1.45; overflow-wrap: anywhere; }
+    .xem-source strong { color: var(--text); }
     .xem-field { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
     .xem-field[disabled] { opacity: 0.5; }
     .xem-field legend, .xem-legend { font-size: 0.7rem; font-weight: 700; color: var(--subtext); text-transform: uppercase; letter-spacing: 0.06em; padding: 0; margin-bottom: 4px; }
-    .xem-radio { display: flex; align-items: baseline; gap: 8px; font-size: 0.84rem; color: var(--text); cursor: pointer; line-height: 1.45; }
-    .xem-radio input { accent-color: var(--blue); }
+    .xem-radio { display: flex; align-items: baseline; gap: 8px; font-size: 0.84rem; color: var(--text); cursor: pointer; line-height: 1.45; overflow-wrap: anywhere; }
+    .xem-radio input { accent-color: var(--blue); flex-shrink: 0; }
     .xem-search-row { display: flex; gap: 8px; align-items: stretch; }
     .xem-search { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 0.85rem; }
     .xem-search:focus-visible, .xem-select:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
-    .xem-create { white-space: nowrap; }
-    .xem-list { display: flex; flex-direction: column; gap: 4px; max-height: 232px; overflow: auto; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); }
-    .xem-event { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 8px 10px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--text); cursor: pointer; min-height: 44px; }
-    .xem-event:hover { background: var(--blue-dim); }
+    .xem-create { white-space: nowrap; flex-shrink: 0; }
+    /* Root cause of the RC.9 overlap: .xem-list was a column flexbox with max-height 232px, and each row had
+       an explicit min-height: 44px, which replaces a flex item's automatic content-size minimum. Once the
+       rows were taller in total than the list, flex-shrink: 1 compressed every row toward 44px, and a long
+       (wrapped) name or component line overflowed — visibly — into the rows below. Rows now never shrink
+       (flex: 0 0 auto) and size to their content; the list scrolls instead. */
+    .xem-list { display: flex; flex-direction: column; gap: 4px; max-height: clamp(150px, 34vh, 320px); overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); }
+    .xem-event { flex: 0 0 auto; width: 100%; min-width: 0; min-height: 44px; display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 10px; align-items: start; text-align: left; padding: 9px 12px 9px 10px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--text); cursor: pointer; font: inherit; transition: background-color 0.15s, border-color 0.15s; }
+    .xem-event:hover { background: color-mix(in srgb, var(--blue) 7%, transparent); border-color: color-mix(in srgb, var(--blue) 25%, transparent); }
     .xem-event:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
-    .xem-event.selected { border-color: var(--blue); background: var(--blue-dim); }
+    .xem-event.selected, .xem-event.selected:hover { border-color: var(--blue); background: var(--blue-dim); box-shadow: inset 3px 0 0 var(--blue); }
     .xem-event[aria-disabled="true"] { cursor: not-allowed; opacity: 0.55; }
-    .xem-event-name { font-size: 0.85rem; font-weight: 600; word-break: break-word; }
-    .xem-event-meta { font-size: 0.72rem; color: var(--subtext); }
+    .xem-event-mark { grid-row: 1 / span 2; width: 16px; height: 16px; margin-top: 1px; border-radius: 50%; border: 1.5px solid var(--subtext); display: flex; align-items: center; justify-content: center; }
+    .xem-event.selected .xem-event-mark { border-color: var(--blue); background: var(--blue); }
+    .xem-event.selected .xem-event-mark::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fff; }
+    .xem-event-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    /* Long names wrap to at most two lines; the full name is the row's tooltip and accessible name, and is
+       shown in full under the list once chosen. */
+    .xem-event-name { font-size: 0.85rem; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+    .xem-event-meta { font-size: 0.72rem; line-height: 1.35; color: var(--subtext); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .xem-chosen { margin: 0; padding: 8px 10px; border-radius: 7px; background: var(--surface2); border: 1px solid var(--border); font-size: 0.8rem; color: var(--text); line-height: 1.45; overflow-wrap: anywhere; }
+    .xem-chosen.none { color: var(--subtext); }
+    .xem-chosen strong { font-weight: 700; }
     .xem-empty { margin: 0; padding: 12px; font-size: 0.8rem; color: var(--subtext); text-align: center; }
     .xem-select { padding: 7px 9px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 0.84rem; max-width: 100%; }
     .xem-facts { display: grid; grid-template-columns: max-content 1fr; gap: 5px 14px; margin: 0; font-size: 0.84rem; }
@@ -4923,6 +4946,9 @@
     .xem-facts dd { margin: 0; color: var(--text); word-break: break-word; font-variant-numeric: tabular-nums; }
     .xem-mix { color: var(--subtext); }
     .xem-statement { margin: 0; padding: 10px 12px; border-radius: 8px; border-left: 3px solid var(--blue); background: var(--blue-dim); color: var(--text); font-size: 0.82rem; font-weight: 600; line-height: 1.5; }
+    /* EQI-3.2 hotfix: capture-time labels while being read / when the file has none. */
+    .file-date.capture-pending, .lt-date.capture-pending { opacity: 0.6; font-style: italic; }
+    .file-date.capture-missing, .lt-date.capture-missing { color: var(--subtext); font-style: italic; }
     .xem-note-ok { margin: 0; color: var(--green); font-size: 0.82rem; font-weight: 600; }
     #dsMetaChip {
       position: absolute; right: 260px; top: 50%; transform: translateY(-50%);
@@ -9381,6 +9407,7 @@
   <script src="photographerRegistryUI.js" defer></script>
   <script src="photographerRegistryActions.js" defer></script>
   <script src="photographerRegistryProfile.js" defer></script>
+  <script src="captureTime.js" defer></script>
   <script src="renderer.js" defer></script>
   <script src="dumpSortMode.js" defer></script>
   <script src="crossEventMove.js" defer></script>

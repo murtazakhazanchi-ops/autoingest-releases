@@ -231,7 +231,7 @@ async function shoot(page, dir, name) {
     await main.fill('#xemSearch', 'zzz-no-match');
     check(await main.evaluate(() => /No event matches/.test(document.getElementById('xemList').textContent)), 'search filters the events');
     await chooseDest(B);
-    check(await main.evaluate(() => document.querySelector('input[name="xemKind"][value="dump"]').checked && document.getElementById('xemComponent').disabled), 'default destination: B\'s Dump');
+    check(await main.evaluate(() => document.querySelector('input[name="xemKind"][value="dump"]').checked && !document.getElementById('xemComponent')), 'default destination: B\'s Dump (no component selector shown)');
     check(await main.evaluate((a) => EventCreator.getActiveEventData()?.eventPath?.endsWith(a), A) && await main.evaluate(() => DumpSortMode.isActive()), 'choosing a destination did not change the current event');
     await reviewMove();
     const rv = await overlayText();
