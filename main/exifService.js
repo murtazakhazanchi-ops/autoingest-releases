@@ -947,6 +947,12 @@ function getBatchStatus(batchId) {
   return _batches.get(batchId) || null;
 }
 
+/** EQI-4: true while any metadata batch still has files to write (Source Cleanup waits for none). */
+function hasActiveBatch() {
+  for (const b of _batches.values()) if (b && (b.done + b.skipped + b.failed) < b.total) return true;
+  return false;
+}
+
 /**
  * Gracefully shuts down the ExifTool process pool. Call during app quit.
  * @returns {Promise<void>}
@@ -1028,7 +1034,7 @@ function classifyForVerification(destPath) {
 }
 
 module.exports = {
-  applyBatch, retryFailed, getBatchStatus, shutdown, readFileTags, readGroupedTags, resumeFrozenFile,
+  applyBatch, retryFailed, getBatchStatus, hasActiveBatch, shutdown, readFileTags, readGroupedTags, resumeFrozenFile,
   classifyForVerification, compareReadback: _compareReadback, buildEvidence: _buildEvidence,
   RAW_EXTENSIONS, VIDEO_EXTENSIONS,
   // The sanctioned, explicit-approval-only Creator/Artist/By-line correction channel

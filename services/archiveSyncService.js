@@ -846,6 +846,64 @@ async function _writeLegacyLink(localCollectionPath, collectionFolderName, nasRo
 }
 
 /**
+ * The archive (NAS) event folder a Local Staging event syncs to — the collection-link routing rules
+ * syncJob uses (extracted unchanged so EQI-4 Source Cleanup resolves the same canonical copy, read-only).
+ * @returns {Promise<{ ok: true, archiveEventPath: string, legacyFallback: boolean } | { ok: false, status: string, error: string }>}
+ */
+async function resolveArchiveEventPath(localEventPath, nasRoot) {
+  const collectionFolderName = path.basename(path.dirname(localEventPath));
+  const eventFolderName      = path.basename(localEventPath);
+  const localCollectionPath  = path.dirname(localEventPath);
+
+  // Resolve the NAS archive target via the collection link file.
+  // Routing rules (strict precedence):
+  //   1. not-found (no link file)        → name-identity fallback, backward compatible.
+  //   2. unreadable/corrupt link         → BLOCK. Do not route to wrong NAS.
+  //   3. status: provisional             → BLOCK. User must match to NAS first.
+  //   4. nasRoot mismatch (stale link)   → BLOCK. Never fall back to name-identity.
+  //   5. nasCollectionPath missing       → BLOCK. Treat as incomplete provisional.
+  //   6. nasCollectionPath outside root  → BLOCK. Containment guard.
+  //   7. Linked + nasRoot matches        → use link.nasCollectionPath.
+  let archiveEventPath;
+  let _legacyFallback = false;
+  try {
+    const { ok: hasLink, link, reason } = await offlineRegistry.readLink(localCollectionPath);
+    if (!hasLink && reason === 'not-found') {
+      // No link file — legacy collection; name-identity fallback for backward compatibility.
+      archiveEventPath = path.join(nasRoot, collectionFolderName, eventFolderName);
+      _legacyFallback  = true;
+    } else if (!hasLink) {
+      // Link file exists but is unreadable or corrupt — block rather than route blindly.
+      console.warn(`[syncJob] collection link unreadable (${reason}): ${localCollectionPath}`);
+      return { ok: false, status: 'stale-link-needs-rematch', error: 'Collection link is unreadable — fix or re-create the link before syncing.' };
+    } else if (link.status === 'provisional') {
+      return { ok: false, status: 'provisional-needs-match', error: 'Collection is provisional — match it to a NAS collection before syncing.' };
+    } else if (link.nasRoot && link.nasRoot !== nasRoot) {
+      // Stale link: stored NAS root no longer matches this device. Block — do not fall back.
+      console.warn(`[syncJob] stale link — stored root "${link.nasRoot}" vs current "${nasRoot}": ${localCollectionPath}`);
+      return { ok: false, status: 'stale-link-needs-rematch', error: `Stale collection link — linked NAS root does not match current device root. Re-link before syncing.` };
+    } else if (!link.nasCollectionPath) {
+      // Link file present but no NAS path stored — treat as incomplete provisional.
+      return { ok: false, status: 'provisional-needs-match', error: 'Collection link is incomplete (no NAS collection path) — match it to a NAS collection before syncing.' };
+    } else {
+      // Containment guard: linked collection path must be inside the stored nasRoot.
+      const _realNasRoot = path.resolve(link.nasRoot || nasRoot);
+      const _realNasColl = path.resolve(link.nasCollectionPath);
+      if (_realNasColl !== _realNasRoot && !_realNasColl.startsWith(_realNasRoot + path.sep)) {
+        console.warn(`[syncJob] link containment violation: "${link.nasCollectionPath}" not inside "${link.nasRoot || nasRoot}"`);
+        return { ok: false, status: 'stale-link-needs-rematch', error: 'Collection link path is outside the NAS root — re-link before syncing.' };
+      }
+      archiveEventPath = path.join(link.nasCollectionPath, eventFolderName);
+    }
+  } catch {
+    // Unexpected error reading registry — block rather than route blindly to wrong NAS.
+    console.warn(`[syncJob] unexpected registry read error for: ${localCollectionPath}`);
+    return { ok: false, status: 'stale-link-needs-rematch', error: 'Unexpected error reading collection link — retry or re-link before syncing.' };
+  }
+  return { ok: true, archiveEventPath, legacyFallback: _legacyFallback };
+}
+
+/**
  * Sync one Local First job to the Active Archive.
  *
  * @param {{ jobId: string, batchId: string|null, collection: string, localEventPath: string }} job
@@ -894,67 +952,17 @@ async function syncJob(job, { nasRoot, stagingRoot }, { progressCallback, pauseS
     }
   }
 
-  const collectionFolderName = path.basename(path.dirname(localEventPath));
-  const eventFolderName      = path.basename(localEventPath);
-  const localCollectionPath  = path.dirname(localEventPath);
-
-  // Resolve the NAS archive target via the collection link file.
-  // Routing rules (strict precedence):
-  //   1. not-found (no link file)        → name-identity fallback, backward compatible.
-  //   2. unreadable/corrupt link         → BLOCK. Do not route to wrong NAS.
-  //   3. status: provisional             → BLOCK. User must match to NAS first.
-  //   4. nasRoot mismatch (stale link)   → BLOCK. Never fall back to name-identity.
-  //   5. nasCollectionPath missing       → BLOCK. Treat as incomplete provisional.
-  //   6. nasCollectionPath outside root  → BLOCK. Containment guard.
-  //   7. Linked + nasRoot matches        → use link.nasCollectionPath.
-  let archiveEventPath;
-  let _legacyFallback = false;
-  try {
-    const { ok: hasLink, link, reason } = await offlineRegistry.readLink(localCollectionPath);
-    if (!hasLink && reason === 'not-found') {
-      // No link file — legacy collection; name-identity fallback for backward compatibility.
-      archiveEventPath = path.join(nasRoot, collectionFolderName, eventFolderName);
-      _legacyFallback  = true;
-    } else if (!hasLink) {
-      // Link file exists but is unreadable or corrupt — block rather than route blindly.
-      console.warn(`[syncJob] collection link unreadable (${reason}): ${localCollectionPath}`);
-      result.errors.push('Collection link is unreadable — fix or re-create the link before syncing.');
-      result.status = 'stale-link-needs-rematch';
-      return result;
-    } else if (link.status === 'provisional') {
-      result.errors.push('Collection is provisional — match it to a NAS collection before syncing.');
-      result.status = 'provisional-needs-match';
-      return result;
-    } else if (link.nasRoot && link.nasRoot !== nasRoot) {
-      // Stale link: stored NAS root no longer matches this device. Block — do not fall back.
-      console.warn(`[syncJob] stale link — stored root "${link.nasRoot}" vs current "${nasRoot}": ${localCollectionPath}`);
-      result.errors.push(`Stale collection link — linked NAS root does not match current device root. Re-link before syncing.`);
-      result.status = 'stale-link-needs-rematch';
-      return result;
-    } else if (!link.nasCollectionPath) {
-      // Link file present but no NAS path stored — treat as incomplete provisional.
-      result.errors.push('Collection link is incomplete (no NAS collection path) — match it to a NAS collection before syncing.');
-      result.status = 'provisional-needs-match';
-      return result;
-    } else {
-      // Containment guard: linked collection path must be inside the stored nasRoot.
-      const _realNasRoot = path.resolve(link.nasRoot || nasRoot);
-      const _realNasColl = path.resolve(link.nasCollectionPath);
-      if (_realNasColl !== _realNasRoot && !_realNasColl.startsWith(_realNasRoot + path.sep)) {
-        console.warn(`[syncJob] link containment violation: "${link.nasCollectionPath}" not inside "${link.nasRoot || nasRoot}"`);
-        result.errors.push('Collection link path is outside the NAS root — re-link before syncing.');
-        result.status = 'stale-link-needs-rematch';
-        return result;
-      }
-      archiveEventPath = path.join(link.nasCollectionPath, eventFolderName);
-    }
-  } catch {
-    // Unexpected error reading registry — block rather than route blindly to wrong NAS.
-    console.warn(`[syncJob] unexpected registry read error for: ${localCollectionPath}`);
-    result.errors.push('Unexpected error reading collection link — retry or re-link before syncing.');
-    result.status = 'stale-link-needs-rematch';
+  const _route = await resolveArchiveEventPath(localEventPath, nasRoot);
+  if (!_route.ok) {
+    result.errors.push(_route.error);
+    result.status = _route.status;
     return result;
   }
+  const archiveEventPath = _route.archiveEventPath;
+  const _legacyFallback  = _route.legacyFallback;
+  const eventFolderName  = path.basename(localEventPath);
+  const localCollectionPath = path.dirname(localEventPath);
+  const collectionFolderName = path.basename(localCollectionPath);
   result.archiveEventPath = archiveEventPath;
 
   // Determine sync strategy:
@@ -1362,6 +1370,7 @@ async function verifyJobChecksum(job, { nasRoot, stagingRoot, progressCallback }
 }
 
 module.exports = {
+  resolveArchiveEventPath,
   syncJob, verifyJobChecksum,
   // Test-only: exposes the event.json merge so the scoped intent-merge rules can be verified directly.
   _copyEventJsonIfNeeded,
