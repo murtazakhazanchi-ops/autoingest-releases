@@ -4949,6 +4949,19 @@
     /* EQI-3.2 hotfix: capture-time labels while being read / when the file has none. */
     .file-date.capture-pending, .lt-date.capture-pending { opacity: 0.6; font-style: italic; }
     .file-date.capture-missing, .lt-date.capture-missing { color: var(--subtext); font-style: italic; }
+    /* EQI-4 Safe Source Cleanup dialog (renderer/sourceCleanup.js) — above Event Management like Sort Dump's prompts. */
+    #srcCleanOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 1010; align-items: center; justify-content: center; padding: 16px; }
+    #srcCleanOverlay.visible { display: flex; }
+    .scx-modal { width: min(660px, 94vw) !important; max-height: 88vh; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 12px; }
+    .scx-modal > * { flex-shrink: 0; }
+    .scx-facts dd strong { font-weight: 700; }
+    .scx-path { display: block; font-size: 0.74rem; color: var(--subtext); overflow-wrap: anywhere; }
+    .scx-progress { margin: 0; font-size: 0.8rem; color: var(--subtext); text-align: center; font-variant-numeric: tabular-nums; }
+    .scx-list { margin: 8px 0 0; padding-left: 18px; max-height: 180px; overflow-y: auto; font-size: 0.76rem; color: var(--subtext); overflow-wrap: anywhere; }
+    .scx-confirm { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); font-size: 0.84rem; color: var(--text); cursor: pointer; line-height: 1.45; overflow-wrap: anywhere; }
+    .scx-confirm input { accent-color: var(--blue); margin-top: 3px; flex-shrink: 0; }
+    .scx-warn { color: var(--yellow) !important; }
+    #ctxCleanupBtn[hidden] { display: none; }
     .xem-note-ok { margin: 0; color: var(--green); font-size: 0.82rem; font-weight: 600; }
     #dsMetaChip {
       position: absolute; right: 260px; top: 50%; transform: translateY(-50%);
@@ -7767,6 +7780,7 @@
       </div>
       <div class="ctx-line1-right">
         <span class="ctx-source-type" id="ctxSourceType" style="display:none"></span>
+        <button id="ctxCleanupBtn" class="ctx-action-btn" type="button" hidden title="Move files that are verified in the archive from this source to the Trash">Clean Up Source…</button>
         <button id="changeDriveBtn" class="ctx-action-btn">Change</button>
         <button id="ejectBtn" class="ctx-action-btn ctx-eject-btn">Eject</button>
       </div>
@@ -9411,6 +9425,7 @@
   <script src="renderer.js" defer></script>
   <script src="dumpSortMode.js" defer></script>
   <script src="crossEventMove.js" defer></script>
+  <script src="sourceCleanup.js" defer></script>
   <!-- Internal command registry for future external controllers (MX Creative
        Console, etc.) — see docs/commandLayer.md. Must load after renderer.js:
        it only calls window.__autoIngestRendererBridge, defined at the end of

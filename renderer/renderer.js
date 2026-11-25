@@ -8565,8 +8565,8 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
     const cleanBtn = document.createElement('button');
     cleanBtn.id        = 'scqOpenBtn';
     cleanBtn.className = 'im-btn-secondary';
-    cleanBtn.textContent = 'Review Cleanup';
-    cleanBtn.title       = 'Review Source Cleanup';
+    cleanBtn.textContent = 'Clean Up Imported Source Files';
+    cleanBtn.title       = 'Review which imported files are verified in the archive and can be moved to the Trash';
     cleanBtn.addEventListener('click', () => openSourceCleanup());
     actLeft.appendChild(cleanBtn);
   }
@@ -8973,238 +8973,16 @@ window.api.onChecksumComplete(({ failed }) => {
 
 // ── Source Cleanup ─────────────────────────────────────────────────────────
 
-function _formatBytes(bytes) {
-  if (!bytes || bytes < 1024) return `${bytes || 0} B`;
-  if (bytes < 1024 * 1024)    return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function _updateScqDeleteBtn() {
-  const list    = document.getElementById('scFileList');
-  const input   = document.getElementById('scConfirmInput');
-  const btn     = document.getElementById('scDeleteBtn');
-  const countEl = document.getElementById('scSelCount');
-  if (!list || !input || !btn) return;
-  const checked = list.querySelectorAll('input[type="checkbox"]:checked');
-  const n = checked.length;
-  if (countEl) countEl.textContent = n > 0 ? `${n} file${n > 1 ? 's' : ''} selected` : '';
-  btn.disabled = !(n > 0 && input.value === 'DELETE FROM SOURCE');
-}
-
+// EQI-4 Safe Source Cleanup (renderer/sourceCleanup.js). The pre-EQI-4 dialog deleted files permanently
+// from the last import's in-memory list, and after one cleanup it removed its own Delete/Cancel buttons and
+// hid its file list, so a second import's cleanup opened with nothing to act on (the second-run failure).
+// Every open now re-reviews the source from durable evidence and moves verified files to the Trash.
 function openSourceCleanup() {
-  const overlay      = document.getElementById('sourceCleanupOverlay');
-  const fileList     = document.getElementById('scFileList');
-  const confirmInput = document.getElementById('scConfirmInput');
-  const resultArea   = document.getElementById('scResultArea');
-  const selectAll    = document.getElementById('scSelectAll');
-  const deleteBtn    = document.getElementById('scDeleteBtn');
-  const cancelBtn    = document.getElementById('scCancelBtn');
-  const confirmGate  = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-confirm-gate');
-  const scActions    = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-actions');
-  const selectAllRow = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-select-all-row');
-  if (!overlay || !fileList || !_csqEligibleFiles) return;
-
-  // Reset modal to file-list state
-  fileList.innerHTML = '';
-  if (confirmInput) confirmInput.value = '';
-  if (resultArea)   { resultArea.style.display = 'none'; resultArea.innerHTML = ''; }
-  if (selectAll)    { selectAll.checked = false; selectAll.indeterminate = false; }
-  if (deleteBtn)    { deleteBtn.disabled = true; deleteBtn.textContent = 'Delete Selected'; }
-  if (cancelBtn)    { cancelBtn.disabled = false; cancelBtn.textContent = 'Cancel'; cancelBtn.onclick = _closeSourceCleanup; }
-  if (confirmGate)  confirmGate.style.display = '';
-  if (scActions)    scActions.style.display = '';
-  if (selectAllRow) selectAllRow.style.display = '';
-
-  // Safety net: empty state when all files were deleted but state was not nulled
-  if (_csqEligibleFiles.length === 0) {
-    fileList.innerHTML = '<div class="sc-empty-state">No source files are eligible for cleanup.<br>Only files confirmed imported successfully can be deleted.</div>';
-    if (selectAllRow) selectAllRow.style.display = 'none';
-    if (confirmGate)  confirmGate.style.display  = 'none';
-    if (scActions) {
-      scActions.innerHTML = '';
-      const doneBtn = document.createElement('button');
-      doneBtn.className   = 'sc-btn-done';
-      doneBtn.textContent = 'Done';
-      doneBtn.onclick     = _closeSourceCleanup;
-      scActions.appendChild(doneBtn);
-    }
-    overlay.classList.remove('hidden');
-    return;
-  }
-
-  // Populate file rows using current _csqEligibleFiles (already filtered of past deletions)
-  _csqEligibleFiles.forEach((f, idx) => {
-    const filename = f.src.split(/[\\/]/).pop();
-    const row = document.createElement('label');
-    row.className = 'sc-file-row';
-    row.dataset.src = f.src;
-    row.innerHTML = `
-      <input type="checkbox" data-idx="${idx}" />
-      <span class="sc-file-name" title="${escapeHtml(f.src)}">${escapeHtml(filename)}</span>
-      <span class="sc-file-size">${_formatBytes(f.size)}</span>`;
-    row.querySelector('input').addEventListener('change', () => {
-      _syncSelectAll();
-      _updateScqDeleteBtn();
-    });
-    fileList.appendChild(row);
-  });
-
-  if (selectAll) {
-    selectAll.onchange = () => {
-      fileList.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = selectAll.checked);
-      _updateScqDeleteBtn();
-    };
-  }
-  if (confirmInput) confirmInput.oninput = _updateScqDeleteBtn;
-  if (deleteBtn)    deleteBtn.onclick = _handleSourceDelete;
-
-  overlay.classList.remove('hidden');
-}
-
-function _syncSelectAll() {
-  const list      = document.getElementById('scFileList');
-  const selectAll = document.getElementById('scSelectAll');
-  if (!list || !selectAll) return;
-  const all     = list.querySelectorAll('input[type="checkbox"]');
-  const checked = list.querySelectorAll('input[type="checkbox"]:checked');
-  selectAll.indeterminate = checked.length > 0 && checked.length < all.length;
-  selectAll.checked       = all.length > 0 && checked.length === all.length;
-}
-
-async function _handleSourceDelete() {
-  if (!_csqEligibleFiles || !_csqSourceRoot) return;
-  const list       = document.getElementById('scFileList');
-  const deleteBtn  = document.getElementById('scDeleteBtn');
-  const cancelBtn  = document.getElementById('scCancelBtn');
-  const resultArea = document.getElementById('scResultArea');
-  if (!list || !deleteBtn) return;
-
-  const checkedBoxes = list.querySelectorAll('input[type="checkbox"]:checked');
-  const toDelete = Array.from(checkedBoxes).map(cb => {
-    const idx = parseInt(cb.getAttribute('data-idx'), 10);
-    return _csqEligibleFiles[idx];
-  }).filter(Boolean);
-  if (!toDelete.length) return;
-
-  deleteBtn.disabled = true;
-  deleteBtn.textContent = 'Deleting…';
-  if (cancelBtn) cancelBtn.disabled = true;
-
-  try {
-    const { ok, results, error } = await window.api.deleteFromSource(toDelete, _csqSourceRoot);
-
-    if (!ok) {
-      if (resultArea) {
-        resultArea.style.display = '';
-        resultArea.innerHTML = `<div class="sc-result-err">Error: ${escapeHtml(error || 'Unknown error')}</div>`;
-      }
-      deleteBtn.textContent = 'Delete Selected';
-      deleteBtn.disabled = false;
-      if (cancelBtn) cancelBtn.disabled = false;
-      return;
-    }
-
-    let successCount = 0;
-    let failCount    = 0;
-    const lines = results.map(r => {
-      const name = (r.src || '').split(/[\\/]/).pop();
-      if (r.deleted) {
-        successCount++;
-        return `<div class="cleanup-file-row"><span class="cleanup-icon">${SVG.check}</span><span>${escapeHtml(name)}</span></div>`;
-      }
-      failCount++;
-      return `<div class="cleanup-file-row cleanup-file-row--err"><span class="cleanup-icon cleanup-icon--err">${SVG.warn}</span><span>${escapeHtml(name)} — ${escapeHtml(r.error || 'Unknown')}</span></div>`;
-    });
-
-    // Record result for Activity Log Source Cleanup panel (session-ephemeral)
-    _scLastBatch = {
-      deleted:   successCount,
-      failed:    failCount,
-      timestamp: Date.now(),
-      errors:    results.filter(r => !r.deleted).map(r => ({
-        file:  (r.src || '').split(/[\\/]/).pop(),
-        error: r.error || 'Unknown',
-      })),
-    };
-
-    // Remove deleted rows from DOM and update eligible set
-    const deletedSrcs = new Set(results.filter(r => r.deleted).map(r => r.src));
-    Array.from(checkedBoxes).forEach(cb => {
-      const idx = parseInt(cb.getAttribute('data-idx'), 10);
-      const f   = _csqEligibleFiles[idx];
-      if (f && deletedSrcs.has(f.src)) cb.closest('.sc-file-row').remove();
-    });
-    _csqEligibleFiles = _csqEligibleFiles.filter(f => !deletedSrcs.has(f.src));
-    // When all eligible files are gone, retire the button so the modal can't reopen blank.
-    if (_csqEligibleFiles.length === 0) {
-      document.getElementById('scqOpenBtn')?.remove();
-      _csqEligibleFiles = null;
-      _csqSourceRoot    = null;
-    }
-
-    // Surgically remove deleted files from the visible file grid
-    if (deletedSrcs.size > 0) {
-      currentFiles = currentFiles.filter(f => !deletedSrcs.has(f.path));
-      for (const srcPath of deletedSrcs) {
-        selectedFiles.delete(srcPath);
-        const tile = tileMap.get(srcPath);
-        if (tile) { tile.remove(); tileMap.delete(srcPath); }
-      }
-      updateSelectionBar();
-    }
-
-    // Show structured result — summary + bounded file list
-    if (resultArea) {
-      const summaryText = successCount > 0
-        ? `${successCount} file${successCount > 1 ? 's' : ''} removed from source${failCount > 0 ? `, ${failCount} failed` : ''}.`
-        : failCount > 0 ? `${failCount} file${failCount > 1 ? 's' : ''} failed to remove.` : '';
-      const fileRows = lines.join('');
-      resultArea.style.display   = '';
-      resultArea.style.maxHeight = 'none';
-      resultArea.innerHTML =
-        `<div class="cleanup-result success"><span class="cleanup-icon">${SVG.check}</span><span>${escapeHtml(summaryText)}</span></div>` +
-        (fileRows ? `<div class="cleanup-file-list">${fileRows}</div>` : '');
-    }
-    // Hide the pre-deletion file-selector list — it is empty or partially cleared
-    list.style.display = 'none';
-
-    // Replace action row with a primary Done button — no auto-close
-    const scActions = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-actions');
-    const confirmGate = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-confirm-gate');
-    const selectAllRow = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-select-all-row');
-    if (confirmGate)  confirmGate.style.display  = 'none';
-    if (selectAllRow) selectAllRow.style.display = 'none';
-    if (scActions) {
-      scActions.innerHTML = '';
-      const doneBtn = document.createElement('button');
-      doneBtn.className   = 'sc-btn-done';
-      doneBtn.textContent = 'Done';
-      doneBtn.onclick     = _closeSourceCleanup;
-      scActions.appendChild(doneBtn);
-    }
-
-    // If failures remain, re-enable for retry
-    if (failCount > 0) {
-      _syncSelectAll();
-      _updateScqDeleteBtn();
-    }
-  } catch (err) {
-    if (resultArea) {
-      resultArea.style.display = '';
-      resultArea.innerHTML = `<div class="sc-result-err">Error: ${escapeHtml(err.message)}</div>`;
-    }
-    deleteBtn.textContent = 'Delete Selected';
-    deleteBtn.disabled = false;
-    if (cancelBtn) cancelBtn.disabled = false;
-  }
-}
-
-function _closeSourceCleanup() {
-  const overlay = document.getElementById('sourceCleanupOverlay');
-  if (overlay) overlay.classList.add('hidden');
-  // State (_csqEligibleFiles, _csqSourceRoot) intentionally kept — cleared only at
-  // import start or by resetAppState (disconnect/eject), not here, so partial
-  // results survive Cancel and the list remains intact until the next import.
+  if (!window.SourceCleanup) return;
+  const root = _csqSourceRoot || activeSource?.path || null;
+  if (!root) { showMessage('Select the source to clean up first.', 5000); return; }
+  const label = (activeSource && activeSource.path === root && (activeSource.label || activeSource.name)) || null;
+  SourceCleanup.open({ sourceRoot: root, sourceLabel: label });
 }
 
 // ── QMZ Sequence Manager ──────────────────────────────────────────────────────
