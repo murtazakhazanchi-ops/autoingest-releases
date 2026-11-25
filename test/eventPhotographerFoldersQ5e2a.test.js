@@ -369,6 +369,11 @@ const add = (ev, additions, extra = {}) => {
       // EQI-3.2 hotfix: original capture time for the workspace (resolver, renderer module, tests).
       'services/captureTimeResolver.js', 'renderer/captureTime.js', 'test/eqi32CaptureTime.test.js', 'test/eqi32PickerCaptureLive.test.js', 'test/companionQ1UiFreeze.test.js',
       'test/multiEventImportUiLive.test.js', 'test/multiEventNewEventUiLive.test.js',
+      // EQI-4 Safe Source Cleanup: evidence, eligibility, Trash, service, UI; the shared archive-event route
+      // extracted from sync, the metadata-active check, and tests.
+      'services/sourceCleanupEvidence.js', 'services/sourceCleanupEligibility.js', 'services/trashService.js', 'services/sourceCleanupService.js',
+      'services/archiveSyncService.js', 'main/exifService.js', 'renderer/sourceCleanup.js',
+      'test/eqi4SourceCleanup.test.js', 'test/eqi4SourceCleanupLive.test.js', 'test/eqi4TrashVolumes.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f)), []);
   });

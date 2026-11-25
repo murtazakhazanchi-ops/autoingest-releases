@@ -421,7 +421,114 @@ function assertClean(payload, fx, label) {
     // EQI-3.2 Move Selection to Another Event: destinations, plan, run, progress.
     'crossEventDestinations', 'crossEventPlan', 'crossEventRun', 'onCrossEventProgress',
     // EQI-3.2 hotfix: original capture times for the workspace grid.
-    'readCaptureTimes'];
+    'readCaptureTimes',
+    // EQI-4 Safe Source Cleanup: review, run, history, progress.
+    'sourceCleanupReview', 'sourceCleanupRun', 'sourceCleanupHistory', 'onSourceCleanupProgress'];
+  // EQI-4 Safe Source Cleanup: the old permanent-delete source cleanup handler is replaced by a refusal.
+  const EQI4_MAIN_CHANGED = [
+    "-ipcMain.handle('files:deleteFromSource', async (_event, files, sourceRoot) => {",
+    "-  if (!Array.isArray(files) || !sourceRoot || typeof sourceRoot !== 'string') {",
+    "-    return { ok: false, error: 'Invalid arguments' };",
+    "-  }",
+    "-",
+    "-  // Resolve symlinks on the root once — fail the whole batch if the root is gone",
+    "-  let realRoot;",
+    "-  try {",
+    "-    realRoot = await fsp.realpath(sourceRoot);",
+    "-  } catch {",
+    "-    return { ok: false, error: 'Cannot resolve source root — drive may have been ejected' };",
+    "-  }",
+    "-",
+    "-  const results = [];",
+    "-  for (const f of files) {",
+    "-    if (!f || typeof f !== 'object') {",
+    "-      results.push({ src: String(f), deleted: false, error: 'Invalid entry' });",
+    "-      continue;",
+    "-    }",
+    "-    const { src, dest, size, copyVerified } = f;",
+    "-    if (!src || typeof src !== 'string') {",
+    "-      results.push({ src: String(src), deleted: false, error: 'Invalid src path' });",
+    "-      continue;",
+    "-    }",
+    "-",
+    "-    // ── Resolve symlinks on the source path ──────────────────────────────────",
+    "-    let realSrc;",
+    "-    try {",
+    "-      realSrc = await fsp.realpath(src);",
+    "-    } catch {",
+    "-      results.push({ src, deleted: false, error: 'Source file not found' });",
+    "-      continue;",
+    "-    }",
+    "-",
+    "-    // ── Containment check (after symlink resolution) ─────────────────────────",
+    "-    if (process.env.DEBUG_SOURCE_CLEANUP) {",
+    "-      console.log('[CSQ DEBUG] containment:', {",
+    "-        src, dest, realSrc, realRoot,",
+    "-        separator: JSON.stringify(path.sep),",
+    "-        relative: path.relative(realRoot, realSrc),",
+    "-        passes: PathUtils.isPathUnderRoot(realSrc, realRoot),",
+    "-      });",
+    "-    }",
+    "-    if (!PathUtils.isPathUnderRoot(realSrc, realRoot)) {",
+    "-      results.push({ src, deleted: false, error: 'Path outside source root' });",
+    "-      continue;",
+    "-    }",
+    "-",
+    "-    // ── Must be a regular file, not a directory or device ────────────────────",
+    "-    let srcStat;",
+    "-    try {",
+    "-      srcStat = await fsp.stat(realSrc);",
+    "-    } catch {",
+    "-      results.push({ src, deleted: false, error: 'Cannot stat source file' });",
+    "-      continue;",
+    "-    }",
+    "-    if (!srcStat.isFile()) {",
+    "-      results.push({ src, deleted: false, error: 'Not a regular file' });",
+    "-      continue;",
+    "-    }",
+    "-",
+    "-    // ── Source file must be unchanged since copy ─────────────────────────────",
+    "-    if (typeof size === 'number' && srcStat.size !== size) {",
+    "-      results.push({ src, deleted: false, error: `Source file changed after import (expected ${size}, got ${srcStat.size})` });",
+    "-      continue;",
+    "-    }",
+    "-",
+    "-    // ── Destination revalidation ──────────────────────────────────────────────",
+    "-    if (!dest || typeof dest !== 'string') {",
+    "-      results.push({ src, deleted: false, error: 'No destination path provided' });",
+    "-      continue;",
+    "-    }",
+    "-    let destStat;",
+    "-    try {",
+    "-      destStat = await fsp.stat(dest);",
+    "-    } catch {",
+    "-      results.push({ src, deleted: false, error: 'Destination file not found — cannot confirm import' });",
+    "-      continue;",
+    "-    }",
+    "-    // copyVerified entries may have a larger destination than the original source size",
+    "-    // because metadata tagging (exiftool) embeds EXIF after copy verification.",
+    "-    // Only block on destination size mismatch for entries without copy-time verification.",
+    "-    if (!copyVerified && typeof size === 'number' && destStat.size !== size) {",
+    "-      results.push({ src, deleted: false, error: `Destination size mismatch (expected ${size}, got ${destStat.size})` });",
+    "-      continue;",
+    "-    }",
+    "-    if (copyVerified && typeof size === 'number' && destStat.size !== size) {",
+    "-      log(`[sourceCleanup] ${path.basename(src)}: dest size changed after copy (${size} → ${destStat.size}), likely metadata update`);",
+    "-    }",
+    "-",
+    "-    // ── All checks passed — delete ────────────────────────────────────────────",
+    "-    try {",
+    "-      await fsp.unlink(realSrc);",
+    "-      log(`[sourceCleanup] Deleted: ${realSrc} | dest: ${dest} | size: ${size ?? 'unknown'}`);",
+    "-      results.push({ src, deleted: true });",
+    "-    } catch (err) {",
+    "-      results.push({ src, deleted: false, error: err.message });",
+    "-    }",
+    "-  }",
+    "-",
+    "-  return { ok: true, results };",
+    "-});",
+  ];
   await t('main.js / preload.js change since Q5b is additions only, confined to the Q5c block', async () => {
     let base;
     try { base = execFileSync('git', ['rev-parse', '--verify', 'aa58eb1^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { console.log('    (Q5b commit not available — skipped)'); return; }
@@ -432,7 +539,7 @@ function assertClean(payload, fx, label) {
       // EQI-1 (AI-FEAT-064 / AI-RM-016, owner-approved milestone, not Q5): the companion gets the
       // import-index / photographer-list dependencies, Dump import entries are marked, and Dump
       // imports get their own learning workflow label — exactly these lines change.
-      const allowedRemoved = f === 'main/main.js' ? ['-});', ...EQI1_MAIN_CHANGED, ...EQI31_MAIN_CHANGED] : EQI31_PRELOAD_CHANGED;
+      const allowedRemoved = f === 'main/main.js' ? ['-});', ...EQI1_MAIN_CHANGED, ...EQI31_MAIN_CHANGED, ...EQI4_MAIN_CHANGED] : EQI31_PRELOAD_CHANGED;
       assert.deepEqual(lines.filter(l => l.startsWith('-')).sort(), [...allowedRemoved].sort(), `${f}: nothing removed`);
     }
     const pre = execFileSync('git', ['diff', '-U0', base, '--', 'main/preload.js'], { cwd: ROOT, encoding: 'utf8' });
@@ -505,6 +612,11 @@ function assertClean(payload, fx, label) {
       // EQI-3.2 hotfix: original capture time for the workspace (resolver, renderer module, tests).
       'services/captureTimeResolver.js', 'renderer/captureTime.js', 'test/eqi32CaptureTime.test.js', 'test/eqi32PickerCaptureLive.test.js', 'test/companionQ1UiFreeze.test.js',
       'test/multiEventImportUiLive.test.js', 'test/multiEventNewEventUiLive.test.js',
+      // EQI-4 Safe Source Cleanup: evidence, eligibility, Trash, service, UI; the shared archive-event route
+      // extracted from sync, the metadata-active check, and tests.
+      'services/sourceCleanupEvidence.js', 'services/sourceCleanupEligibility.js', 'services/trashService.js', 'services/sourceCleanupService.js',
+      'services/archiveSyncService.js', 'main/exifService.js', 'renderer/sourceCleanup.js',
+      'test/eqi4SourceCleanup.test.js', 'test/eqi4SourceCleanupLive.test.js', 'test/eqi4TrashVolumes.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });
