@@ -3934,7 +3934,8 @@ const sourceCleanup = require('../services/sourceCleanupService').createSourceCl
   },
   listSource: (root) => _listCleanupSource(root),
   log,
-  testHooks: process.env.AI_EQI4_TEST_CRASH_AFTER ? { crashAfterTrash: (n) => { if (n >= Number(process.env.AI_EQI4_TEST_CRASH_AFTER)) process.kill(process.pid, 'SIGKILL'); } } : null,
+  // Test seam (live crash test): honoured only under a test identity, never by the production app.
+  testHooks: process.env.AI_EQI4_TEST_CRASH_AFTER && app.getName() !== 'AutoIngest' ? { crashAfterTrash: (n) => { if (n >= Number(process.env.AI_EQI4_TEST_CRASH_AFTER)) process.kill(process.pid, 'SIGKILL'); } } : null,
 });
 
 function _sha256File(p) {
